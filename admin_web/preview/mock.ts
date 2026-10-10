@@ -82,7 +82,7 @@ class Query implements PromiseLike<Answer> {
           return { data: out, error: null };
         }
         rows = out;
-      } catch (e) { return { data: null, error: { message: e instanceof Error ? e.message : String(e) } }; }
+      } catch (e) { return { data: null, error: { message: e instanceof Error ? e.message : String(e), code: (e as { code?: string })?.code } }; }
     } else {
       const table = (tables[this.source] ??= []);
       if (this.mode === 'insert' || this.mode === 'upsert') {
