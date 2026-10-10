@@ -1,5 +1,5 @@
 import React, { useId, useMemo } from 'react';
-import { FieldFrame, Icon, SelectField } from '../../ui';
+import { FieldFrame, Icon, Select, SelectField } from '../../ui';
 import { clockLabel } from '../../lib/time';
 import { MONTHS, daysIn } from '../../lib/platform';
 
@@ -30,15 +30,11 @@ export const DayPicker: React.FC<{ label: React.ReactNode; today: string; value:
         <input id={id} aria-label="اليوم" inputMode="numeric" dir="ltr" placeholder="اليوم" value={value.day}
           onChange={(e) => onChange({ ...value, day: e.target.value.replace(/\D/g, '').slice(0, 2) })}
           className={`h-12 w-20 flex-none rounded-control bg-surface px-3 text-center text-small outline-none placeholder:text-ink-3 sm:h-11 ${ring}`} />
-        <label className={`relative flex h-12 min-w-0 flex-1 items-center rounded-control bg-surface px-3 text-small sm:h-11 ${ring}`}>
-          <span className="sr-only">الشهر</span>
-          <Icon name="calendar" size={18} className="me-2 text-ink-3" />
-          <select value={value.month} onChange={(e) => onChange({ ...value, month: e.target.value })} className="h-full min-w-0 flex-1 cursor-pointer appearance-none bg-transparent pe-6 outline-none">
-            <option value="">اختر الشهر</option>
-            {months.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
-          </select>
-          <Icon name="down" size={18} className="pointer-events-none absolute end-3 text-ink-3" />
-        </label>
+        <div className="min-w-0 flex-1">
+          <Select value={value.month} onChange={(m) => onChange({ ...value, month: m })} options={months.map((m) => ({ value: String(m.value), label: m.label }))}
+            placeholder="اختر الشهر" ariaLabel="الشهر" icon="calendar"
+            className={`flex h-12 w-full items-center gap-2 rounded-control bg-surface px-3 text-start text-small sm:h-11 ${ring}`} />
+        </div>
       </div>
     </FieldFrame>
   );

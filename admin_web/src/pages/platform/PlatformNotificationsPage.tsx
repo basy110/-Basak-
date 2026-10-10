@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Select } from '../../ui/Select';
 import { useSearchParams } from 'react-router-dom';
 import {
   Button, Cell2, Chips, DataTable, Dialog, EmptyState, ErrorState, Icon, Note, Page, PageHeader, Pager, PhoneBar, SearchBox, SectionHead,
@@ -88,14 +89,9 @@ const HistoryView: React.FC<{ params: URLSearchParams; setParams: ReturnType<typ
       ]} />}
       sort={<SortSelect value={sort} onChange={setSort} options={[{ value: 'new', label: 'الأحدث أولاً' }, { value: 'old', label: 'الأقدم أولاً' }]} />}
       actions={(
-        <label className="relative inline-flex h-10 flex-none items-center gap-1.5 rounded-control px-2.5 text-label shadow-ring sm:h-9">
-          <Icon name="building" size={14} stroke={2} />
-          <select aria-label="الشركة" value={companyId} onChange={(e) => setCompanyId(e.target.value)} className="max-w-[180px] cursor-pointer appearance-none bg-transparent pe-5 outline-none">
-            <option value="">كل الشركات</option>
-            {companies.filter((c) => c.status !== 'archived').map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
-          <Icon name="down" size={14} stroke={2} className="pointer-events-none absolute end-2" />
-        </label>
+        <Select value={companyId} onChange={setCompanyId} ariaLabel="الشركة" icon="building" minListWidth={240}
+          options={[{ value: '', label: 'كل الشركات' }, ...companies.filter((c) => c.status !== 'archived').map((c) => ({ value: c.id, label: c.name }))]}
+          className="inline-flex h-10 max-w-[220px] flex-none items-center gap-1.5 rounded-control px-2.5 text-label font-semibold shadow-ring hover:bg-ground sm:h-9" />
       )}
     />
   );

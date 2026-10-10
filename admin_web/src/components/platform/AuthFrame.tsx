@@ -1,5 +1,6 @@
 import React from 'react';
 import { Icon, type IconName } from '../../ui/Icon';
+import { BasakLogo } from '../BasakLogo';
 
 /**
  * The frame of the signed-out pages (docs/canvas/AdmSignIn*): the form column on the
@@ -8,9 +9,9 @@ import { Icon, type IconName } from '../../ui/Icon';
  */
 const Brand: React.FC<{ light?: boolean }> = ({ light }) => (
   <div className="flex items-center gap-3">
-    <span aria-hidden="true" className={`flex h-11 w-11 flex-none items-center justify-center rounded-[12px] ${light ? 'bg-white text-ink' : 'bg-ink text-white'}`}><Icon name="bus" size={20} /></span>
+    <BasakLogo className={`h-12 w-12 ${light ? 'ring-2 ring-white/30' : ''}`} />
     <span className="flex flex-col">
-      <span className={`text-[20px] font-semibold leading-7 ${light ? 'text-white' : 'text-ink'}`}>باصك</span>
+      <span className={`text-[22px] font-extrabold leading-7 ${light ? 'text-white' : 'text-ink'}`}>باصك</span>
       <span className={`text-label ${light ? 'text-[#C9D8E1]' : 'text-ink-2'}`}>لوحة شركات النقل</span>
     </span>
   </div>

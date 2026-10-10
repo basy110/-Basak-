@@ -47,16 +47,16 @@ export const PageHeader: React.FC<{
         <div className="hidden flex-wrap items-center gap-3 sm:flex"><h1 className="m-0 text-page">{title}</h1>{meta}</div>
         {meta && <div className="flex flex-wrap items-center gap-2 sm:hidden">{meta}</div>}
         <h1 className="sr-only sm:hidden">{title}</h1>
-        {sub && <p className="m-0 max-w-[720px] text-small text-ink-2">{sub}</p>}
+        {sub && <p className="m-0 max-w-[900px] text-small text-ink-2">{sub}</p>}
       </div>
       {actions && <div className={`${phoneActions ? 'flex' : 'hidden sm:flex'} flex-col gap-2 sm:flex-none sm:flex-row sm:items-center`}>{actions}</div>}
     </div>
   );
 };
 
-/** Sections of a page, 24 apart; content never wider than 1200. */
+/** Sections of a page, 24 apart; the page uses the whole width the screen gives it. */
 export const Page: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = '' }) => (
-  <div className={`mx-auto flex w-full max-w-[1200px] flex-col gap-5 sm:gap-6 ${className}`}>{children}</div>
+  <div className={`mx-auto flex w-full max-w-[1920px] flex-col gap-5 sm:gap-6 ${className}`}>{children}</div>
 );
 
 /** A section title inside a page: 12 above its card. */
@@ -107,8 +107,8 @@ export const StatCard: React.FC<{
 }> = ({ label, value, unit, hint, icon, tone, to, bar, className = '' }) => {
   const body = (
     <>
-      <div className="flex items-center gap-2 text-label font-medium text-ink-2">
-        {icon && <span className={`flex ${tone ? TONE[tone].split(' ')[1] : 'text-ink-3'}`}><Icon name={icon} size={16} stroke={2} /></span>}
+      <div className="flex items-center gap-2.5 text-label font-semibold text-ink-2">
+        {icon && <span className={`flex h-8 w-8 flex-none items-center justify-center rounded-lg ${TONE[tone ?? 'teal']}`}><Icon name={icon} size={17} stroke={2} /></span>}
         <span className="min-w-0 flex-1 truncate">{label}</span>
         {to && <Icon name="fwd" size={16} stroke={2} className="text-ink-3" />}
       </div>

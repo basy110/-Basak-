@@ -1,5 +1,6 @@
 import React, { useId } from 'react';
 import { Icon, type IconName } from './Icon';
+import { Select } from './Select';
 
 const RING = 'shadow-field hover:shadow-field-hover focus-within:!shadow-field-focus';
 const box = (error?: string, disabled?: boolean) =>
@@ -65,21 +66,19 @@ export const PasswordField: React.FC<InputProps> = (props) => {
     end={<button type="button" onClick={() => setShown((s) => !s)} aria-label={shown ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'} className="-me-2 flex h-9 w-9 items-center justify-center rounded-control text-ink-3 hover:bg-sunken"><Icon name={shown ? 'eyeOff' : 'eye'} size={18} /></button>} />;
 };
 
-export const SelectField: React.FC<Frame & Omit<React.SelectHTMLAttributes<HTMLSelectElement>, 'size'> & {
-  options: { value: string; label: string; disabled?: boolean }[]; placeholder?: string;
-}> = ({ label, help, error, optional, className, options, placeholder, id: given, disabled, ...select }) => {
+export const SelectField: React.FC<Frame & {
+  options: { value: string; label: string; disabled?: boolean }[]; placeholder?: string; id?: string; disabled?: boolean;
+  value: string; onChange: (e: { target: { value: string } }) => void; name?: string; required?: boolean; 'aria-label'?: string;
+}> = ({ label, help, error, optional, className, options, placeholder, id: given, disabled, value, onChange, 'aria-label': ariaLabel }) => {
   const auto = useId();
   const id = given ?? auto;
+  // A placeholder is also a choice that clears the field, as an empty <option> was.
+  const all = placeholder !== undefined ? [{ value: '', label: placeholder }, ...options] : options;
   return (
     <FieldFrame id={id} label={label} help={help} error={error} optional={optional} className={className}>
-      <div className={`${box(error, disabled)} relative pe-0`}>
-        <select id={id} disabled={disabled} aria-invalid={error ? true : undefined} aria-describedby={error || help ? `${id}-msg` : undefined}
-          className="h-full min-w-0 flex-1 cursor-pointer appearance-none bg-transparent pe-10 outline-none disabled:cursor-not-allowed" {...select}>
-          {placeholder !== undefined && <option value="">{placeholder}</option>}
-          {options.map((o) => <option key={o.value} value={o.value} disabled={o.disabled}>{o.label}</option>)}
-        </select>
-        <Icon name="down" size={18} className="pointer-events-none absolute end-3 text-ink-3" />
-      </div>
+      <Select id={id} value={value} options={all} placeholder={placeholder} disabled={disabled} invalid={!!error}
+        ariaLabel={ariaLabel} describedBy={error || help ? `${id}-msg` : undefined}
+        onChange={(v) => onChange({ target: { value: v } })} />
     </FieldFrame>
   );
 };

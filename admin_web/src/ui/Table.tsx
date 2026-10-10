@@ -2,6 +2,7 @@ import React from 'react';
 import { Icon } from './Icon';
 import { Checkbox } from './Field';
 import { Button } from './Button';
+import { Select } from './Select';
 
 /* ── Toolbar parts ───────────────────────────────────────────────────── */
 export const SearchBox: React.FC<{ value: string; onChange: (v: string) => void; placeholder: string; className?: string; inputRef?: React.Ref<HTMLInputElement>; onFocus?: () => void; onKeyDown?: React.KeyboardEventHandler<HTMLInputElement>; kbd?: boolean; label?: string }> = ({ value, onChange, placeholder, className = '', inputRef, onFocus, onKeyDown, kbd, label }) => (
@@ -29,13 +30,8 @@ export function Chips<V extends string>({ value, onChange, options }: { value: V
 }
 export function SortSelect<V extends string>({ value, onChange, options }: { value: V; onChange: (v: V) => void; options: { value: V; label: string }[] }) {
   return (
-    <label className="relative inline-flex h-10 flex-none items-center gap-1.5 rounded-control px-2.5 text-label text-teal sm:h-9 sm:text-ink sm:shadow-ring">
-      <Icon name="sort" size={14} stroke={2} />
-      <select aria-label="الترتيب" value={value} onChange={(e) => onChange(e.target.value as V)} className="cursor-pointer appearance-none bg-transparent pe-5 font-medium outline-none sm:font-normal">
-        {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-      </select>
-      <Icon name="down" size={14} stroke={2} className="pointer-events-none absolute end-2" />
-    </label>
+    <Select value={value} onChange={onChange} options={options} ariaLabel="الترتيب" icon="sort" minListWidth={220}
+      className="inline-flex h-10 flex-none items-center gap-1.5 rounded-control px-2.5 text-label font-semibold text-teal hover:bg-ground sm:h-9 sm:text-ink sm:shadow-ring" />
   );
 }
 

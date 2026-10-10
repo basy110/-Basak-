@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { Select } from '../../ui/Select';
 import { useQueryClient } from '@tanstack/react-query';
 import { keys } from '../../lib/query';
 import { usePlatformCompanies } from '../../lib/reference';
@@ -136,15 +137,9 @@ export const CompanyAdminsPage: React.FC = () => {
                 sort={<SortSelect<AdminSort> value={sort} onChange={setSort} options={[
                   { value: 'newest', label: 'الأحدث أولاً' }, { value: 'oldest', label: 'الأقدم أولاً' }, { value: 'name', label: 'بالاسم' }]} />}
                 actions={
-                  <label className="relative hidden h-9 flex-none items-center gap-1.5 rounded-control px-2.5 text-label shadow-ring sm:inline-flex">
-                    <Icon name="building" size={14} stroke={2} />
-                    <select aria-label="الشركة" value={company} onChange={(e) => { setCompany(e.target.value); setPage(1); }}
-                      className="w-[132px] cursor-pointer appearance-none truncate bg-transparent pe-5 outline-none">
-                      <option value="">كل الشركات</option>
-                      {companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                    </select>
-                    <Icon name="down" size={14} stroke={2} className="pointer-events-none absolute end-2" />
-                  </label>
+                  <span className="hidden sm:inline-flex"><Select value={company} onChange={(v) => { setCompany(v); setPage(1); }} ariaLabel="الشركة" icon="building" minListWidth={240}
+                    options={[{ value: '', label: 'كل الشركات' }, ...companies.map((c) => ({ value: c.id, label: c.name }))]}
+                    className="inline-flex h-9 w-[180px] flex-none items-center gap-1.5 rounded-control px-2.5 text-label font-semibold shadow-ring hover:bg-ground" /></span>
                 } />}
               empty={shown.length === 0 ? <EmptyState icon="search" title="لا مدير يطابق" text="جرّب اسماً آخر أو جزءاً من البريد، أو اعرض كل الشركات."
                 action={<Button kind="secondary" onClick={() => { setSearch(''); setCompany(''); }}>اعرض الكل</Button>} /> : undefined}

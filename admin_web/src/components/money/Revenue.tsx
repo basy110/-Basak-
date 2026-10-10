@@ -1,23 +1,16 @@
-import React, { useId } from 'react';
-import { Icon, Money } from '../../ui';
+import React from 'react';
+import { Icon, Money, Select } from '../../ui';
 import { share } from '../../lib/money';
 
 /** A filter as a pill: «الاشتراك الكل ⌄». Tinted while it narrows the list. */
 export function FilterSelect<V extends string>({ label, value, onChange, options, defaultValue = '' as V, className = '' }: {
   label: string; value: V; onChange: (v: V) => void; options: { value: V; label: string }[]; defaultValue?: V; className?: string;
 }) {
-  const id = useId();
   const on = value !== defaultValue;
-  const shown = options.find((o) => o.value === value)?.label ?? '';
   return (
-    <label htmlFor={id} className={`relative inline-flex h-10 flex-none cursor-pointer items-center gap-1.5 rounded-control px-3 text-label sm:h-9 ${on ? 'bg-teal-tint text-teal shadow-[inset_0_0_0_1.5px_#00658D]' : 'bg-surface text-ink shadow-ring hover:bg-ground'} ${className}`}>
-      <span className={on ? 'text-teal' : 'text-ink-2'}>{label}</span>
-      <span className="font-semibold">{shown}</span>
-      <Icon name="down" size={14} stroke={2} />
-      <select id={id} aria-label={label} value={value} onChange={(e) => onChange(e.target.value as V)} className="absolute inset-0 cursor-pointer opacity-0">
-        {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-      </select>
-    </label>
+    <Select value={value} onChange={onChange} options={options} ariaLabel={label}
+      renderValue={(o) => <><span className={`font-normal ${on ? 'text-teal' : 'text-ink-2'}`}>{label} </span><span className="font-bold">{o?.label ?? ''}</span></>}
+      className={`inline-flex h-10 flex-none items-center gap-1.5 rounded-control px-3 text-label sm:h-9 ${on ? 'bg-teal-tint text-teal shadow-[inset_0_0_0_1.5px_#00658D]' : 'bg-surface text-ink shadow-ring hover:bg-ground'} ${className}`} />
   );
 }
 

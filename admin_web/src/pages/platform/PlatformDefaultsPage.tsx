@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Select } from '../../ui/Select';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   Badge, Button, Card, Dialog, ErrorState, FormSection, Icon, Note, Page, PageHeader, SkeletonForm, TextField, Toggle,
@@ -128,13 +129,8 @@ const TermsSection: React.FC<{ terms: TermRow[]; periods: Period[]; online: bool
   });
 
   const month = (code: string, k: 'start_month' | 'end_month', label: string) => (
-    <label className="relative flex h-12 min-w-0 items-center rounded-control bg-surface px-3 text-small shadow-field focus-within:!shadow-field-focus hover:shadow-field-hover sm:h-11">
-      <span className="sr-only">{label}</span>
-      <select value={draft[code][k]} onChange={(e) => set(code, { [k]: Number(e.target.value) } as never)} className="h-full w-full cursor-pointer appearance-none bg-transparent pe-7 outline-none">
-        {MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
-      </select>
-      <Icon name="down" size={18} className="pointer-events-none absolute end-3 text-ink-3" />
-    </label>
+    <Select value={String(draft[code][k])} onChange={(v) => set(code, { [k]: Number(v) } as never)} ariaLabel={label}
+      options={MONTHS.map((m, i) => ({ value: String(i + 1), label: m }))} />
   );
   const dayBox = (code: string, k: 'start_day' | 'end_day', label: string, err: string | null) => (
     <input aria-label={label} inputMode="numeric" dir="ltr" value={draft[code][k]} aria-invalid={!!err || undefined}

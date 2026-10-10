@@ -15,42 +15,44 @@ export interface NavItem {
   badge?: BadgeKey;
   preload?: () => void;
 }
-export interface NavGroup { group: string | null; items: NavItem[] }
+/** Each group has its colour, so a destination is found by colour as well as by name. */
+export type NavTone = 'teal' | 'amber' | 'violet' | 'blue' | 'green' | 'pink';
+export interface NavGroup { group: string | null; tone?: NavTone; items: NavItem[] }
 
 export const COMPANY_NAV: NavGroup[] = [
-  { group: null, items: [{ id: 'today', slug: '', label: 'اليوم', icon: 'home', preload: routes.TodayPage.preload }] },
-  { group: 'كل يوم', items: [
+  { tone: 'teal', group: null, items: [{ id: 'today', slug: '', label: 'اليوم', icon: 'home', preload: routes.TodayPage.preload }] },
+  { tone: 'amber', group: 'كل يوم', items: [
     { id: 'receipts', slug: 'receipts', label: 'الإيصالات', icon: 'receipt', badge: 'receipts', preload: routes.ReceiptsPage.preload },
     { id: 'password-requests', slug: 'password-requests', label: 'طلبات كلمة المرور', icon: 'key', badge: 'requests', preload: routes.PasswordRequestsPage.preload },
     { id: 'notifications', slug: 'notifications', label: 'الإشعارات', icon: 'megaphone', preload: routes.NotificationsPage.preload }] },
-  { group: 'الطلاب والفريق', items: [
+  { tone: 'violet', group: 'الطلاب والفريق', items: [
     { id: 'students', slug: 'students', label: 'الطلاب', icon: 'users', preload: routes.StudentsPage.preload },
     { id: 'supervisors', slug: 'supervisors', label: 'المشرفون', icon: 'scan', preload: routes.SupervisorsPage.preload },
     { id: 'team', slug: 'team', label: 'مديرو الشركة', icon: 'shield', preload: routes.TeamPage.preload }] },
-  { group: 'الخطوط والرحلات', items: [
+  { tone: 'blue', group: 'الخطوط والرحلات', items: [
     { id: 'lines', slug: 'lines', label: 'الخطوط', icon: 'route', preload: routes.LinesPage.preload },
     { id: 'ride-confirmation', slug: 'ride-confirmation', label: 'تأكيد الركوب', icon: 'clock', preload: routes.RideConfirmationPage.preload }] },
-  { group: 'الاشتراكات والمدفوعات', items: [
+  { tone: 'green', group: 'الاشتراكات والمدفوعات', items: [
     { id: 'subscription-periods', slug: 'subscription-periods', label: 'مواعيد الاشتراك', icon: 'calendar', preload: routes.SubscriptionPeriodsPage.preload },
     { id: 'payment-methods', slug: 'payment-methods', label: 'وسائل الدفع', icon: 'card', preload: routes.PaymentMethodsPage.preload },
     { id: 'reports', slug: 'reports', label: 'الإيرادات', icon: 'chart', preload: routes.ReportsPage.preload }] },
-  { group: 'هوية الشركة', items: [
+  { tone: 'pink', group: 'هوية الشركة', items: [
     { id: 'wallet-card', slug: 'wallet-card', label: 'بطاقة الطالب', icon: 'idcard', preload: routes.WalletCardPage.preload },
     { id: 'receipt-details', slug: 'receipt-details', label: 'بيانات الإيصال', icon: 'building', preload: routes.ReceiptDetailsPage.preload }] },
 ];
 
 export const PLATFORM_NAV: NavGroup[] = [
-  { group: null, items: [{ id: 'p-today', slug: '', label: 'اليوم', icon: 'home', preload: routes.PlatformTodayPage.preload }] },
-  { group: 'يحتاج قرارك', items: [
+  { tone: 'teal', group: null, items: [{ id: 'p-today', slug: '', label: 'اليوم', icon: 'home', preload: routes.PlatformTodayPage.preload }] },
+  { tone: 'amber', group: 'يحتاج قرارك', items: [
     { id: 'p-corrections', slug: 'corrections', label: 'طلبات تصحيح البيانات', icon: 'pencil', badge: 'corrections', preload: routes.CorrectionsPage.preload },
     { id: 'p-password-requests', slug: 'password-requests', label: 'طلبات كلمة المرور', icon: 'key', badge: 'requests', preload: routes.PlatformPasswordRequestsPage.preload }] },
-  { group: 'الشركات', items: [
+  { tone: 'blue', group: 'الشركات', items: [
     { id: 'p-companies', slug: 'companies', label: 'الشركات', icon: 'building', preload: routes.CompaniesPage.preload },
     { id: 'p-admins', slug: 'admins', label: 'مديرو الشركات', icon: 'shield', preload: routes.CompanyAdminsPage.preload }] },
-  { group: 'الطلاب', items: [
+  { tone: 'violet', group: 'الطلاب', items: [
     { id: 'p-students', slug: 'students', label: 'كل الطلاب', icon: 'users', preload: routes.AllStudentsPage.preload },
     { id: 'p-notifications', slug: 'notifications', label: 'إشعارات المنصة', icon: 'megaphone', preload: routes.PlatformNotificationsPage.preload }] },
-  { group: 'إعدادات المنصة', items: [
+  { tone: 'green', group: 'إعدادات المنصة', items: [
     { id: 'p-universities', slug: 'universities', label: 'الجامعات والكليات', icon: 'school', preload: routes.UniversitiesPage.preload },
     { id: 'p-defaults', slug: 'defaults', label: 'الإعدادات الافتراضية', icon: 'sliders', preload: routes.PlatformDefaultsPage.preload },
     { id: 'p-app-versions', slug: 'app-versions', label: 'إصدارات التطبيق', icon: 'smartphone', preload: routes.AppVersionsPage.preload }] },
