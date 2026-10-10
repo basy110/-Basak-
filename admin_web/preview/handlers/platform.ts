@@ -198,3 +198,68 @@ registerFunctions({
     return { id, name, adminId, invited: !body.admin.password };
   },
 });
+
+// ── Platform notifications (AdmPlatNotifications) ─────────────────────────────
+const hoursAgo = (h: number) => new Date(Date.now() - h * 3_600_000).toISOString();
+const NOTE_TEXTS: [string, string][] = [
+  ['تذكير بتأكيد الركوب', 'أكّد ركوبك قبل 6:00 ص حتى نحجز لك مقعداً.'], ['تعديل موعد رحلة العودة', 'رحلة العودة 3:00 م تتحرك 3:30 م هذا الأسبوع فقط.'],
+  ['إجازة رسمية', 'لا رحلات يوم الخميس. تعود الرحلات السبت في مواعيدها.'], ['خط جديد إلى جامعة حورس', 'بدأ خط جديد إلى جامعة حورس. اشترك من صفحة الخطوط.'],
+  ['آخر موعد لرفع الإيصال', 'ارفع إيصال الدفع قبل نهاية الأسبوع ليبقى اشتراكك نشطاً.'], ['تغيير رقم التواصل', 'رقم خدمة العملاء تغيّر. تجده في بطاقتك.'],
+];
+const companiesFor = () => tables.companies.filter((c) => c.status === 'active');
+const note = (i: number, o: Row): Row => ({
+  id: `f0aa0000-0000-4000-8000-${String(i).padStart(12, '0')}`, type: 'announcement.admin', category: 'announcement', priority: 'normal',
+  status_note: null, sender_role: 'admin', sender_name: 'أحمد سعيد النورس', audience: 'كل طلاب الشركة', audience_spec: { kind: 'company' }, line_id: null,
+  read: 0, opened: 0, push: { devices: 0, queued: 0, accepted: 0, failed: 0, skipped: 0 }, ...o,
+});
+const NOTES: Row[] = [];
+if (as === 'platform') {
+  const all = companiesFor();
+  all.forEach((c, k) => NOTES.push(note(1000 + k, {
+    type: 'announcement.platform', sender_name: 'محمد عادل', title: 'إجازة 6 أكتوبر', body: 'لا رحلات يوم الثلاثاء 6 أكتوبر. تعود الرحلات الأربعاء في مواعيدها.',
+    created_at: hoursAgo(120), scheduled_at: null, sent_at: hoursAgo(120), status: 'sent', company_id: c.id, company_name: c.name,
+    students: [718, 33, 280, 225][k] ?? 200, read: [520, 22, 200, 160][k] ?? 150, opened: 80, push: { devices: 150, queued: 0, accepted: 140, failed: k === 0 ? 14 : 0, skipped: 40 },
+  })));
+  all.forEach((c, k) => NOTES.push(note(2000 + k, {
+    type: 'announcement.platform', sender_name: 'محمد عادل', title: 'تحديث جديد للتطبيق', body: 'حدّث التطبيق لتأكيد الركوب بضغطة واحدة من الإشعار.',
+    created_at: hoursAgo(2), scheduled_at: new Date(Date.now() + 20 * 3_600_000).toISOString(), sent_at: null, status: 'scheduled', company_id: c.id, company_name: c.name, students: 0,
+  })));
+  NOTES.push(note(1, { title: 'تأخير رحلة 7:15 ص', body: 'رحلة فارسكور تتأخر 20 دقيقة اليوم بسبب عطل. نعتذر.', created_at: hoursAgo(3), sent_at: hoursAgo(3), scheduled_at: null, status: 'sent', company_id: COMPANY_ID, company_name: 'النورس للنقل', students: 71, read: 64, opened: 30, priority: 'high', push: { devices: 60, queued: 0, accepted: 58, failed: 2, skipped: 11 } }));
+  NOTES.push(note(2, { title: 'موعد تجديد الفصل الثاني', body: 'باب الاشتراك في الفصل الثاني مفتوح حتى 7 فبراير.', created_at: hoursAgo(16), sent_at: null, scheduled_at: null, status: 'failed', status_note: 'لم يُرسل', company_id: all[2]?.id, company_name: all[2]?.name, students: 0 }));
+  NOTES.push(note(3, { title: 'تغيير موقف المحطة الثالثة', body: 'موقف الحي الثالث انتقل أمام الصيدلية بداية من الأحد.', created_at: hoursAgo(40), sent_at: null, scheduled_at: hoursAgo(30), status: 'cancelled', company_id: all[3]?.id, company_name: all[3]?.name, students: 0 }));
+  for (let i = 0; i < 40; i += 1) {
+    const c = all[(i * 7) % all.length]; const [title, body] = NOTE_TEXTS[i % NOTE_TEXTS.length];
+    const students = 41 + ((i * 53) % 320);
+    NOTES.push(note(10 + i, { title, body, created_at: hoursAgo(48 + i * 9), sent_at: hoursAgo(48 + i * 9), scheduled_at: null, status: i % 13 === 5 ? 'scheduled' : 'sent', company_id: c.id, company_name: c.name, students, read: Math.round(students * 0.7), opened: Math.round(students * 0.3), push: { devices: students - 10, queued: 0, accepted: students - 12, failed: 2, skipped: 10 } }));
+  }
+  NOTES.sort((a, b) => b.created_at.localeCompare(a.created_at));
+}
+const missing = (map: Record<string, (a: Row, c: never) => unknown>) => {
+  const fill = () => Object.entries(map).forEach(([k, f]) => { if (!rpcs[k]) registerRpc({ [k]: f }); });
+  fill(); setTimeout(fill, 0);
+};
+missing({
+  get_platform_notifications_page: ({ p_before, p_limit = 30, p_status, p_company_id }) => {
+    if (state() === 'empty') return { items: [], next_before: null, push: { configured: false, devices: 0, ios: 0, android: 0, queued: 0, accepted_24h: 0, failed_24h: 0 } };
+    const rows = NOTES.filter((n) => (!p_status || n.status === p_status) && (!p_company_id || n.company_id === p_company_id) && (!p_before || n.created_at < p_before));
+    const items = rows.slice(0, p_limit);
+    return { items, next_before: rows.length > p_limit ? items[items.length - 1].created_at : null,
+      push: { configured: true, devices: 5120, ios: 1840, android: 3280, queued: 36, accepted_24h: 8412, failed_24h: 14 } };
+  },
+  platform_preview_notification: ({ p_company_ids }) => {
+    const ids: string[] | null = p_company_ids;
+    const chosen = companiesFor().filter((c) => !ids || ids.includes(c.id));
+    const students = chosen.reduce((a, c) => a + (STATS[c.id]?.students ?? 0), 0);
+    return { companies: chosen.filter((c) => (STATS[c.id]?.students ?? 0) > 0).length, students, supervisors: Math.round(students / 130), devices: Math.round(students * 0.86) };
+  },
+  platform_compose_notification: ({ p_title, p_body, p_company_ids, p_scheduled_at, p_priority }) => {
+    const ids: string[] | null = p_company_ids;
+    const chosen = companiesFor().filter((c) => !ids || ids.includes(c.id));
+    chosen.forEach((c, k) => NOTES.unshift(note(5000 + NOTES.length + k, { type: 'announcement.platform', sender_name: 'محمد عادل', title: p_title, body: p_body, priority: p_priority,
+      created_at: new Date().toISOString(), scheduled_at: p_scheduled_at, sent_at: p_scheduled_at ? null : new Date().toISOString(), status: p_scheduled_at ? 'scheduled' : 'sent',
+      company_id: c.id, company_name: c.name, students: p_scheduled_at ? 0 : STATS[c.id]?.students ?? 0 })));
+    return { status: p_scheduled_at ? 'scheduled' : 'sent', companies: chosen.length, students: chosen.reduce((a, c) => a + (STATS[c.id]?.students ?? 0), 0), duplicate: false };
+  },
+  delete_notification: ({ p_id }) => { const i = NOTES.findIndex((n) => n.id === p_id); if (i >= 0) NOTES.splice(i, 1); return null; },
+  cancel_scheduled_notification: ({ p_id }) => { const n = NOTES.find((x) => x.id === p_id); if (n) n.status = 'cancelled'; return null; },
+});

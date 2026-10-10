@@ -12,7 +12,7 @@ import { useSyncExternalStore } from 'react';
 import { supabase } from './supabase';
 import { keys, STALE, unwrap, usePageData } from './query';
 import { rpcOr } from './rpc';
-import { countText, NOUN, num } from '../ui/format';
+import { cairo, clock, countText, dayText, NOUN, num } from '../ui/format';
 
 // =============================================================================
 // Words
@@ -431,3 +431,41 @@ export const useIsPhone = () => useSyncExternalStore(
   (cb) => { phoneQuery?.addEventListener('change', cb); return () => phoneQuery?.removeEventListener('change', cb); },
   () => !!phoneQuery?.matches, () => false);
 
+
+// =============================================================================
+// Platform notifications
+// =============================================================================
+
+/** The fields of a notification row the platform's list groups by (lib/notifications.ts · HistoryRow). */
+export interface NoteRow {
+  id: string; type: string | null; title: string; body: string; status: 'scheduled' | 'sent' | 'cancelled' | 'failed'; created_at: string;
+  scheduled_at: string | null; sent_at: string | null; students: number; read: number; opened: number; priority: string | null;
+  company_id?: string; company_name?: string | null; sender_name: string | null; sender_role: string; audience: string | null;
+  push: { devices: number; queued: number; accepted: number; failed: number; skipped: number } | null;
+}
+export interface NoteGroup<R extends NoteRow = NoteRow> { key: string; rows: R[]; platform: boolean; first: R; students: number; read: number; opened: number }
+
+/**
+ * One platform announcement is stored once per company it reached; the list shows
+ * it once («المنصة · 26 شركة»). Rows of the same announcement: platform type, same
+ * title, body and status, written within two minutes of each other.
+ */
+export function groupNotes<R extends NoteRow>(rows: R[]): NoteGroup<R>[] {
+  const out: NoteGroup<R>[] = [];
+  for (const r of rows) {
+    const platform = r.type === 'announcement.platform';
+    const g = platform ? out.find((x) => x.platform && x.first.title === r.title && x.first.body === r.body && x.first.status === r.status
+      && Math.abs(new Date(x.first.created_at).getTime() - new Date(r.created_at).getTime()) < 120_000) : undefined;
+    if (g) { g.rows.push(r); g.students += r.students; g.read += r.read; g.opened += r.opened; }
+    else out.push({ key: r.id, rows: [r], platform, first: r, students: r.students, read: r.read, opened: r.opened });
+  }
+  return out;
+}
+
+/** When a notification goes or went out: «اليوم 6:40 ص», «أمس 8:12 م», «غداً 9:00 ص», «5 أكتوبر 6:00 م». */
+export function whenText(iso: string, now: Date = new Date()): string {
+  const c = cairo(iso); const today = cairo(now).day;
+  const shift = (n: number) => { const [y, m, d] = today.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10); };
+  const name = c.day === today ? 'اليوم' : c.day === shift(-1) ? 'أمس' : c.day === shift(1) ? 'غداً' : dayText(c.day, { year: c.day.slice(0, 4) !== today.slice(0, 4) });
+  return `${name} ${clock(c.time)}`;
+}

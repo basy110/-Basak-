@@ -126,9 +126,9 @@ const RevenueView: React.FC = () => {
   const set = (patch: Partial<Filters>) => setFilters((f) => ({ ...f, ...patch }));
   const clear = () => { setFilters(blank); setSearch(''); setPayment(''); };
   const optionRow = (o: Breakdown['by_option'][number]) => {
-    const note = o.option === 'daily' ? counted(o.paid, DAYS_W)
+    const note = o.option === 'daily' ? (o.paid ? counted(o.paid, DAYS_W) : undefined)
       : o.paid && o.upcoming_paid === o.paid ? `${num(o.paid)} مقدماً`
-        : o.option === 'summer' && o.paid === 0 ? 'لم يُفتح' : counted(o.paid, SUBS);
+        : o.paid === 0 ? (o.option === 'summer' ? 'لم يُفتح' : undefined) : counted(o.paid, SUBS);
     return { key: o.option, name: REVENUE_OPTION_LABEL[o.option], note, amount: Number(o.amount), muted: o.paid === 0, onClick: () => { setPayment('paid'); set({ period: o.option }); } };
   };
   const methodRow = (m: Breakdown['by_method'][number], i: number) => ({
@@ -161,7 +161,7 @@ const RevenueView: React.FC = () => {
   );
 
   const columns: Column<ReportRow>[] = [
-    { key: 'student', label: 'الطالب', w: 250, render: (r) => <Cell2 main={r.student_name} sub={<><Ltr>{phoneText(r.phone)}</Ltr>{r.university ? ` · ${r.university}` : ''}</>} /> },
+    { key: 'student', label: 'الطالب', w: 230, render: (r) => <Cell2 main={r.student_name} sub={<><Ltr>{phoneText(r.phone)}</Ltr>{r.university ? ` · ${r.university}` : ''}</>} /> },
     { key: 'line', label: 'الخط', w: 120, render: (r) => <span className="truncate">{r.line}</span> },
     { key: 'sub', label: 'الاشتراك', w: 120, render: (r) => <Cell2 strong={false} main={optName(r)} sub={r.academic_year ? `${r.academic_year}/${r.academic_year + 1}` : undefined} /> },
     { key: 'amount', label: 'المبلغ', w: 110, render: (r) => (r.paid
@@ -172,7 +172,7 @@ const RevenueView: React.FC = () => {
     { key: 'paid_at', label: <span className="inline-flex items-center gap-1">تاريخ الدفع<Icon name="adown" size={13} stroke={2} /></span>, w: 100,
       render: (r) => (r.paid_at ? dayText(cairo(r.paid_at).day, { year: cairo(r.paid_at).day.slice(0, 4) !== cairoToday().slice(0, 4) }) : <span className="text-ink-3">—</span>) },
     { key: 'until', label: 'يسري حتى', w: 110, hideTablet: true, render: (r) => (r.end_date ? dayText(r.end_date, { year: r.end_date.slice(0, 4) !== cairoToday().slice(0, 4) || r.type !== 'daily' }) : '—') },
-    { key: 'status', label: 'الحالة', w: 120, render: (r) => <StatusPill status={rowStatus(r)} /> },
+    { key: 'status', label: 'الحالة', w: 136, render: (r) => <StatusPill status={rowStatus(r)} /> },
   ];
   const card = (r: ReportRow) => ({
     title: r.student_name, sub: <><Ltr>{phoneText(r.phone)}</Ltr>{r.university ? ` · ${r.university}` : ''}</>, end: <StatusPill status={rowStatus(r)} />,
@@ -212,9 +212,9 @@ const RevenueView: React.FC = () => {
           <StatCard icon="check" label="اشتراكات مدفوعة" value={num(t!.paid)} hint={t!.daily_paid ? `منها ${counted(t!.daily_paid, DAYS_W)} نقداً` : '—'} />
           <StatCard icon="clock" label="لم تُدفع بعد" value={num(t!.unpaid)}
             hint={overview?.pending_receipts ? `${counted(overview.pending_receipts, RECEIPTS_W)} ${overview.pending_receipts > 10 || overview.pending_receipts < 3 ? 'ينتظر' : 'تنتظر'} مراجعتك` : '—'}
-            to={overview?.pending_receipts ? `${base}/receipts` : undefined} />
+          />
           <StatCard icon="calendar" label="مدفوعة مقدماً" value={num(t!.upcoming_paid)} unit={t!.upcoming ? `من ${num(t!.upcoming)}` : undefined}
-            hint={upcomingOption ? `ل${REVENUE_OPTION_LABEL[upcomingOption.option]}، ولم يبدأ بعد` : 'للفصل الثاني، ولم يبدأ بعد'} />
+            hint={upcomingOption ? `${REVENUE_OPTION_LABEL[upcomingOption.option].replace(/^ال/, 'لل')}، ولم يبدأ بعد` : 'للفصل الثاني، ولم يبدأ بعد'} />
         </div>
       )}
 
@@ -227,7 +227,7 @@ const RevenueView: React.FC = () => {
           {/* Where the money came from */}
           <section className="flex flex-col gap-3">
             <h2 className="m-0 text-card sm:text-section">من أين جاءت الإيرادات</h2>
-            {!b ? <div className="grid grid-cols-1 gap-3 lg:grid-cols-3 lg:gap-6">{[0, 1, 2].map((i) => <Card key={i} className="flex flex-col gap-4 p-5"><SkeletonBar w={120} h={14} />{[0, 1, 2, 3].map((j) => <SkeletonBar key={j} w="100%" h={10} />)}</Card>)}</div> : (
+            {!b ? <div className="grid grid-cols-1 gap-3 lg:grid-cols-3 lg:gap-6">{[0, 1, 2].map((i) => <Card key={i} className="flex flex-col gap-4 p-5"><SkeletonBar w={120} h={14} />{[0, 1, 2, 3].map((j) => <SkeletonBar key={j} w={260 - j * 30} h={10} />)}</Card>)}</div> : (
               <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-3 lg:gap-6">
                 <BreakdownCard title="حسب الاشتراك" sub="اضغط سطراً لترى من دفعوه" rows={b.by_option.map(optionRow)} />
                 <BreakdownCard title="حسب الخط" sub={counted(b.by_line.length, ['خط واحد', 'خطان', 'خطوط', 'خطاً'])} className="hidden lg:flex"
@@ -381,7 +381,7 @@ const ResetView: React.FC = () => {
         <Card className="flex flex-col p-4 sm:p-6">
           <h2 className="m-0 text-section">سجل التصفير</h2>
           <p className="m-0 text-small text-ink-2">آخر 10 مرات. إلغاء التصفير يعيد العدّ ليشمل ما قبله.</p>
-          {resets.isPending ? <div className="mt-4 flex flex-col gap-3"><SkeletonBar w="70%" /><SkeletonBar w="50%" /><SkeletonBar w="60%" /></div>
+          {resets.isPending ? <div className="mt-4 flex flex-col gap-3"><SkeletonBar w={260} /><SkeletonBar w={200} /><SkeletonBar w={230} /></div>
             : resets.error ? <div className="mt-4"><ErrorState title="تعذّر تحميل السجل" error={resets.error} onRetry={() => void resets.refetch()} /></div>
               : (resets.data ?? []).length === 0 ? <p className="m-0 mt-4 text-small text-ink-2">لم تُصفَّر الأرقام من قبل.</p> : (
                 <ul className="m-0 mt-2 flex list-none flex-col p-0">

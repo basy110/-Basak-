@@ -236,7 +236,7 @@ function reportRows(): Row[] {
     const opt = k.split('_')[0];
     if (k === 'second_unpaid') counts.second_unpaid += 1; else if (unpaid) counts.unpaid += 1; else counts[opt] += 1;
     const n = rows.length;
-    const dayN = Math.floor(n / 3);
+    const dayN = Math.floor(n / 24);
     const paidAt = unpaid ? null : daysAgo(dayN, (n % 3) * 3, 20);
     const price = opt === 'both' ? 8000 : opt === 'daily' ? 60 : 4500;
     const method = opt === 'daily' ? null : METHOD_NAMES[n % 4];
@@ -263,9 +263,10 @@ let RESETS: Row[] = [
   { id: uuid(), scope: 'all', reset_at: '2026-06-14T15:40:00Z', note: 'تجربة قبل الفصل الصيفي', undone_at: '2026-06-14T16:02:00Z', company_id: COMPANY_ID, reset_by_name: ADMINS.company.full_name, undone_by_name: ADMINS.company.full_name },
   { id: uuid(), scope: 'financial', reset_at: '2026-02-07T07:05:00Z', note: 'بداية الفصل الثاني', undone_at: null, company_id: COMPANY_ID, reset_by_name: ADMINS.company.full_name, undone_by_name: null },
 ];
-const baseline = () => RESETS.filter((r) => !r.undone_at).map((r) => r.reset_at).sort().pop() ?? null;
+const baseline = () => (state() === 'empty' ? [] : RESETS).filter((r) => !r.undone_at).map((r) => r.reset_at).sort().pop() ?? null;
 
 function filtered(f: Row) {
+  if (state() === 'empty') return [];
   const since = f.include_before_reset ? null : baseline();
   const term = String(f.search ?? '').trim();
   const digits = term.replace(/\D/g, '');
@@ -318,7 +319,7 @@ reg({
         return { option, paid: of.filter((r) => r.paid).length, amount: sum(of.filter((r) => r.paid)), upcoming: of.filter((r) => r.phase === 'upcoming').length, upcoming_paid: of.filter((r) => r.phase === 'upcoming' && r.paid).length };
       }),
       by_line: plain ? BOARD_LINES.map(([name, amount]) => ({ line_id: lineIds[name] ?? null, name, is_active: true, paid: Math.round(amount / 4600), amount }))
-        : LINE_ORDER.map((name) => { const p = paid.filter((r) => r.line === name); return { line_id: lineIds[name] ?? null, name, is_active: true, paid: p.length, amount: sum(p) }; }).sort((a, b) => b.amount - a.amount),
+        : LINE_ORDER.filter((name) => !p_filters.line_id || lineIds[name] === p_filters.line_id).map((name) => { const p = paid.filter((r) => r.line === name); return { line_id: lineIds[name] ?? null, name, is_active: true, paid: p.length, amount: sum(p) }; }).sort((a, b) => b.amount - a.amount),
       by_method: plain ? BOARD_METHODS.map((m) => ({ ...m, method_id: null }))
         : [...new Set(paid.map((r) => r.payment_method ?? ''))].map((name) => {
           const p = paid.filter((r) => (r.payment_method ?? '') === name);
@@ -326,7 +327,7 @@ reg({
         }).sort((a, b) => b.amount - a.amount),
     };
   },
-  company_report_resets: () => RESETS,
+  company_report_resets: () => (state() === 'empty' ? [] : RESETS),
   admin_reset_reports: ({ p_scope, p_confirm, p_note }) => {
     if (p_confirm !== (p_scope === 'all' ? 'RESET ALL DATA' : 'RESET FINANCIAL DATA')) fail('عبارة التأكيد غير صحيحة.');
     const row = { id: uuid(), scope: p_scope, reset_at: iso(now()), note: p_note || null, undone_at: null, company_id: COMPANY_ID, reset_by_name: ADMINS.company.full_name, undone_by_name: null };

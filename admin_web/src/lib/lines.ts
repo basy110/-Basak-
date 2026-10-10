@@ -387,8 +387,12 @@ export function parseClock(text: string, assume?: 'am' | 'pm'): string | null {
 }
 
 // ── Editing a line in use ───────────────────────────────────────────────────
-const sameTrip = (a: TripDraft, b: TripDraft) => a.start_time === b.start_time && a.arrival_time === b.arrival_time && a.label.trim() === b.label.trim()
-  && a.university_id === b.university_id && JSON.stringify(Object.entries(a.times).filter(([, v]) => v).sort()) === JSON.stringify(Object.entries(b.times).filter(([, v]) => v).sort());
+/** Same trip, comparing stop times only on the stations that remain (a removed station is counted once, on its own). */
+const sameTrip = (a: TripDraft, b: TripDraft, keep: Set<string>) => {
+  const times = (t: TripDraft) => JSON.stringify(Object.entries(t.times).filter(([k, v]) => v && keep.has(k)).sort());
+  return a.start_time === b.start_time && a.arrival_time === b.arrival_time && a.label.trim() === b.label.trim()
+    && a.university_id === b.university_id && times(a) === times(b);
+};
 
 /** How many things the draft changes compared with the saved line (for «تعديلان لم يُحفظا»). */
 export function changeCount(saved: LineDraft, d: LineDraft): number {
@@ -402,7 +406,8 @@ export function changeCount(saved: LineDraft, d: LineDraft): number {
   const kept = d.stations.filter((s) => oldSt.has(s.key)).map((s) => s.key).join();
   if (kept !== saved.stations.filter((s) => d.stations.some((x) => x.key === s.key)).map((s) => s.key).join()) n += 1;
   const oldTr = new Map(saved.trips.map((t) => [t.key, t]));
-  d.trips.forEach((t) => { const o = oldTr.get(t.key); if (!o || !sameTrip(o, t)) n += 1; });
+  const keep = new Set(d.stations.map((s) => s.key));
+  d.trips.forEach((t) => { const o = oldTr.get(t.key); if (!o || !sameTrip(o, t, keep)) n += 1; });
   saved.trips.forEach((t) => { if (!d.trips.some((x) => x.key === t.key)) n += 1; });
   SALE_OPTIONS.forEach((o) => { if (saved.prices[o].enabled !== d.prices[o].enabled || priceOf(saved.prices[o]) !== priceOf(d.prices[o])) n += 1; });
   if (Number(saved.price_daily || 0) !== Number(d.price_daily || 0)) n += 1;
