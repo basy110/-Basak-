@@ -101,11 +101,12 @@ export const History: React.FC<Props> = ({ companyId, filter, onFilter, history,
   ];
   const card = (r: HistoryRow) => ({
     title: <span className="flex items-center gap-2">{r.title}{r.priority === 'high' && <Badge tone="danger">عاجل</Badge>}</span>,
-    sub: r.audience ?? undefined, end: statePill(r),
-    fields: [['المرسل', senderShort(r, me)], ['الموعد', whenLabel(at(r))], ...(r.status === 'sent' ? [['قرأه', `${r.read} من ${r.students}`]] : [])] as [React.ReactNode, React.ReactNode][],
-    actions: canEdit(r) ? <><Button kind="secondary" className="!h-11" onClick={() => setOpen({ kind: 'edit', row: r })}>تعديل</Button><Button kind="dangerQuiet" className="!h-11" onClick={() => setOpen({ kind: 'cancel', row: r })}>إلغاء الإرسال</Button></> : undefined,
+    sub: <span className={`line-clamp-2 ${r.status === 'failed' && r.status_note ? 'text-bad' : ''}`}>{(r.status === 'failed' || r.status === 'cancelled') && r.status_note ? r.status_note : r.body}</span>,
+    end: statePill(r),
+    fields: [['إلى', r.audience ?? '—'], ['المرسل', senderShort(r, me)], ['الموعد', whenLabel(at(r))],
+      ...(r.status === 'sent' ? [['قرأه', <span key="r"><b className="font-semibold">{r.read}</b> من {r.students}</span>]] : [])] as [React.ReactNode, React.ReactNode][],
+    actions: canEdit(r) ? <><Button kind="secondary" className="!h-11" onClick={() => setOpen({ kind: 'edit', row: r })}>تعديل</Button><Button kind="outline" className="!h-11" onClick={() => setOpen({ kind: 'cancel', row: r })}>إلغاء الإرسال</Button></> : undefined,
   });
-
   const toolbar = (
     <Toolbar search={<SearchBox value={query} onChange={setQuery} placeholder="ابحث في الإشعارات" />}
       filters={<div className="flex items-center gap-2"><Chips<StatusFilter> value={filter} onChange={onFilter} options={STATUS_FILTERS.map((f) => ({ value: f.key, label: f.label }))} />{filters}</div>}
@@ -126,9 +127,9 @@ export const History: React.FC<Props> = ({ companyId, filter, onFilter, history,
       <DataTable<HistoryRow> rows={shown} rowKey={(r) => r.id} caption="سجل الإشعارات" columns={columns} card={card} toolbar={toolbar} empty={empty}
         rowH={58} onOpen={(r) => setOpen({ kind: 'details', row: r })} openKey={open?.kind === 'details' ? open.row.id : null}
         pager={shown.length > 0 && (
-          <div className="flex min-h-14 items-center gap-3 px-0 sm:border-t sm:border-hair sm:px-4">
-            <span className="flex-1 text-label text-ink-2">يُعرض {history.rows.length <= 25 ? `أحدث ${history.rows.length.toLocaleString('en-US')} ${history.rows.length > 10 ? 'إشعاراً' : 'إشعارات'}` : `${history.rows.length.toLocaleString('en-US')} إشعاراً`}</span>
-            {history.hasMore && <Button kind="outline" sm icon="adown" loading={history.loadingMore} onClick={history.loadMore}>اعرض 25 أقدم</Button>}
+          <div className="flex min-h-14 flex-col items-stretch gap-3 px-0 sm:flex-row sm:items-center sm:border-t sm:border-hair sm:px-4">
+            <span className="hidden flex-1 text-label text-ink-2 sm:block">يُعرض {history.rows.length <= 25 ? `أحدث ${history.rows.length.toLocaleString('en-US')} ${history.rows.length > 10 ? 'إشعاراً' : 'إشعارات'}` : `${history.rows.length.toLocaleString('en-US')} إشعاراً`}</span>
+            {history.hasMore && <Button kind="outline" sm icon="adown" className="max-sm:!h-12" loading={history.loadingMore} onClick={history.loadMore}>اعرض 25 أقدم</Button>}
           </div>
         )} />
 

@@ -85,6 +85,7 @@ export const Composer: React.FC<{ companyId: string; onBack?: () => void; onDone
     }
   };
 
+  const hint = draft.audience.kind === 'university' ? 'اختر الجامعة لنحسب عدد من يصلهم.' : draft.audience.kind === 'company' ? undefined : 'اختر الخط لنحسب عدد من يصلهم.';
   const reach = (c: AudiencePreview) => `${studentsText(c.students)}${c.supervisors ? ` و${supervisorsText(c.supervisors)}` : ''}`;
   const sendLabel = scheduled ? 'جدولة الإشعار' : 'إرسال الإشعار';
   return (
@@ -97,16 +98,17 @@ export const Composer: React.FC<{ companyId: string; onBack?: () => void; onDone
       <form className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-6" onSubmit={(e) => { e.preventDefault(); ask(); }}>
         <div className="flex flex-col gap-4 lg:gap-6">
           <NotificationForm draft={draft} onChange={change} lines={options.data?.lines ?? []} universities={options.data?.universities ?? []}
-            optionsLoading={options.loading} today={today} disabled={busy} templates={TEMPLATES} companyCount={members} showErrors={tried} />
+            optionsLoading={options.loading} today={today} disabled={busy} templates={TEMPLATES} companyCount={members} showErrors={tried}
+            afterAudience={<AudiencePreviewCard className="lg:hidden" preview={preview} hint={hint} />} />
           {options.error && <Note tone="danger" title="تعذّر تحميل الخطوط والجامعات">{errorText(options.error)}</Note>}
           {error && !confirming && <Note tone="danger" title="لم يُرسل الإشعار">{error}</Note>}
         </div>
         <div className="flex flex-col gap-4 lg:sticky lg:top-6 lg:gap-6">
-          <section className="hidden flex-col gap-3 rounded-card bg-surface px-4 py-4 shadow-card sm:px-5 lg:flex">
+          <section className="flex flex-col gap-3 rounded-card bg-surface px-4 py-4 shadow-card sm:px-5">
             <h3 className="m-0 text-card">كما يظهر على هاتف الطالب</h3>
             <PhonePreview title={draft.title} body={draft.body} high={draft.priority === 'high'} />
           </section>
-          <AudiencePreviewCard preview={preview} hint={draft.audience.kind === 'university' ? 'اختر الجامعة لنحسب عدد من يصلهم.' : draft.audience.kind === 'company' ? undefined : 'اختر الخط لنحسب عدد من يصلهم.'} />
+          <AudiencePreviewCard className="hidden lg:flex" preview={preview} hint={hint} />
         </div>
       </form>
       <PhoneBar><Button full icon="megaphone" disabled={busy || (tried && !canSend)} onClick={ask}>{sendLabel}</Button></PhoneBar>

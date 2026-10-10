@@ -425,7 +425,7 @@ export function saleLine(terms: TermRow[]): string {
   return off.length ? `${a} · ${off.join(' و')} ${agree(off.length, ['موقوف', 'موقوفان', 'موقوفة'])} حتى يفتحه المدير` : a;
 }
 
-const phoneQuery = typeof window !== 'undefined' ? window.matchMedia('(max-width: 639px)') : null;
+const phoneQuery = typeof window !== 'undefined' && typeof window.matchMedia === 'function' ? window.matchMedia('(max-width: 639px)') : null;
 /** Below 640: the phone layout (a few words differ from the board's desktop form). */
 export const useIsPhone = () => useSyncExternalStore(
   (cb) => { phoneQuery?.addEventListener('change', cb); return () => phoneQuery?.removeEventListener('change', cb); },

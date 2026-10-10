@@ -25,6 +25,8 @@ interface Props {
   companyCount?: number | null;
   /** Say what is missing under each field (after a first try, or as soon as it is wrong). */
   showErrors?: boolean;
+  /** Under «إلى من؟» on a phone (the reach card). */
+  afterAudience?: React.ReactNode;
 }
 
 const Counter: React.FC<{ n: number; max: number }> = ({ n, max }) => (
@@ -40,7 +42,7 @@ const Section: React.FC<{ n: number; title: string; plain?: boolean; children: R
 
 /** The fields of a notification, shared by the composer and by the edit of a scheduled one. */
 export const NotificationForm: React.FC<Props> = ({
-  draft, onChange, lines = [], universities = [], optionsLoading, audience, today, scheduledOnly, disabled, templates, plain, companyCount, showErrors,
+  draft, onChange, lines = [], universities = [], optionsLoading, audience, today, scheduledOnly, disabled, templates, plain, companyCount, showErrors, afterAudience,
 }) => {
   const set = (patch: Partial<NotificationDraft>) => onChange({ ...draft, ...patch });
   const later = scheduledOnly || draft.when === 'later';
@@ -60,6 +62,7 @@ export const NotificationForm: React.FC<Props> = ({
             today={today} loading={optionsLoading} disabled={disabled} companyCount={companyCount} showErrors={showErrors} />
         )}
       </Section>
+      {afterAudience}
 
       <Section n={2} title="الرسالة" plain={plain}>
         {templates && templates.length > 0 && (
@@ -95,11 +98,11 @@ export const NotificationForm: React.FC<Props> = ({
           }} options={[{ value: 'now', label: 'الآن', disabled }, { value: 'later', label: 'في موعد لاحق', disabled }]} />
         )}
         {later && (
-          <FieldRow cols="minmax(0, 3fr) minmax(0, 2fr)">
+          <FieldRow cols="repeat(2, minmax(0, 1fr))">
             <TextField label="اليوم" type="date" ltr min={today} value={day ?? ''} disabled={disabled}
               onChange={(e) => setWhen(`${e.target.value}T${time || '09:00'}`)}
               error={timeProblem || (showErrors && !day ? 'اختر يوم الإرسال.' : undefined)} help={day ? dayLong(day) : undefined} />
-            <TextField label="الساعة" type="time" ltr value={time ?? ''} disabled={disabled} suffix={CAIRO_LABEL}
+            <TextField label="الساعة" type="time" ltr value={time ?? ''} disabled={disabled} help={CAIRO_LABEL}
               onChange={(e) => setWhen(`${day || today}T${e.target.value}`)} />
           </FieldRow>
         )}

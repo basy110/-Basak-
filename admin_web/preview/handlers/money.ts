@@ -189,6 +189,12 @@ if (methods.length === 3) {
   );
 }
 
+// For the error board: the table read fails when sessionStorage `preview.fail` names it.
+Object.defineProperty(tables, 'company_payment_methods', {
+  configurable: true, enumerable: true,
+  get: () => { if ((sessionStorage.getItem('preview.fail') ?? '').split(',').includes('company_payment_methods')) throw new Error('Failed to fetch'); return methods; },
+  set: () => undefined,
+});
 if (sessionStorage.getItem('preview.payNone')) methods.forEach((m) => { m.is_active = false; });
 if (sessionStorage.getItem('preview.payOne')) methods.splice(1);
 reg({

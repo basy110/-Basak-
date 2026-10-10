@@ -172,7 +172,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
           <PasswordField id="login-password" label="كلمة المرور" placeholder="كلمة المرور" value={password} autoComplete="current-password" maxLength={200}
             onChange={(e) => { setPassword(e.target.value); setFieldErrors((f) => ({ ...f, password: undefined })); if (problem === 'credentials') setProblem(null); }}
             error={problem === 'credentials' ? 'البريد الإلكتروني أو كلمة المرور غير صحيحة.' : fieldErrors.password} />
-          <button type="button" onClick={() => go('forgot')} className="-mt-1 self-start text-label font-medium text-teal hover:underline">نسيت كلمة المرور؟</button>
+          <button type="button" onClick={() => go('forgot')} className="self-start text-label font-medium text-teal hover:underline">نسيت كلمة المرور؟</button>
         </div>
         <Button type="submit" full loading={loading}>دخول</Button>
         <p className="m-0 flex items-start gap-2 text-label text-ink-2"><Icon name="lock" size={14} className="mt-[3px]" />للمديرين فقط. الطلاب والمشرفون يدخلون من تطبيق باصك برقم الهاتف.</p>

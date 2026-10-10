@@ -142,7 +142,7 @@ export const supabase = {
       const who = email.includes('student') ? { id: crypto.randomUUID() } : email.startsWith('admin@') ? ADMINS.platform : ADMINS.company;
       return { data: { user: { id: who.id }, session: {} }, error: null };
     },
-    signOut: async () => { sessionStorage.removeItem('preview.as'); location.href = '/'; return { error: null }; },
+    signOut: async () => { if (as === 'none') return { error: null }; sessionStorage.removeItem('preview.as'); location.href = '/'; return { error: null }; },
     updateUser: async () => ({ data: {}, error: null }),
     resetPasswordForEmail: async () => ({ data: {}, error: null }),
     refreshSession: async () => ({ data: {}, error: null }),
