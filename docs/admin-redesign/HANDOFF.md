@@ -13,18 +13,15 @@ foreign key is now `ON DELETE SET NULL`, every record carries its supervisor's n
 Step 6 of the team test deletes a supervisor and could not run through the connector
 (deletes wait for an approval); run it locally with psql if wanted.
 
-Edge function `admin-reset-supervisor-password` is deployed (version 1).
+Edge functions `admin-reset-supervisor-password` and `admin-update-supervisor` are deployed (version 1 each).
 
 ## What is left
-1. Deploy `admin-update-supervisor` (blocked from this session):
-   `supabase functions deploy admin-update-supervisor` — until then a supervisor's
-   name can still be edited; a new phone number shows a clear «not activated yet» message.
-2. Delete the temporary QA account (banned, password scrambled):
+1. Delete the temporary QA account (banned, password scrambled):
    ```sql
    delete from public.admins where email = 'qa-redesign@basak.invalid';
    delete from auth.users where email = 'qa-redesign@basak.invalid';
    ```
-3. Merge the branch (pull request) and let Vercel deploy the dashboard.
+2. Merge the branch (pull request) and let Vercel deploy the dashboard.
 
 ## Run locally
 ```
