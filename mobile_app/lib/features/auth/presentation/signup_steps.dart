@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'package:basak_mobile/core/theme/app_icons.dart';
 import 'package:basak_mobile/core/ui/ui.dart';
@@ -32,6 +33,63 @@ const signupSteps = <({String rail, String title, String why})>[
     why: '8 أحرف على الأقل. اختر شيئاً لا تستخدمه في مكان آخر.',
   ),
 ];
+
+/// Where the terms and the privacy policy live, in one place for the whole app
+/// (sign-up, profile, help). The App Store asks for the privacy policy inside
+/// the app as well as on the listing.
+///
+/// OWNER: placeholder addresses. Confirm (or replace) both before submitting,
+/// and use the same privacy link in App Store Connect and Google Play.
+class LegalLinks {
+  LegalLinks._();
+
+  static const String terms = 'https://basak.app/terms';
+  static const String privacy = 'https://basak.app/privacy';
+
+  /// Opens [url] in the browser; says so on the page when it cannot.
+  static Future<void> open(BuildContext context, String url) async {
+    var opened = false;
+    try {
+      opened = await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    } catch (_) {
+      opened = false;
+    }
+    if (!opened && context.mounted) {
+      BasakToast.show(context, 'تعذر فتح الرابط على هذا الجهاز.', kind: BasakToastKind.failure);
+    }
+  }
+}
+
+/// The terms and the privacy policy as links, under the box that accepts them.
+/// They sit outside the box's row so opening one never ticks (or unticks) it.
+class _LegalLinksRow extends StatelessWidget {
+  final TextStyle style;
+
+  const _LegalLinksRow({super.key, required this.style});
+
+  Widget _link(String label, String url, BuildContext context) => Semantics(
+        link: true,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => LegalLinks.open(context, url),
+          child: Padding(
+            // A finger-sized target around a short word.
+            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+            child: Text(label, style: style.copyWith(decoration: TextDecoration.underline)),
+          ),
+        ),
+      );
+
+  @override
+  Widget build(BuildContext context) => Wrap(
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          _link('اقرأ الشروط', LegalLinks.terms, context),
+          Text(' · ', style: style),
+          _link('سياسة الخصوصية', LegalLinks.privacy, context),
+        ],
+      );
+}
 
 Widget _blocks(List<Widget> children) => Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -336,6 +394,7 @@ class SignupPasswordStep extends StatelessWidget {
             ),
           ),
           if (termsError != null) FieldNote(termsError!),
+          _LegalLinksRow(key: const Key('signup-legal-links'), style: strong),
         ],
       ),
     ]);

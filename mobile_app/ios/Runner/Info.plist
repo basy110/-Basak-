@@ -6,16 +6,20 @@
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>ar</string>
+	</array>
 	<key>NSCameraUsageDescription</key>
-	<string>يستخدم باصك الكاميرا لمسح بطاقة الطالب ضوئياً والتحقق من بيانات الاشتراك.</string>
+	<string>يستخدم باصك الكاميرا لتصوير إيصال الدفع أو صورتك الشخصية عندما تختار ذلك، وليمسح المشرف بطاقة الطالب ضوئياً عند الصعود.</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>يستخدم باصك Face ID لتسجيل دخولك بسرعة بدلاً من كتابة كلمة المرور، عندما تفعّل ذلك.</string>
 	<key>NSContactsUsageDescription</key>
 	<string>لحفظ رقم مشرف الحافلة في جهات الاتصال عندما تطلب ذلك.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>لحفظ إيصال الاشتراك كصورة في الصور عندما تطلب ذلك.</string>
+	<string>لحفظ إيصال الاشتراك أو ملخص الترم كصورة في الصور عندما تطلب ذلك.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>يستخدم باصك الصورة التي تختارها لإضافتها إلى ملفك الشخصي.</string>
+	<string>يستخدم باصك الصورة التي تختارها فقط: صورة إيصال الدفع لرفعها مع طلب الاشتراك، أو صورتك الشخصية لملفك وبطاقة الاشتراك.</string>
 	<key>CFBundleDisplayName</key>
 	<string>باصك</string>
 	<key>CFBundleExecutable</key>
@@ -34,6 +38,8 @@
 	<string>????</string>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>
