@@ -2,7 +2,7 @@
 # One-time: npx.cmd supabase@latest login
 $ref = "hnwpkkryxovhmsrokdsd"
 # Every folder under supabase/functions except _shared (keep in step with config.toml).
-$functions = @("admin-create-company", "admin-create-company-admin", "admin-delete-company-admin", "admin-create-student", "admin-delete-student", "admin-create-supervisor", "admin-delete-supervisor", "student-delete-account", "student-reset-password", "admin-reset-student-password", "student-change-password", "student-wallet-pass", "wallet-apple-web", "wallet-sync", "wallet-photo", "push-dispatch", "storage-cleanup")
+$functions = @("admin-create-company", "admin-create-company-admin", "admin-delete-company-admin", "admin-create-student", "admin-delete-student", "admin-create-supervisor", "admin-delete-supervisor", "admin-update-supervisor", "admin-reset-supervisor-password", "student-delete-account", "student-reset-password", "admin-reset-student-password", "student-change-password", "student-wallet-pass", "wallet-apple-web", "wallet-sync", "wallet-photo", "push-dispatch", "storage-cleanup")
 foreach ($fn in $functions) {
   Write-Host "Deploying $fn ..."
   npx.cmd supabase@latest functions deploy $fn --project-ref $ref --no-verify-jwt --use-api
