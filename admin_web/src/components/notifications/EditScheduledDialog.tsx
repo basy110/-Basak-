@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
-import { audienceFromSpec, audienceToPayload, draftProblem, type HistoryRow, type NotificationDraft } from '../../lib/notifications';
+import { audienceFromSpec, audienceToPayload, draftProblem, studentsText, supervisorsText, type HistoryRow, type NotificationDraft } from '../../lib/notifications';
 import { cairoLocalToIso, cairoToday, isoToCairoLocal } from '../../lib/time';
 import { updateScheduledNotification, useAudiencePreview, useNotificationActions } from '../../lib/notificationsData';
 import { useLineOptions } from '../../lib/reference';
 import { useGuard } from '../../lib/guard';
-import { notify } from '../../lib/toasts';
+import { notifyDone } from '../../lib/toasts';
+import { Button, Note, SidePanel, errorText } from '../../ui';
 import { NotificationForm } from './NotificationForm';
-import { AudiencePreviewCard, Dialog } from './parts';
 
 /** A scheduled notification before it goes out: its words, its audience and its time can still change. */
-export const EditScheduledDialog: React.FC<{ companyId: string; row: HistoryRow; onClose: () => void }> = ({ companyId, row, onClose }) => {
+export const EditScheduledDialog: React.FC<{ companyId: string; row: HistoryRow; onClose: () => void; onCancelSend?: () => void }> = ({ companyId, row, onClose, onCancelSend }) => {
   const [today] = useState(() => cairoToday());
   const [draft, setDraft] = useState<NotificationDraft>(() => ({
     title: row.title, body: row.body, audience: audienceFromSpec(row.audience_spec, today),
@@ -18,13 +18,11 @@ export const EditScheduledDialog: React.FC<{ companyId: string; row: HistoryRow;
   }));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-
   const options = useLineOptions(companyId);
   const guard = useGuard();
   const audience = audienceToPayload(draft.audience);
   const preview = useAudiencePreview(companyId, audience);
   const { refresh } = useNotificationActions(companyId);
-
   const problem = draftProblem(draft);
   const students = preview.status === 'ready' ? preview.data?.students ?? 0 : 0;
   const canSave = !problem && preview.status === 'ready' && students > 0;
@@ -37,42 +35,34 @@ export const EditScheduledDialog: React.FC<{ companyId: string; row: HistoryRow;
     setError('');
     try {
       await updateScheduledNotification({ id: row.id, title: draft.title.trim(), body: draft.body.trim(), audience, scheduledAt });
-      notify({ title: 'تم حفظ تعديل الإشعار المجدول' });
+      notifyDone('حُفظ تعديل الإشعار المجدول');
       void refresh(row.id);
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'تعذر حفظ التعديل.');
+      setError(errorText(err));
       setBusy(false);
     }
   });
 
   return (
-    <Dialog wide title="تعديل إشعار مجدول" onClose={() => { if (!busy) onClose(); }}>
-      <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); if (canSave) void save(); }}>
-        {!row.audience_spec && (
-          <p className="rounded-xl bg-amber-50 p-3 text-xs font-bold text-amber-700">
-            تعذر قراءة المستلمين المحفوظين لهذا الإشعار ({row.audience || 'غير معروف'}). اخترهم من جديد قبل الحفظ.
-          </p>
-        )}
-        <NotificationForm draft={draft} onChange={(next) => { setDraft(next); setError(''); }} lines={options.data?.lines ?? []}
-          universities={options.data?.universities ?? []} optionsLoading={options.loading} today={today} scheduledOnly disabled={busy} />
-        <AudiencePreviewCard preview={preview} />
-        {(error || problem) && (
-          <p role={error ? 'alert' : undefined} className={`text-sm ${error ? 'rounded-xl bg-rose-50 p-3 text-rose-700' : 'text-xs text-slate-500'}`}>
-            {error || problem}
-          </p>
-        )}
-        <div className="flex justify-end gap-2">
-          <button type="button" onClick={onClose} disabled={busy}
-            className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-bold text-slate-600 transition hover:bg-slate-200 disabled:opacity-50">
-            رجوع
-          </button>
-          <button type="submit" disabled={busy || !canSave}
-            className="rounded-xl bg-blue-600 px-5 py-2 text-sm font-bold text-white transition hover:bg-blue-700 disabled:opacity-50">
-            {busy ? 'جاري الحفظ…' : canSave ? `حفظ · ${students} طالب` : 'حفظ التعديل'}
-          </button>
-        </div>
-      </form>
-    </Dialog>
+    <SidePanel open onClose={() => { if (!busy) onClose(); }} title="تعديل إشعار مجدول" sub="لم يُرسل بعد: تستطيع تغيير كلماته ومستلميه وموعده." w={560} backLabel="الإشعارات"
+      footer={(
+        <>
+          {onCancelSend && <Button kind="dangerQuiet" icon="x" onClick={onCancelSend} disabled={busy}>إلغاء الإرسال</Button>}
+          <span className="hidden flex-1 sm:block" />
+          <Button kind="secondary" onClick={onClose} disabled={busy} className="hidden sm:inline-flex">رجوع</Button>
+          <Button onClick={() => void save()} loading={busy} disabled={!canSave}>حفظ التعديل</Button>
+        </>
+      )}>
+      {!row.audience_spec && <Note tone="warning" title="اختر المستلمين من جديد">تعذّرت قراءة المستلمين المحفوظين لهذا الإشعار ({row.audience || 'غير معروف'}).</Note>}
+      <NotificationForm draft={draft} onChange={(next) => { setDraft(next); setError(''); }} lines={options.data?.lines ?? []} plain showErrors
+        universities={options.data?.universities ?? []} optionsLoading={options.loading} today={today} scheduledOnly disabled={busy} />
+      <div className="rounded-inner bg-ground px-4 py-3">
+        <div className="text-small font-semibold">{preview.status === 'ready' && preview.data
+          ? `يصل إلى ${studentsText(preview.data.students)}${preview.data.supervisors ? ` و${supervisorsText(preview.data.supervisors)}` : ''}` : 'نحسب المستلمين…'}</div>
+        <div className="text-label text-ink-2">يُحسب المستلمون من جديد عند الإرسال.</div>
+      </div>
+      {error && <Note tone="danger" title="لم يُحفظ التعديل">{error}</Note>}
+    </SidePanel>
   );
 };

@@ -6,7 +6,7 @@ import { CAIRO_LABEL } from '../../lib/time';
 import type { HistoryActions, HistoryState } from '../../lib/notificationsData';
 import { useGuard } from '../../lib/guard';
 import type { CompanyBrand } from '../../lib/branding';
-import { Badge, Button, Cell2, Chips, DataTable, EmptyState, ErrorState, IconButton, Menu, SearchBox, SkeletonTable, StatePill, Toolbar, errorText, type Column } from '../../ui';
+import { Badge, Button, Chips, DataTable, EmptyState, ErrorState, IconButton, Menu, SearchBox, SkeletonTable, StatePill, Toolbar, errorText, type Column } from '../../ui';
 import { notifyError } from '../../lib/toasts';
 import { CompanyMark } from '../CompanyMark';
 import { EditScheduledDialog } from './EditScheduledDialog';
@@ -158,4 +158,3 @@ export const History: React.FC<Props> = ({ companyId, filter, onFilter, history,
   );
 };
 
-export { Cell2 };

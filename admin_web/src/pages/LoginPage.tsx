@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Button } from '../ui/Button';
 import { PasswordField, TextField } from '../ui/Field';
 import { Icon } from '../ui/Icon';
@@ -47,7 +47,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
   const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
   const [loading, setLoading] = useState(false);
   const [wait, setWait] = useState(0);
-  const passwordRef = useRef<HTMLInputElement>(null);
   const guard = useGuard();
 
   useEffect(() => {
@@ -88,7 +87,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
       } catch (err) {
         const p = signInProblem(err instanceof Error ? err.message : String((err as { message?: string })?.message ?? ''), navigator.onLine);
         setProblem(p);
-        if (p === 'credentials') { setPassword(''); passwordRef.current?.focus(); }
+        if (p === 'credentials') { setPassword(''); document.getElementById('login-password')?.focus(); }
       } finally {
         setLoading(false);
       }
@@ -170,7 +169,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
         {note && <AuthNote tone={note[0]} title={note[1]}>{note[2]}</AuthNote>}
         <div className="flex flex-col gap-4">
           {emailField}
-          <PasswordField ref={passwordRef} label="كلمة المرور" placeholder="كلمة المرور" value={password} autoComplete="current-password" maxLength={200}
+          <PasswordField id="login-password" label="كلمة المرور" placeholder="كلمة المرور" value={password} autoComplete="current-password" maxLength={200}
             onChange={(e) => { setPassword(e.target.value); setFieldErrors((f) => ({ ...f, password: undefined })); if (problem === 'credentials') setProblem(null); }}
             error={problem === 'credentials' ? 'البريد الإلكتروني أو كلمة المرور غير صحيحة.' : fieldErrors.password} />
           <button type="button" onClick={() => go('forgot')} className="-mt-1 self-start text-label font-medium text-teal hover:underline">نسيت كلمة المرور؟</button>
