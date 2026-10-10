@@ -148,11 +148,17 @@ const platformOr = (name: string, mine: (args: Row) => unknown) => {
   return (args: Row, ctx: never) => (args.p_company_id == null || !theirs ? mine(args) : theirs(args, ctx));
 };
 
+/** `?state=platerror` / `?state=platloading`: this file's functions fail or never answer (the shell still loads). */
+const gate = <A extends unknown[], R>(f: (...a: A) => R) => (...a: A): R | Promise<R> => {
+  if (state() === 'platerror') throw new Error('Failed to fetch');
+  if (state() === 'platloading') return new Promise<R>(() => undefined);
+  return f(...a);
+};
 const register = () => registerRpc({
-  platform_companies: () => (state() === 'one' ? [companyRow(tables.companies[0])] : tables.companies.map(companyRow)),
+  platform_companies: gate(() => (state() === 'one' ? [companyRow(tables.companies[0])] : tables.companies.map(companyRow))),
   platform_company_detail: ({ p_company_id }) => detail(p_company_id),
   platform_university_counts: () => (state() === 'nocounts' ? fail('Failed to fetch') : universityCounts()),
-  get_subscription_settings: platformOr('get_subscription_settings', platformSettings),
+  get_subscription_settings: platformOr('get_subscription_settings', gate(platformSettings)),
   get_subscription_switches: platformOr('get_subscription_switches', () => ({ daily_global: settings().daily_subscription_enabled, daily_company: null, daily_effective: settings().daily_subscription_enabled, annual_effective: settings().annual_subscription_enabled })),
   get_vote_settings: platformOr('get_vote_settings', platformVote),
   set_vote_settings: platformOr('set_vote_settings', (a) => {
@@ -239,13 +245,13 @@ const missing = (map: Record<string, (a: Row, c: never) => unknown>) => {
   fill(); setTimeout(fill, 0);
 };
 missing({
-  get_platform_notifications_page: ({ p_before, p_limit = 30, p_status, p_company_id }) => {
+  get_platform_notifications_page: gate(({ p_before, p_limit = 30, p_status, p_company_id }) => {
     if (state() === 'empty') return { items: [], next_before: null, push: { configured: false, devices: 0, ios: 0, android: 0, queued: 0, accepted_24h: 0, failed_24h: 0 } };
     const rows = NOTES.filter((n) => (!p_status || n.status === p_status) && (!p_company_id || n.company_id === p_company_id) && (!p_before || n.created_at < p_before));
     const items = rows.slice(0, p_limit);
     return { items, next_before: rows.length > p_limit ? items[items.length - 1].created_at : null,
       push: { configured: true, devices: 5120, ios: 1840, android: 3280, queued: 36, accepted_24h: 8412, failed_24h: 14 } };
-  },
+  }),
   platform_preview_notification: ({ p_company_ids }) => {
     const ids: string[] | null = p_company_ids;
     const chosen = companiesFor().filter((c) => !ids || ids.includes(c.id));
