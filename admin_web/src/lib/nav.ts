@@ -33,7 +33,8 @@ export const COMPANY_NAV: NavGroup[] = [
   { group: 'الاشتراكات والمدفوعات', items: [
     { id: 'subscription-periods', slug: 'subscription-periods', label: 'مواعيد الاشتراك', icon: 'calendar', preload: routes.SubscriptionPeriodsPage.preload },
     { id: 'payment-methods', slug: 'payment-methods', label: 'وسائل الدفع', icon: 'card', preload: routes.PaymentMethodsPage.preload },
-    { id: 'reports', slug: 'reports', label: 'الإيرادات', icon: 'chart', preload: routes.ReportsPage.preload }] },
+    { id: 'reports', slug: 'reports', label: 'الإيرادات', icon: 'chart', preload: routes.ReportsPage.preload },
+    { id: 'analytics', slug: 'analytics', label: 'التحليلات', icon: 'trend', preload: routes.AnalyticsPage.preload }] },
   { group: 'هوية الشركة', items: [
     { id: 'wallet-card', slug: 'wallet-card', label: 'بطاقة الطالب', icon: 'idcard', preload: routes.WalletCardPage.preload },
     { id: 'receipt-details', slug: 'receipt-details', label: 'بيانات الإيصال', icon: 'building', preload: routes.ReceiptDetailsPage.preload }] },

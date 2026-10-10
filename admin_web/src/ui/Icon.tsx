@@ -4,7 +4,7 @@ import {
   ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Clock, Contact, Copy, CreditCard, Download, ExternalLink, Eye, EyeOff,
   Filter, GraduationCap, GripVertical, HelpCircle, Home, Image, Info, KeyRound, Lock, LogOut, Mail, MapPin, Megaphone, Menu,
   MoreVertical, Palette, PanelRight, Pencil, Phone, Plus, Power, Receipt, RefreshCw, Route, ScanLine, Search, Send, Shield,
-  SlidersHorizontal, Smartphone, Trash2, Undo2, Upload, User, Users, Wand2, WifiOff, X, ZoomIn, type LucideIcon,
+  SlidersHorizontal, Smartphone, Trash2, TrendingUp, Undo2, Upload, User, Users, Wand2, WifiOff, X, ZoomIn, type LucideIcon,
 } from 'lucide-react';
 
 /**
@@ -20,7 +20,7 @@ const ICONS = {
   alert: AlertTriangle, info: Info, help: HelpCircle, logout: LogOut, trash: Trash2, undo: Undo2, pencil: Pencil, copy: Copy,
   eye: Eye, eyeOff: EyeOff, lock: Lock, phone: Phone, mail: Mail, image: Image, pin: MapPin, wifiOff: WifiOff, refresh: RefreshCw,
   external: ExternalLink, power: Power, panel: PanelRight, grip: GripVertical, wand: Wand2, upload: Upload, download: Download,
-  ban: Ban, send: Send, palette: Palette,
+  ban: Ban, send: Send, palette: Palette, trend: TrendingUp,
 } satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof ICONS;
