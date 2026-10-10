@@ -50,6 +50,28 @@ export const StepsNav: React.FC<{ step: StepNo; d: LineDraft; reached: number; e
   );
 };
 
+/** Tablet: the five steps in a row, only the current one named. */
+export const StepsRow: React.FC<{ step: StepNo; reached: number; edit: boolean; go: (s: StepNo) => void }> = ({ step, reached, edit, go }) => (
+  <ol className="m-0 flex list-none items-center gap-2 p-0" aria-label="الخطوات">
+    {STEPS.map((s, i) => {
+      const n = (i + 1) as StepNo;
+      const state = n === step ? 'current' : edit || n < reached ? 'done' : 'todo';
+      return (
+        <React.Fragment key={n}>
+          <li aria-current={state === 'current' ? 'step' : undefined} className="flex flex-none items-center gap-2">
+            <button type="button" disabled={state === 'current' || !(edit || n <= reached)} onClick={() => go(n)} aria-label={s.label}
+              className={`flex h-7 w-7 items-center justify-center rounded-full text-label font-semibold ${state === 'done' ? 'bg-ok text-white' : state === 'current' ? 'bg-teal text-white' : 'bg-surface text-ink-3 shadow-[inset_0_0_0_1.5px_#9DB0BB]'}`}>
+              {state === 'done' ? <Icon name="check" size={16} stroke={2.5} /> : n}
+            </button>
+            {state === 'current' && <span className="whitespace-nowrap text-small font-semibold">{s.label}</span>}
+          </li>
+          {i < STEPS.length - 1 && <li aria-hidden="true" className={`h-0.5 min-w-4 flex-1 rounded-sm ${state === 'done' ? 'bg-ok' : 'bg-hair'}`} />}
+        </React.Fragment>
+      );
+    })}
+  </ol>
+);
+
 // ── «ملخص الخط» ──────────────────────────────────────────────────────────────
 export const Summary: React.FC<{ d: LineDraft; uniName: (id: string) => string; badge: React.ReactNode }> = ({ d, uniName, badge }) => {
   const seats = parseBusCapacity(d.capacity);

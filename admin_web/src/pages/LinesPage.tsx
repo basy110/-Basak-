@@ -117,12 +117,12 @@ export const LinesPage: React.FC = () => {
   );
 
   const columns: Column<Row>[] = [
-    { key: 'name', label: 'الخط', w: 216, render: (r) => <div className="min-w-0"><div className="truncate font-semibold">{r.line.name}</div><div className="truncate text-cap text-ink-3">{r.unis.join(' · ') || 'بلا جامعة'}</div></div> },
-    { key: 'st', label: 'المحطات والرحلات', w: 136, render: (r) => <StationsTrips r={r} /> },
-    { key: 'subs', label: <span className="inline-flex items-center gap-1">المشتركون{sort === 'subs' && <Icon name="adown" size={14} stroke={2} />}</span>, w: 104, render: (r) => <span className="tabular">{r.stats.subscribers == null ? '—' : n(r.stats.subscribers)}</span> },
-    { key: 'riders', label: 'ركاب الغد', w: 164, render: (r) => <Riders s={r.stats} /> },
-    { key: 'seats', label: 'مقاعد الباص', w: 104, hideTablet: true, render: (r) => <Seats r={r} /> },
-    { key: 'sup', label: 'المشرف', w: 176, hideTablet: true, render: (r) => <Supervisors r={r} /> },
+    { key: 'name', label: 'الخط', w: 200, render: (r) => <div className="min-w-0"><div className="truncate font-semibold">{r.line.name}</div><div className="truncate text-cap text-ink-3">{r.unis.join(' · ') || 'بلا جامعة'}</div></div> },
+    { key: 'st', label: 'المحطات والرحلات', w: 128, hideTablet: true, render: (r) => <StationsTrips r={r} /> },
+    { key: 'subs', label: <span className="inline-flex items-center gap-1">المشتركون{sort === 'subs' && <Icon name="adown" size={14} stroke={2} />}</span>, w: 96, render: (r) => <span className="tabular">{r.stats.subscribers == null ? '—' : n(r.stats.subscribers)}</span> },
+    { key: 'riders', label: 'ركاب الغد', render: (r) => <Riders s={r.stats} /> },
+    { key: 'seats', label: 'مقاعد الباص', w: 96, hideTablet: true, render: (r) => <Seats r={r} /> },
+    { key: 'sup', label: 'المشرف', w: 168, hideTablet: true, render: (r) => <Supervisors r={r} /> },
     { key: 'vis', label: 'للطلاب', render: (r) => <VisibilityCell vis={r.vis} /> },
     { key: 'menu', label: <span className="sr-only">إجراءات</span>, w: 56, align: 'end', render: menu },
   ];

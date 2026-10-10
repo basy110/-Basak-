@@ -155,3 +155,20 @@ describe('lookups in the shape the pages use', () => {
     expect(activeStations(undefined)).toEqual([]);
   });
 });
+
+import { dayLong, senderShort, studentsText, whenLabel } from './notifications';
+describe('the notifications page words', () => {
+  const now = new Date('2026-10-10T12:00:00Z');
+  it('says when, in Cairo time, as the list does', () => {
+    expect(whenLabel('2026-10-10T11:41:00Z', now)).toBe('اليوم · 2:41 م');
+    expect(whenLabel('2026-10-09T17:00:00Z', now)).toBe('أمس · 8:00 م');
+    expect(whenLabel('2026-10-14T15:00:00Z', now)).toBe('الأربعاء 14 أكتوبر · 6:00 م');
+    expect(whenLabel('2026-10-07T04:02:00Z', now)).toBe('7 أكتوبر · 7:02 ص');
+    expect(dayLong('2026-10-14')).toBe('الأربعاء 14 أكتوبر 2026');
+  });
+  it('counts students and names the sender', () => {
+    expect([1, 2, 5, 96].map(studentsText)).toEqual(['طالب واحد', 'طالبان', '5 طلاب', '96 طالباً']);
+    expect(senderShort({ sender_role: 'admin', sender_name: 'أحمد', type: null }, 'أحمد')).toBe('أنت');
+    expect(senderShort({ sender_role: 'supervisor', sender_name: 'محمود السيد', type: null })).toBe('المشرف محمود السيد');
+  });
+});

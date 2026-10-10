@@ -3,7 +3,7 @@
  * idempotency key and labels. Nothing here touches the network or React, so
  * every function can be tested with plain values. Cairo time is in lib/time.ts.
  */
-import { CAIRO_LABEL, addDays, cairoLocalToIso, clockLabel, isDay } from './time';
+import { CAIRO_LABEL, addDays, cairoLocalToIso, clockLabel, isDay, isoToCairoLocal } from './time';
 
 export const TITLE_MAX = 80;
 export const BODY_MAX = 600;
@@ -174,7 +174,7 @@ export const isDirty = (draft: NotificationDraft) => draft.title.trim() !== '' |
 /** Why the draft cannot be submitted yet ('' = it can). The server checks again. */
 export function draftProblem(draft: NotificationDraft, now: Date = new Date()): string {
   if (!draft.title.trim() || !draft.body.trim()) return 'اكتب عنوان الإشعار ونصه.';
-  if (draft.title.trim().length > TITLE_MAX) return `العنوان أطول من ${TITLE_MAX} حرفاً.`;
+  if (draft.title.trim().length > TITLE_MAX) return `العنوان أطول من ${TITLE_MAX} حرفاً. اختصره بـ ${draft.title.trim().length - TITLE_MAX} ${draft.title.trim().length - TITLE_MAX <= 10 ? 'أحرف' : 'حرفاً'}.`;
   if (draft.body.trim().length > BODY_MAX) return `نص الإشعار أطول من ${BODY_MAX} حرفاً.`;
   const audience = audienceProblem(draft.audience);
   if (audience) return audience;
@@ -287,7 +287,7 @@ export function tripLabel(trip: { direction: 'departure' | 'return'; label?: str
 export function scheduleProblem(local: string, now: Date = new Date()): string {
   const iso = local ? cairoLocalToIso(local) : null;
   if (!iso) return 'حدد موعد الإرسال.';
-  if (new Date(iso).getTime() <= now.getTime()) return `موعد الإرسال يجب أن يكون في المستقبل (${CAIRO_LABEL}).`;
+  if (new Date(iso).getTime() <= now.getTime()) return `هذا الموعد مضى. اختر وقتاً قادماً ${CAIRO_LABEL}.`;
   return '';
 }
 
@@ -308,4 +308,69 @@ export const withoutRow = (items: HistoryRow[], id: string) => items.filter((row
 export function withCancelled(items: HistoryRow[], id: string, filter: StatusFilter): HistoryRow[] {
   if (filter === 'scheduled') return withoutRow(items, id);
   return items.map((row) => (row.id === id ? { ...row, status: 'cancelled' as const } : row));
+}
+
+// ------------------------------------------------------- the page's words ----
+
+const AR_MONTHS = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+const AR_DAYS = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+const cairoWall = (iso: string) => isoToCairoLocal(iso);
+
+/**
+ * When a notification went (or goes), in Cairo time, as the list says it:
+ * «اليوم · 2:41 م», «أمس · 8:00 م», «الأربعاء 14 أكتوبر · 6:00 م» (ahead),
+ * «7 أكتوبر · 7:02 ص», and the year when it is not this one.
+ */
+export function whenLabel(iso: string | null | undefined, now: Date = new Date()): string {
+  if (!iso) return '';
+  const wall = cairoWall(iso);
+  if (!wall) return '';
+  const [day, time] = wall.split('T');
+  const today = cairoWall(now.toISOString()).slice(0, 10);
+  const clock = clockLabel(time);
+  if (day === today) return `اليوم · ${clock}`;
+  if (day === addDays(today, -1)) return `أمس · ${clock}`;
+  if (day === addDays(today, 1)) return `غداً · ${clock}`;
+  const [y, m, d] = day.split('-').map(Number);
+  const weekday = AR_DAYS[new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
+  const date = `${d} ${AR_MONTHS[m - 1]}${String(y) === today.slice(0, 4) ? '' : ` ${y}`}`;
+  return `${day > today ? `${weekday} ` : ''}${date} · ${clock}`;
+}
+
+/** «الأربعاء 14 أكتوبر 2026» for a Cairo calendar day. */
+export function dayLong(day: string): string {
+  if (!isDay(day)) return '';
+  const [y, m, d] = day.split('-').map(Number);
+  return `${AR_DAYS[new Date(Date.UTC(y, m - 1, d)).getUTCDay()]} ${d} ${AR_MONTHS[m - 1]} ${y}`;
+}
+
+/** «طالب واحد», «طالبان», «5 طلاب», «96 طالباً». */
+export function studentsText(n: number): string {
+  if (n === 1) return 'طالب واحد';
+  if (n === 2) return 'طالبان';
+  if (n >= 3 && n <= 10) return `${n} طلاب`;
+  return `${n.toLocaleString('en-US')} طالباً`;
+}
+/** «مشرف واحد», «مشرفان», «5 مشرفين». */
+export function supervisorsText(n: number): string {
+  if (n === 1) return 'مشرف واحد';
+  if (n === 2) return 'مشرفان';
+  if (n >= 3 && n <= 10) return `${n} مشرفين`;
+  return `${n.toLocaleString('en-US')} مشرفاً`;
+}
+/** «هاتف واحد», «83 هاتفاً». */
+export function phonesText(n: number): string {
+  if (n === 1) return 'هاتف واحد';
+  if (n === 2) return 'هاتفان';
+  if (n >= 3 && n <= 10) return `${n} هواتف`;
+  return `${n.toLocaleString('en-US')} هاتفاً`;
+}
+
+/** Who sent it, as the company's own list says it («أنت» for the admin reading). */
+export function senderShort(row: Pick<HistoryRow, 'sender_role' | 'sender_name' | 'type'>, me?: string | null): string {
+  if (row.type === PLATFORM_ANNOUNCEMENT) return PLATFORM_SENDER;
+  if (row.sender_role === 'system') return 'النظام';
+  if (row.sender_role === 'supervisor') return row.sender_name ? `المشرف ${row.sender_name}` : 'مشرف';
+  if (me && row.sender_name === me) return 'أنت';
+  return row.sender_name ?? 'الإدارة';
 }

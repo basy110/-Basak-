@@ -12,7 +12,7 @@ import {
   unsavedText, W, type LineDraft, type StepNo, type TripDraft,
 } from '../../lib/lines';
 import { SALE_OPTIONS } from '../../lib/saleOptions';
-import { STEPS, Step1, Step2, Step4, Step5, StepsNav, Summary, UnsavedBadge } from './WizardSteps';
+import { STEPS, StepsRow, Step1, Step2, Step4, Step5, StepsNav, Summary, UnsavedBadge } from './WizardSteps';
 import { TripsStep } from './TripsStep';
 import { useLeaveGuard } from './useLeaveGuard';
 
@@ -197,7 +197,8 @@ export const LineWizard: React.FC<{ mode: 'new' | 'edit'; line?: LineRow; startS
           تغيير اسم محطة أو موعدها يظهر عند طلابها فور الحفظ، ويتغيّر موعد الركوب في اشتراكاتهم. محطة أو رحلة عليها طلاب لا تُحذف: تتوقف وتختفي من الخط، ويبقى طلابها عليها حتى تنقلهم. الاسم، الجامعات، المقاعد، الأسعار والمحطات والرحلات الخالية تتغيّر بحرية.
         </Note>
       )}
-      <div className="lg:hidden"><Stepper steps={stepperSteps} /></div>
+      <div className="sm:hidden"><Stepper steps={stepperSteps} /></div>
+      <div className="hidden sm:block lg:hidden"><StepsRow step={step} reached={reached} edit={edit} go={go} /></div>
       <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[208px_minmax(0,1fr)_292px]">
         <div className="hidden lg:block"><StepsNav step={step} d={d} reached={reached} edit={edit} go={go} /></div>
         <div className="flex min-w-0 flex-col gap-3">

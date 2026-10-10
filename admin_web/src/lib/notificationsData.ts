@@ -9,7 +9,7 @@ import {
   type PlatformHistoryPage, type PlatformPreview, type Priority, type StatusFilter,
 } from './notifications';
 
-const PAGE_SIZE = 30;
+const PAGE_SIZE = 25;
 
 /**
  * The history lives under `keys.company(id, 'notifications', …)`, the key
