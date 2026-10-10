@@ -57,6 +57,31 @@ export async function exportSheet<T>({ name, sheet, columns, rows }: { name: str
   } as never, { fontFamily: 'Arial', fontSize: 12 }).toBlob().then((blob) => save(blob, fileNameFor(name)));
 }
 
+/** One sheet of a workbook: its tab name (31 characters at most), columns and rows. */
+export interface SheetSpec<T = any> { sheet: string; columns: ExportColumn<T>[]; rows: T[] }
+
+/** Several sheets in one .xlsx file, each right-to-left with a bold header row (sheets without rows are left out). */
+export async function exportSheets(name: string, sheets: SheetSpec[]) {
+  const { default: writeXlsxFile } = await import('write-excel-file/browser');
+  const used = new Set<string>();
+  const kept = sheets.filter((s) => s.rows.length > 0);
+  const list = (kept.length ? kept : sheets.slice(0, 1)).map((s) => {
+    // Excel refuses two tabs with one name and some characters in a tab name.
+    let tab = s.sheet.replace(/[\\/:*?[\]]+/g, ' ').trim().slice(0, 31) || 'ورقة';
+    for (let i = 2; used.has(tab); i += 1) tab = `${tab.slice(0, 28)} ${i}`;
+    used.add(tab);
+    return {
+      sheet: tab, rightToLeft: true, stickyRowsCount: 1,
+      columns: s.columns.map((c) => ({ width: c.width ?? Math.min(40, Math.max(12, c.label.length + 4)) })),
+      data: [
+        s.columns.map((c) => ({ value: c.label, type: String, ...HEADER })),
+        ...s.rows.map((r) => s.columns.map((c) => cell(c.value(r), c.format))),
+      ],
+    };
+  });
+  await writeXlsxFile(list as never, { fontFamily: 'Arial', fontSize: 12 } as never).toBlob().then((blob) => save(blob, fileNameFor(name)));
+}
+
 /** A blank file with just the header row (and optional example rows) to fill and import back. */
 export async function exportTemplate(name: string, headers: string[], examples: CellValue[][] = []) {
   const { default: writeXlsxFile } = await import('write-excel-file/browser');

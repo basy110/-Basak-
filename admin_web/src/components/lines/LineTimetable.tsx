@@ -41,51 +41,65 @@ const Num: React.FC<{ n: number }> = ({ n }) => (
   <span aria-hidden="true" className="flex h-[22px] w-[22px] flex-none items-center justify-center rounded-full bg-sunken text-cap font-medium text-ink-2 tabular">{n}</span>
 );
 
-/** Desktop and tablet: stations down, departure trips across, tomorrow's riders on top, the arrival at the bottom. */
+/** Column widths of the departure table: the stations, and each trip between the least it needs and the most it gets. */
+const STATION_W = 240;
+const TRIP_MIN = 168;
+const TRIP_MAX = 240;
+/** The timetable's natural width: what it takes when nothing squeezes it. */
+export const departureWidth = (trips: number) => STATION_W + trips * TRIP_MAX;
+
+/**
+ * Desktop and tablet: stations down, departure trips across, tomorrow's riders on top, the arrival at the bottom.
+ * The card is only as wide as its trips need (a trip gets at most TRIP_MAX), so one trip makes a narrow card
+ * instead of an empty band; many trips share the width and scroll sideways once each is down to TRIP_MIN.
+ */
 export const DepartureTable: React.FC<{ stations: Station[]; trips: Trip[]; stats: LineStats; uniName: (id: string) => string }> = ({ stations, trips, stats, uniName }) => {
   const seats = stats.bus_capacity;
   const stop = (t: Trip, s: Station) => t.line_trip_stops.find((x) => x.station_id === s.id)?.stop_time;
   return (
-    <Card className="overflow-hidden">
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[720px] border-collapse text-small">
-          <caption className="sr-only">مواعيد رحلات الذهاب على كل محطة</caption>
-          <thead>
-            <tr className="border-b border-hair">
-              <th scope="col" className="w-[280px] px-5 pb-3 pt-4 text-start align-bottom text-label font-medium text-ink-2">المحطة بترتيب المسار</th>
-              {trips.map((t) => (
-                <th key={t.id} scope="col" className="border-s border-hair px-4 pb-3 pt-4 text-start align-bottom font-normal">
-                  <Clock t={t.start_time} className="block text-section font-semibold" />
-                  <span className="block truncate text-cap text-ink-2">{tripSub(t, uniName)}</span>
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            <tr className="border-b border-hair">
-              <th scope="row" className="px-5 py-3 text-start font-normal">
-                <span className="block font-semibold">ركاب الغد</span>
-                <span className="block text-cap text-ink-2">{seats ? `من مقاعد الباص (${seats})` : 'لم تُحدد مقاعد الباص'}</span>
-              </th>
-              {trips.map((t) => <td key={t.id} className="border-s border-hair px-3 py-3"><RidersMeter riders={stats.riders_departure == null ? null : stats.trip_riders[t.id] ?? 0} seats={seats} /></td>)}
-            </tr>
-            {stations.map((s, i) => (
-              <tr key={s.id} className="h-11 border-b border-hair">
-                <th scope="row" className="px-5 text-start font-normal"><span className="flex items-center gap-3"><Num n={i + 1} /><span className="truncate">{s.name}</span></span></th>
-                {trips.map((t) => {
-                  const time = stop(t, s);
-                  return <td key={t.id} className="border-s border-hair px-4">{time ? <Clock t={time} /> : <span className="text-label text-ink-3">لا تقف</span>}</td>;
-                })}
+    <div className="max-w-full" style={{ width: `min(100%, ${STATION_W + trips.length * TRIP_MAX}px)` }}>
+      <Card className="overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="table-fixed border-collapse text-small" style={{ width: `max(100%, ${STATION_W + trips.length * TRIP_MIN}px)` }}>
+            <caption className="sr-only">مواعيد رحلات الذهاب على كل محطة</caption>
+            <colgroup><col style={{ width: STATION_W }} />{trips.map((t) => <col key={t.id} />)}</colgroup>
+            <thead>
+              <tr className="border-b border-hair">
+                <th scope="col" className="px-5 pb-3 pt-4 text-start align-bottom text-label font-medium text-ink-2">المحطة بترتيب المسار</th>
+                {trips.map((t) => (
+                  <th key={t.id} scope="col" className="border-s border-hair px-4 pb-3 pt-4 text-start align-bottom font-normal">
+                    <Clock t={t.start_time} className="block text-section font-semibold" />
+                    <span className="block truncate text-cap text-ink-2">{tripSub(t, uniName)}</span>
+                  </th>
+                ))}
               </tr>
-            ))}
-            <tr className="h-11 bg-ground">
-              <th scope="row" className="px-5 text-start"><span className="flex items-center gap-3 font-semibold"><Icon name="school" size={18} className="text-teal" />الوصول إلى الجامعة</span></th>
-              {trips.map((t) => <td key={t.id} className="border-s border-hair px-4 font-semibold"><Clock t={t.arrival_time} /></td>)}
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </Card>
+            </thead>
+            <tbody>
+              <tr className="border-b border-hair">
+                <th scope="row" className="px-5 py-3 text-start font-normal">
+                  <span className="block font-semibold">ركاب الغد</span>
+                  <span className="block text-cap text-ink-2">{seats ? `من مقاعد الباص (${seats})` : 'لم تُحدد مقاعد الباص'}</span>
+                </th>
+                {trips.map((t) => <td key={t.id} className="border-s border-hair px-3 py-3"><RidersMeter riders={stats.riders_departure == null ? null : stats.trip_riders[t.id] ?? 0} seats={seats} w="w-[140px]" /></td>)}
+              </tr>
+              {stations.map((s, i) => (
+                <tr key={s.id} className="h-11 border-b border-hair">
+                  <th scope="row" className="px-5 text-start font-normal"><span className="flex items-center gap-3"><Num n={i + 1} /><span className="min-w-0 truncate" title={s.name}>{s.name}</span></span></th>
+                  {trips.map((t) => {
+                    const time = stop(t, s);
+                    return <td key={t.id} className="border-s border-hair px-4">{time ? <Clock t={time} /> : <span className="text-label text-ink-3">لا تقف</span>}</td>;
+                  })}
+                </tr>
+              ))}
+              <tr className="h-11 bg-ground">
+                <th scope="row" className="px-5 text-start"><span className="flex items-center gap-3 font-semibold"><Icon name="school" size={18} className="text-teal" />الوصول إلى الجامعة</span></th>
+                {trips.map((t) => <td key={t.id} className="border-s border-hair px-4 font-semibold"><Clock t={t.arrival_time} /></td>)}
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </Card>
+    </div>
   );
 };
 

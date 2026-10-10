@@ -50,5 +50,6 @@ export const RideConfirmationPage = page(() => import('../pages/RideConfirmation
 export const SubscriptionPeriodsPage = page(() => import('../pages/SubscriptionPeriodsPage'), 'SubscriptionPeriodsPage');
 export const PaymentMethodsPage = page(() => import('../pages/PaymentMethodsPage'), 'PaymentMethodsPage');
 export const ReportsPage = page(() => import('../pages/ReportsPage'), 'ReportsPage');
+export const AnalyticsPage = page(() => import('../pages/AnalyticsPage'), 'AnalyticsPage');
 export const WalletCardPage = page(() => import('../pages/WalletCardPage'), 'WalletCardPage');
 export const ReceiptDetailsPage = page(() => import('../pages/ReceiptDetailsPage'), 'ReceiptDetailsPage');
