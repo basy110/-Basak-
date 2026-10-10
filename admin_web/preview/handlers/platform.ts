@@ -247,7 +247,7 @@ const missing = (map: Record<string, (a: Row, c: never) => unknown>) => {
 missing({
   get_platform_notifications_page: gate(({ p_before, p_limit = 30, p_status, p_company_id }) => {
     if (state() === 'empty') return { items: [], next_before: null, push: { configured: false, devices: 0, ios: 0, android: 0, queued: 0, accepted_24h: 0, failed_24h: 0 } };
-    const rows = NOTES.filter((n) => (!p_status || n.status === p_status) && (!p_company_id || n.company_id === p_company_id) && (!p_before || n.created_at < p_before));
+    const rows = NOTES.filter((n) => n.sender_role !== 'system' && (!p_status || n.status === p_status) && (!p_company_id || n.company_id === p_company_id) && (!p_before || n.created_at < p_before));
     const items = rows.slice(0, p_limit);
     return { items, next_before: rows.length > p_limit ? items[items.length - 1].created_at : null,
       push: { configured: true, devices: 5120, ios: 1840, android: 3280, queued: 36, accepted_24h: 8412, failed_24h: 14 } };
