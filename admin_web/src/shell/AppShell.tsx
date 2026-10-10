@@ -8,6 +8,7 @@ import { OfflineBar, Toaster } from '../ui/Feedback';
 import { PhoneHeadProvider, usePhoneHead } from '../ui/Layout';
 import { activeItem, type BadgeKey, type NavGroup, type NavItem } from '../lib/nav';
 import { StudentSearch } from './StudentSearch';
+import { EnterCompany } from './EnterCompany';
 
 export interface Who { name: string; roleLabel: string; initial: string }
 export type ShellRole = 'company' | 'platform' | 'workspace';
@@ -190,6 +191,7 @@ const TopBar: React.FC<ShellProps> = (p) => {
         </nav>
         <StudentSearch role={p.role} base={p.base} companyId={p.companyId} inputRef={searchRef} className="w-[280px] lg:w-[380px]" />
         <span className="hidden flex-1 lg:block" />
+        {p.role === 'platform' && <div className="hidden lg:block"><EnterCompany /></div>}
         <span aria-hidden="true" className="h-7 w-px flex-none bg-hair" />
         <div className="lg:hidden"><Person who={p.who} compact /></div>
         <div className="hidden lg:block"><Person who={p.who} /></div>
