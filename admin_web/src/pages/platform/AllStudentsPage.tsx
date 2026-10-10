@@ -1,23 +1,25 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Button } from '../../ui/Button';
 import { EmptyState, ErrorState, useOnline } from '../../ui/Feedback';
 import { Page, PageHeader } from '../../ui/Layout';
 import { Badge, Ltr } from '../../ui/Status';
-import { Chips, DataTable, Pager, SearchBox, SortSelect, type Column } from '../../ui/Table';
-import { countText, num, phoneText } from '../../ui/format';
+import { Chips, DataTable, Pager, SearchBox, SortSelect, Toolbar, type Column } from '../../ui/Table';
+import { ExportButton } from '../../ui/Transfer';
+import { countText, errorText, num, phoneText } from '../../ui/format';
 import { supabase } from '../../lib/supabase';
 import { keys, unwrap, usePageData, VARIANT_GC } from '../../lib/query';
 import { usePlatformCompanies } from '../../lib/reference';
 import { blockedLookup, useBlockedPhones } from '../../lib/blockedPhones';
 import { notifyError } from '../../lib/toasts';
 import {
-  loadPlatformCounts, loadPlatformStudents, type Membership, type PlatformStudent, type PlatformStudentDetails,
+  loadAllPlatformStudents, loadPlatformCounts, loadPlatformStudents, type Membership, type PlatformStudent, type PlatformStudentDetails,
 } from '../../lib/students';
 import { BlockedPhonesPanel } from '../../components/BlockedPhonesPanel';
 import { BlockedBadge } from '../../components/BlockStudentButton';
 import { PlatformStudentPanel } from '../../components/students/PlatformStudentPanel';
 import { FilterSelect, fullDay, LinkSelect } from '../../components/students/parts';
+import { exportPlatformStudents } from '../../components/students/StudentsTransfer';
 
 const PAGE_SIZE = 25;
 const accountsCount = (n: number) => (n === 1 ? 'حساب واحد' : n === 2 ? 'حسابان' : countText(n, ['حساب', 'حسابان', 'حسابات', 'حساباً']));
@@ -84,6 +86,29 @@ export const AllStudentsPage: React.FC = () => {
     memberships: alone.data.memberships, active_subscriptions: alone.data.active_subscriptions,
   } : undefined);
 
+  // The selection (ids kept across pages; the rows as last seen) and the exports.
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const known = useRef(new Map<string, PlatformStudent>());
+  useEffect(() => { rows.forEach((r) => known.current.set(r.id, r)); }, [rows]);
+  useEffect(() => { setSelected(new Set()); }, [q, companyId, membership]);
+  const allMatching = () => loadAllPlatformStudents({ search: q, companyId, membership });
+  const exportName = companyName ? `طلاب ${companyName}` : 'كل الطلاب';
+  const selectAll = async () => {
+    try {
+      const all = await allMatching();
+      all.forEach((r) => known.current.set(r.id, r));
+      setSelected(new Set(all.map((r) => r.id)));
+    } catch (e) { notifyError('لم نحدد كل الحسابات', errorText(e)); }
+  };
+  const exportAll = async () => { await exportPlatformStudents(await allMatching(), exportName); };
+  const chosen = [...selected].map((id) => known.current.get(id)).filter((r): r is PlatformStudent => !!r);
+  const bulkBar = selected.size > 0 ? (
+    <Toolbar bulk={{
+      count: selected.size, total, onClear: () => setSelected(new Set()), onAll: () => void selectAll(),
+      actions: <ExportButton label="تصدير المحدد" count={chosen.length} onExport={() => exportPlatformStudents(chosen, `${exportName} (محدد)`)} />,
+    }} />
+  ) : null;
+
   const chips = useMemo(() => [
     { value: '' as Membership, label: 'كل الحسابات', count: counts.data ? num(counts.data.all) : undefined },
     { value: 'none' as Membership, label: 'بلا شركة', count: counts.data ? num(counts.data.none) : undefined },
@@ -113,6 +138,7 @@ export const AllStudentsPage: React.FC = () => {
         <span className="sm:hidden"><LinkSelect<string> label="الشركة" value={companyId} onChange={(v) => { setCompanyId(v); setPage(1); }} options={[{ value: '', label: 'كل الشركات' }, ...companyOptions]} /></span>
         <FilterSelect label="الشركة" hideLabel icon="building" value={companyId} allLabel="كل الشركات" options={companyOptions} className="max-sm:hidden"
           onChange={(v) => { setCompanyId(v); setPage(1); }} />
+        <ExportButton count={total} disabled={list.loading} onExport={exportAll} label="تصدير" className="sm:hidden" />
       </div>
     </div>
   );
@@ -132,10 +158,12 @@ export const AllStudentsPage: React.FC = () => {
 
   return (
     <Page>
-      <PageHeader title="كل الطلاب" sub="كل حساب طالب على المنصة والشركات التي ينتمي إليها. للقراءة والبحث؛ الاشتراكات والإيصالات تُدار من داخل كل شركة." />
+      <PageHeader title="كل الطلاب" sub="كل حساب طالب على المنصة والشركات التي ينتمي إليها. للقراءة والبحث؛ الاشتراكات والإيصالات تُدار من داخل كل شركة."
+        actions={<ExportButton sm={false} count={total} disabled={list.loading} onExport={exportAll} className="max-sm:!hidden" />} />
       <div className={list.refreshing ? 'transition-opacity [&_tbody]:opacity-60 [&_[role=button]]:opacity-60' : ''}>
         <DataTable<PlatformStudent> caption="كل الطلاب" columns={columns} rows={rows} rowKey={(r) => r.id} onOpen={(r) => set({ student: r.id })} openKey={studentId}
-          toolbar={toolbar} empty={empty ? <div className="sm:[&>div]:!rounded-none sm:[&>div]:!shadow-none">{empty}</div> : undefined}
+          selectable={!nothing} selected={selected} onSelect={setSelected}
+          toolbar={bulkBar ?? toolbar} empty={empty ? <div className="sm:[&>div]:!rounded-none sm:[&>div]:!shadow-none">{empty}</div> : undefined}
           pager={<Pager page={page} total={total} onPage={(p) => { setPage(p); window.scrollTo({ top: 0 }); }} />}
           card={(r) => ({
             title: <span className="flex items-center gap-2">{r.full_name}{blockOf(r) && <BlockedBadge entry={blockOf(r)!} />}</span>, sub: <Ltr>{phoneText(r.phone)}</Ltr>,

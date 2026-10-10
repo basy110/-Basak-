@@ -16,6 +16,7 @@ import { NO_FILTER, StudentsList, type ListFilter } from '../components/students
 import { StudentPanel } from '../components/students/StudentPanel';
 import { CorrectionsTab, InvitesTab } from '../components/students/RequestTabs';
 import { AddStudentFlow } from '../components/students/AddStudentFlow';
+import { StudentsImport } from '../components/students/StudentsTransfer';
 
 type Tab = 'students' | 'invites' | 'corrections';
 
@@ -49,6 +50,7 @@ export const StudentsPage: React.FC = () => {
 
   const [filter, setFilter] = useState<ListFilter>(NO_FILTER);
   const [allCount, setAllCount] = useState<number | null>(null);
+  const [importing, setImporting] = useState(false);
   const [onPage, setOnPage] = useState<StudentRow[]>([]);
   const onAnswer = useCallback((answer: StudentsListAnswer | undefined, filtered: boolean) => {
     setOnPage(answer?.rows ?? []);
@@ -95,7 +97,10 @@ export const StudentsPage: React.FC = () => {
   return (
     <Page>
       <PageHeader title="الطلاب" sub={<span className="hidden sm:inline">كل من يركب مع شركتك: بياناته، اشتراكه وحالته.</span>} phoneActions={false}
-        actions={<Button icon="plus" disabled={!online} onClick={startAdd}>إضافة طالب</Button>} />
+        actions={<>
+          <Button kind="outline" icon="upload" disabled={!online} onClick={() => setImporting(true)}>استيراد من Excel</Button>
+          <Button icon="plus" disabled={!online} onClick={startAdd}>إضافة طالب</Button>
+        </>} />
       <div className="max-sm:-mt-5"><Tabs<Tab> label="أقسام الطلاب" value={tab} onChange={(t) => setParam({ tab: t === 'students' ? null : t })}
         tabs={[
           { value: 'students', label: 'الطلاب', count: studentsTotal },
@@ -104,9 +109,9 @@ export const StudentsPage: React.FC = () => {
         ]} /></div>
 
       {tab === 'students' && (
-        <StudentsList companyId={company.id} today={today} q={q} onSearch={(v) => setParam({ q: v || null }, true)}
+        <StudentsList companyId={company.id} companyName={company.name} today={today} q={q} onSearch={(v) => setParam({ q: v || null }, true)}
           filter={filter} onFilter={setFilter} lines={lineNames.data ?? []} universities={activeUniversities}
-          openId={studentId} onOpen={(row) => setParam({ student: row.id })} onAdd={startAdd} online={online} onAnswer={onAnswer} />
+          openId={studentId} onOpen={(row) => setParam({ student: row.id })} onAdd={startAdd} online={online} onImport={() => setImporting(true)} onAnswer={onAnswer} />
       )}
       {tab === 'invites' && (
         <InvitesTab companyId={company.id} data={invites.data} loading={invites.loading} error={invites.error} reload={() => void invites.reload()} onAdd={startAdd} online={online} />
@@ -122,6 +127,7 @@ export const StudentsPage: React.FC = () => {
           avatarUrl={open.profile_image_url ? openAvatar[open.profile_image_url] : undefined} universities={activeUniversities}
           block={blockOf(open)} blockAs={blockAs} onClose={() => setParam({ student: null })} />
       )}
+      <StudentsImport open={importing} onClose={() => setImporting(false)} companyId={company.id} today={today} />
       {studentId && !open && alone.data && alone.data.rows.length === 0 && (
         <MissingStudent onClose={() => setParam({ student: null }, true)} />
       )}
