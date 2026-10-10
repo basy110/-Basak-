@@ -264,7 +264,7 @@ export const SupervisorsPage: React.FC = () => {
   const columns: Column<Sup>[] = [
     { key: 'name', label: 'المشرف', render: (s) => <PersonCell name={s.full_name} src={photoOf(s)} /> },
     { key: 'phone', label: 'رقم الهاتف', w: 168, hideTablet: true, render: (s) => <PhoneLtr phone={s.phone} className={s.is_active ? '' : 'text-ink-3'} /> },
-    { key: 'lines', label: 'الخطوط', w: 300, render: lineCell },
+    { key: 'lines', label: 'الخطوط', w: 280, render: lineCell },
     { key: 'state', label: 'الحالة', w: 120, render: (s) => <StatePill state={s.is_active ? 'on' : 'off'} /> },
     { key: 'menu', label: <span className="sr-only">إجراءات</span>, w: 64, align: 'end', render: menu },
   ];

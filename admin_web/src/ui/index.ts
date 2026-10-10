@@ -3,6 +3,7 @@ export * from './Feedback';
 export * from './Field';
 export * from './Icon';
 export * from './Layout';
+export * from './Menu';
 export * from './Overlay';
 export * from './Status';
 export * from './Table';

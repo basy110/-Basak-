@@ -65,9 +65,9 @@ export const TeamPage: React.FC = () => {
   const you = (a: CompanyAdmin) => (a.id === me.id ? <Badge tone="teal">أنت</Badge> : null);
   const columns: Column<CompanyAdmin>[] = [
     { key: 'name', label: 'المدير', render: (a) => <PersonCell name={a.full_name} end={you(a)} /> },
-    { key: 'email', label: 'البريد الإلكتروني', w: platform ? 300 : 320, render: (a) => <div className="truncate"><Ltr>{a.email}</Ltr></div> },
-    { key: 'added', label: 'أُضيف في', w: platform ? 170 : 220, render: (a) => addedOn(a.created_at) },
-    ...(platform ? [{ key: 'remove', label: <span className="sr-only">إزالة</span>, w: 120, align: 'end' as const, render: (a: CompanyAdmin) => removeButton(a) }] : []),
+    { key: 'email', label: 'البريد الإلكتروني', w: platform ? 260 : 320, render: (a) => <div className="truncate"><Ltr>{a.email}</Ltr></div> },
+    { key: 'added', label: 'أُضيف في', w: platform ? 150 : 220, render: (a) => addedOn(a.created_at) },
+    ...(platform ? [{ key: 'remove', label: <span className="sr-only">إزالة</span>, w: 112, align: 'end' as const, render: (a: CompanyAdmin) => removeButton(a) }] : []),
   ];
 
   return (

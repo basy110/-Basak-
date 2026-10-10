@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useLayoutEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Icon, type IconName } from './Icon';
 import { TONE, type Tone } from './Status';
@@ -102,9 +102,10 @@ export const SidePanel: React.FC<{
           <button type="button" onClick={onClose} aria-label={`رجوع إلى ${backLabel}`} className="flex h-12 w-12 items-center justify-center rounded-control text-ink"><Icon name="arrowBack" size={20} /></button>
           <span className="min-w-0 flex-1 truncate text-[17px] font-semibold leading-[26px]">{typeof title === 'string' ? title : backLabel}</span>
         </div>
-        <header className="flex flex-none items-start gap-3 border-b border-hair bg-surface px-4 pb-4 pt-4 sm:px-6 sm:pt-5">
+        {/* On a phone the title is already in the bar above; only its status and second line stay here. */}
+        <header className={`${sub || meta ? 'flex' : 'hidden sm:flex'} flex-none items-start gap-3 border-b border-hair bg-surface px-4 pb-3 pt-3 sm:px-6 sm:pb-4 sm:pt-5`}>
           <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2.5"><h2 id="panel-title" className="m-0 text-section">{title}</h2>{meta}</div>
+            <div className="flex flex-wrap items-center gap-2.5"><h2 id="panel-title" className="m-0 text-section max-sm:sr-only">{title}</h2>{meta}</div>
             {sub && <div className="text-label text-ink-2">{sub}</div>}
           </div>
           <IconButton icon="x" label="إغلاق" onClick={onClose} className="-me-2 -mt-1.5 hidden sm:inline-flex" />
@@ -145,35 +146,5 @@ export const Drawer: React.FC<{ open: boolean; onClose: () => void; label: strin
     <Scrim where="start" onClose={onClose}>
       <nav ref={ref} tabIndex={-1} aria-label={label} className={`flex h-full w-[320px] max-w-[88vw] flex-col bg-surface shadow-floating outline-none ${className}`}>{children}</nav>
     </Scrim>
-  );
-};
-
-/** A row's «⋮» menu: a short list of named actions. */
-export const Menu: React.FC<{ label?: string; items: { label: string; icon?: IconName; danger?: boolean; onClick: () => void; hidden?: boolean }[]; sm?: boolean }> = ({ label = 'إجراءات أخرى', items, sm = true }) => {
-  const [open, setOpen] = useState(false);
-  const box = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return undefined;
-    const off = (e: MouseEvent) => { if (!box.current?.contains(e.target as Node)) setOpen(false); };
-    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
-    document.addEventListener('mousedown', off); document.addEventListener('keydown', key);
-    return () => { document.removeEventListener('mousedown', off); document.removeEventListener('keydown', key); };
-  }, [open]);
-  const shown = items.filter((i) => !i.hidden);
-  if (!shown.length) return null;
-  return (
-    <div ref={box} className="relative" onClick={(e) => e.stopPropagation()}>
-      <IconButton icon="dots" label={label} sm={sm} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((o) => !o)} />
-      {open && (
-        <div role="menu" className="enter absolute end-0 top-full z-30 mt-1 min-w-[200px] overflow-hidden rounded-inner bg-surface py-1 shadow-floating ring-1 ring-hair">
-          {shown.map((i) => (
-            <button key={i.label} type="button" role="menuitem" onClick={() => { setOpen(false); i.onClick(); }}
-              className={`flex h-11 w-full items-center gap-2.5 px-4 text-start text-small hover:bg-ground ${i.danger ? 'text-bad' : 'text-ink'}`}>
-              {i.icon && <Icon name={i.icon} size={16} />}<span>{i.label}</span>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
   );
 };
