@@ -1,5 +1,4 @@
 import React, { useRef, useState } from 'react';
-import { CalendarClock, Megaphone, Send } from 'lucide-react';
 import { notify } from '../../lib/toasts';
 import {
   draftProblem, emptyDraft, idempotencyKeyFor, isDirty, platformAudience, platformCompanyIds, type NotificationDraft,
@@ -11,9 +10,10 @@ import { usePlatformCompanies, type CompanyOption } from '../../lib/reference';
 import { NotificationForm } from './NotificationForm';
 import { PhonePreview } from './PhonePreview';
 import { AudiencePreviewCard, ConfirmDialog, labelClass } from './parts';
+import { Button, Checkbox, Note, errorText } from '../../ui';
 
-const pill = (on: boolean) => `rounded-full px-3 py-1.5 text-xs font-bold transition disabled:opacity-50 ${
-  on ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`;
+const pill = (on: boolean) => `inline-flex h-10 items-center rounded-full px-3.5 text-label disabled:opacity-50 sm:h-9 ${
+  on ? 'bg-ink font-semibold text-white' : 'bg-surface text-ink shadow-ring hover:bg-ground'}`;
 
 interface PickerProps {
   all: boolean;
@@ -39,25 +39,22 @@ const CompanyPicker: React.FC<PickerProps> = ({ all, selected, onChange, compani
         </button>
       </div>
       {!all && (
-        <div className="mt-3 rounded-xl border border-slate-200">
-          <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-3 py-1.5 text-[11px] font-bold">
-            <span className="text-slate-500">{selected.length} من {companies.length} شركة</span>
+        <div className="mt-3 rounded-inner shadow-ring">
+          <div className="flex items-center justify-between gap-2 border-b border-hair px-3 py-1.5 text-cap font-medium">
+            <span className="text-ink-2">{selected.length} من {companies.length} شركة</span>
             <span className="flex gap-3">
-              <button type="button" disabled={disabled} className="text-blue-700 disabled:opacity-50"
+              <button type="button" disabled={disabled} className="text-teal disabled:opacity-50"
                 onClick={() => onChange(false, companies.map((company) => company.id))}>تحديد الكل</button>
-              <button type="button" disabled={disabled || !selected.length} className="text-slate-500 disabled:opacity-50"
+              <button type="button" disabled={disabled || !selected.length} className="text-ink-2 disabled:opacity-50"
                 onClick={() => onChange(false, [])}>مسح</button>
             </span>
           </div>
           <div className="grid max-h-44 grid-cols-1 gap-x-4 overflow-y-auto p-2 sm:grid-cols-2">
             {companies.map((company) => (
-              <label key={company.id} className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-50">
-                <input type="checkbox" checked={selected.includes(company.id)} disabled={disabled} onChange={() => toggle(company.id)} />
-                <span className="truncate">{company.name}</span>
-              </label>
+              <Checkbox key={company.id} className="px-2" checked={selected.includes(company.id)} disabled={disabled} onChange={() => toggle(company.id)} label={<span className="truncate">{company.name}</span>} />
             ))}
             {companies.length === 0 && (
-              <p className="p-2 text-xs text-slate-500">{loading ? 'جاري التحميل…' : 'لا توجد شركات مفعّلة.'}</p>
+              <p className="m-0 p-2 text-label text-ink-2">{loading ? 'جاري التحميل…' : 'لا توجد شركات مفعّلة.'}</p>
             )}
           </div>
         </div>
@@ -130,56 +127,43 @@ export const PlatformComposer: React.FC = () => {
   };
 
   return (
-    <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
-      <h2 className="flex items-center gap-2 text-base font-bold text-slate-700">
-        <Megaphone className="h-4 w-4 text-blue-600" />
-        إشعار جديد من المنصة
-      </h2>
-      <form className="mt-4 grid grid-cols-1 gap-6 lg:grid-cols-3"
+    <div className="flex flex-col gap-4">
+      <form className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-6"
         onSubmit={(e) => { e.preventDefault(); if (canSend && preview.data) { setError(''); setConfirming(preview.data); } }}>
-        <div className="space-y-4 lg:col-span-2">
+        <div className="flex flex-col gap-4 lg:gap-6">
           <NotificationForm draft={draft} onChange={change} today={today} disabled={busy}
             audience={(
               <CompanyPicker all={all} selected={selected} companies={companies} loading={lookup.loading} disabled={busy}
                 onChange={(nextAll, nextSelected) => { setAll(nextAll); setSelected(nextSelected); setError(''); }} />
             )} />
-          {lookup.error && <p role="alert" className="text-xs text-rose-600">تعذر تحميل الشركات: {lookup.error}</p>}
-          {error && !confirming && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-700">{error}</p>}
+          {lookup.error && <Note tone="danger" title="تعذّر تحميل الشركات">{errorText(lookup.error)}</Note>}
+          {error && !confirming && <Note tone="danger" title="لم يُرسل الإشعار">{error}</Note>}
         </div>
-
-        <div className="space-y-4">
-          <PhonePreview title={draft.title} body={draft.body} high={draft.priority === 'high'} />
+        <div className="flex flex-col gap-4 lg:sticky lg:top-6 lg:gap-6">
+          <section className="flex flex-col gap-3 rounded-card bg-surface px-4 py-4 shadow-card sm:px-5">
+            <h3 className="m-0 text-card">كما يظهر على هاتف الطالب</h3>
+            <PhonePreview title={draft.title} body={draft.body} high={draft.priority === 'high'} />
+          </section>
           <AudiencePreviewCard hint="اختر شركة واحدة على الأقل."
             preview={{ ...preview, data: preview.data && platformAudience(preview.data, all, selected.length) }} />
-          <button type="submit" disabled={busy || !canSend}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-2.5 text-sm font-bold text-white transition hover:bg-blue-700 disabled:opacity-50">
-            {scheduled ? <CalendarClock className="h-4 w-4" /> : <Send className="h-4 w-4" />}
-            {scheduled ? 'جدولة الإشعار' : 'إرسال الإشعار'}
-          </button>
-          {!canSend && isDirty(draft) && problem && <p className="text-center text-xs text-slate-500">{problem}</p>}
+          <Button type="submit" full icon={scheduled ? 'calendar' : 'megaphone'} disabled={busy || !canSend}>{scheduled ? 'جدولة الإشعار' : 'إرسال الإشعار'}</Button>
+          {!canSend && isDirty(draft) && problem && <p className="m-0 text-center text-label text-ink-2">{problem}</p>}
         </div>
       </form>
 
       {confirming && (
-        <ConfirmDialog title={scheduled ? 'تأكيد جدولة الإشعار' : 'تأكيد إرسال الإشعار'} busy={busy} error={error}
-          confirmLabel={scheduled ? 'جدولة' : `إرسال إلى ${confirming.students} طالب`}
+        <ConfirmDialog title={scheduled ? 'جدولة الإشعار؟' : `إرسال الإشعار إلى ${confirming.students} طالب؟`} busy={busy} error={error} icon={scheduled ? 'calendar' : 'megaphone'}
+          confirmLabel={scheduled ? 'جدولة الإشعار' : `إرسال إلى ${confirming.students} طالب`}
           onConfirm={() => void send()} onClose={() => { setConfirming(null); setError(''); }}>
-          <p>
-            {scheduled ? 'سيُرسل هذا الإشعار إلى ' : 'سيُرسل هذا الإشعار الآن إلى '}
-            <b>{confirming.students} طالب</b> في <b>{confirming.companies} شركة</b>
+          <p className="m-0">
+            {scheduled ? 'يُرسل إلى ' : 'يصل الآن إلى '}
+            <b className="text-ink">{confirming.students} طالب</b> في <b className="text-ink">{confirming.companies} شركة</b>
             {all ? ' (كل الشركات المفعّلة التي بها مستلمون)' : ` (من ${selected.length} شركة مختارة)`}
             {confirming.supervisors ? `، ومعهم ${confirming.supervisors} مشرف` : ''}.
-            {' '}الأجهزة المسجّلة لديهم: {confirming.devices}.
           </p>
-          <p className="text-xs text-slate-500">يُنشأ إشعار مستقل لكل شركة، والشركة التي لا يوجد بها من يستلمه تُتخطى.</p>
-          {scheduled && scheduledIso && (
-            <p>موعد الإرسال: <b>{formatCairo(scheduledIso, true)}</b> {CAIRO_LABEL}.</p>
-          )}
-          <div className="rounded-2xl bg-slate-50 p-3">
-            <p className="font-bold text-slate-800">{draft.title.trim()}</p>
-            <p className="mt-1 whitespace-pre-line text-slate-600">{draft.body.trim()}</p>
-          </div>
-          {draft.priority === 'high' && <p className="text-xs font-bold text-amber-700">أولوية عالية.</p>}
+          <p className="m-0 text-label">يُنشأ إشعار مستقل لكل شركة، والشركة التي لا يوجد بها من يستلمه تُتخطى.</p>
+          {scheduled && scheduledIso && <p className="m-0">موعد الإرسال: <b className="text-ink">{formatCairo(scheduledIso, true)}</b> {CAIRO_LABEL}.</p>}
+          {draft.priority === 'high' && <p className="m-0 font-semibold text-bad">عاجل.</p>}
         </ConfirmDialog>
       )}
     </div>
