@@ -465,5 +465,26 @@ void main() {
       expect(recapOf(sara())!.bannerOpen(), isTrue);
       expect(recapOf(ahmed())!.bannerOpen(), isFalse, reason: 'the 12th of December is too early');
     });
+
+    test('the platform publishes it: not published, no banner; a server that does not say, the dates alone', () {
+      final old = RecapData.tryParse(sara())!;
+      expect(old.published, isNull);
+      expect(old.publishedMessage, isNull);
+      expect(recapOf(sara())!.bannerOpen(), isTrue);
+
+      final out = RecapData.tryParse(sara()..addAll({'published': true, 'published_message': ' شاركه مع أصحابك '}))!;
+      expect(out.published, isTrue);
+      expect(out.publishedMessage, 'شاركه مع أصحابك');
+      expect(TermRecap.build(out, studentKey: 'student-1')!.bannerOpen(), isTrue);
+
+      final held = RecapData.tryParse(sara()..addAll({'published': false, 'published_message': null}))!;
+      expect(held.published, isFalse);
+      final recap = TermRecap.build(held, studentKey: 'student-1')!;
+      expect(recap.bannerOpen(), isFalse);
+      expect(recap.rideDays, 62, reason: 'the recap itself is the same; only the banner waits');
+
+      final early = TermRecap.build(RecapData.tryParse(ahmed()..['published'] = true)!, studentKey: 'student-1')!;
+      expect(early.bannerOpen(), isFalse, reason: 'published, but still outside the window');
+    });
   });
 }

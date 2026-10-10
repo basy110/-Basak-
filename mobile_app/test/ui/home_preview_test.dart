@@ -36,6 +36,8 @@ import 'package:basak_mobile/features/student/home/presentation/student_home_scr
 import 'package:basak_mobile/features/student/home/presentation/supervisor_contact_sheet.dart';
 import 'package:basak_mobile/features/student/invites/invites.dart';
 import 'package:basak_mobile/features/student/subscription/models/subscription_model.dart';
+import 'package:basak_mobile/features/student/subscription/presentation/subscription_screen.dart'
+    show subscriptionReceiptsProvider;
 
 import '../support/notification_fakes.dart';
 
@@ -181,6 +183,7 @@ Future<void> _home(
       notificationsRepoProvider
           .overrideWithValue(FakeNotificationsRepo([for (var i = 0; i < unread; i++) note('n$i', 'تنبيه')])),
       if (push != null) pushMessagingProvider.overrideWithValue(push),
+      subscriptionReceiptsProvider.overrideWith((ref, id) async => const <ReceiptModel>[]),
     ],
     child: RepaintBoundary(
       key: _key,

@@ -15,6 +15,7 @@ import { Button, Card, Dialog, EmptyState, ErrorState, Icon, IconButton, Menu, N
 import { ExportButton } from '../ui/Transfer';
 import { exportSheet } from '../lib/excel';
 import { AccountText, METHOD_ICON, PaymentPreview } from '../components/money/PaymentPreview';
+import { autoDisplayName, hasCustomName, withDisplayName } from '../lib/paymentMethodName';
 
 const COLUMNS = 'id, company_id, method_type, display_name, account_holder, instapay_address, wallet_phone, bank_name, bank_account_number, iban, instructions, is_active, sort_order, created_at';
 const LISTS = ['paymentMethods'];
@@ -291,22 +292,28 @@ const MethodPanel: React.FC<{
   const [saving, setSaving] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const [serverError, setServerError] = useState('');
+  // Only a saved method with a name of its own keeps it (and can change it);
+  // every other name is the kind's, or the bank's.
+  const [custom, setCustom] = useState(() => hasCustomName(start));
+  const [renaming, setRenaming] = useState(false);
   const guard = useGuard();
   const saved = methods.find((m) => m.id === d.id);
-  const errors = methodErrors(d);
+  const out = withDisplayName(d, custom);
+  const errors = methodErrors(out);
   const err = (k: keyof MethodDraft) => ((tried || shown.has(k)) ? errors[k] : undefined);
   const set = (patch: Partial<MethodDraft>) => { setD((x) => ({ ...x, ...patch })); setServerError(''); };
   const blur = (k: keyof MethodDraft) => () => setShown((s) => new Set(s).add(k));
-  const dirty = JSON.stringify(d) !== JSON.stringify(start);
+  // What would be saved, against what was there: a name going back to the automatic one counts.
+  const dirty = JSON.stringify(out) !== JSON.stringify(withDisplayName(start, hasCustomName(start)));
   const close = () => { if (dirty && !saving) setLeaving(true); else onClose(); };
   const others = methods.filter((m) => m.is_active && m.id !== d.id);
   const labels = FIELD_LABELS[d.method_type];
 
   const save = () => guard('save', async () => {
     setTried(true);
-    if (Object.keys(methodErrors(d)).length) return;
+    if (Object.keys(methodErrors(out)).length) return;
     setSaving(true);
-    const row = { ...methodRow(d), company_id: companyId, updated_at: new Date().toISOString() };
+    const row = { ...methodRow(out), company_id: companyId, updated_at: new Date().toISOString() };
     const order = methods.length ? Math.max(...methods.map((m) => m.sort_order)) + 1 : 0;
     const { data, error } = d.id
       ? await supabase.from('company_payment_methods').update(row).eq('id', d.id).select(COLUMNS).single()
@@ -324,32 +331,49 @@ const MethodPanel: React.FC<{
     <div className="flex flex-col gap-4">
       <RadioCards<MethodType> label="نوع الوسيلة" value={d.method_type} onChange={(t) => set({ method_type: t })}
         options={METHOD_TYPES.map((t) => ({ value: t, label: METHOD_LABEL[t] }))} />
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <TextField label="الاسم الظاهر للطالب" value={d.display_name} maxLength={DISPLAY_NAME_MAX} placeholder={`مثل: ${METHOD_LABEL[d.method_type]} الشركة`}
-          onChange={(e) => set({ display_name: e.target.value })} onBlur={blur('display_name')} error={err('display_name')} />
-        {d.method_type !== 'vodafone_cash' && (
+      {custom && (renaming ? (
+        <div className="flex flex-col gap-1.5">
+          <TextField label="الاسم الظاهر للطالب" value={d.display_name} maxLength={DISPLAY_NAME_MAX} autoFocus
+            onChange={(e) => set({ display_name: e.target.value })} onBlur={blur('display_name')} error={err('display_name')} />
+          {autoDisplayName(d) && (
+            <Button kind="link" sm className="self-start" onClick={() => { setCustom(false); setRenaming(false); set({ display_name: start.display_name }); }}>
+              استخدم «{autoDisplayName(d)}»
+            </Button>
+          )}
+        </div>
+      ) : (
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-small" data-testid="pm-custom-name">
+          <span className="text-ink-2">الاسم الظاهر للطالب:</span>
+          <span className="font-semibold">{d.display_name}</span>
+          <Button kind="link" sm onClick={() => setRenaming(true)}>تغيير الاسم</Button>
+        </div>
+      ))}
+      {d.method_type === 'instapay' && (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <TextField label="عنوان إنستاباي" value={d.instapay_address} ltr placeholder="name@instapay" maxLength={60} autoCapitalize="off" spellCheck={false}
+            help="العنوان كما في تطبيق إنستاباي، أو رقم الهاتف المربوط به." onChange={(e) => set({ instapay_address: e.target.value })} onBlur={blur('instapay_address')} error={err('instapay_address')} />
           <TextField label={labels.holder} value={d.account_holder} maxLength={80} onChange={(e) => set({ account_holder: e.target.value })} onBlur={blur('account_holder')} error={err('account_holder')} />
-        )}
-        {d.method_type === 'vodafone_cash' && (
+        </div>
+      )}
+      {d.method_type === 'vodafone_cash' && (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <TextField label={labels.account} value={d.wallet_phone} inputMode="tel" ltr placeholder="01xxxxxxxxx" maxLength={16}
             onChange={(e) => set({ wallet_phone: e.target.value })} onBlur={blur('wallet_phone')} error={err('wallet_phone')} />
-        )}
-      </div>
-      {d.method_type === 'vodafone_cash' && (
-        <TextField label={labels.holder} value={d.account_holder} maxLength={80} help={labels.holderHelp} onChange={(e) => set({ account_holder: e.target.value })} onBlur={blur('account_holder')} error={err('account_holder')} />
-      )}
-      {d.method_type === 'instapay' && (
-        <TextField label="عنوان إنستاباي" value={d.instapay_address} ltr placeholder="name@instapay" maxLength={60} autoCapitalize="off" spellCheck={false}
-          help="العنوان كما في تطبيق إنستاباي، أو رقم الهاتف المربوط به." onChange={(e) => set({ instapay_address: e.target.value })} onBlur={blur('instapay_address')} error={err('instapay_address')} />
+          <TextField label={labels.holder} value={d.account_holder} maxLength={80} help={labels.holderHelp} onChange={(e) => set({ account_holder: e.target.value })} onBlur={blur('account_holder')} error={err('account_holder')} />
+        </div>
       )}
       {d.method_type === 'bank' && (
         <>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <TextField label="اسم البنك والفرع" value={d.bank_name} maxLength={80} placeholder="مثل: البنك الأهلي المصري · فرع دمياط" onChange={(e) => set({ bank_name: e.target.value })} onBlur={blur('bank_name')} error={err('bank_name')} />
-            <TextField label="رقم الحساب" value={d.bank_account_number} inputMode="numeric" ltr maxLength={40} onChange={(e) => set({ bank_account_number: e.target.value })} onBlur={blur('bank_account_number')} error={err('bank_account_number')} />
+            <TextField label="اسم البنك" value={d.bank_name} maxLength={DISPLAY_NAME_MAX} placeholder="مثل: البنك الأهلي المصري"
+              help={custom ? undefined : 'هذا ما يراه الطالب في صفحة الدفع.'} onChange={(e) => set({ bank_name: e.target.value })} onBlur={blur('bank_name')} error={err('bank_name')} />
+            <TextField label={labels.holder} value={d.account_holder} maxLength={80} onChange={(e) => set({ account_holder: e.target.value })} onBlur={blur('account_holder')} error={err('account_holder')} />
           </div>
-          <TextField label="رقم الآيبان" optional value={d.iban} ltr placeholder="EG00 0000 0000 0000 0000 0000 0000 0" maxLength={40} autoCapitalize="characters" spellCheck={false}
-            help="EG ثم 27 رقماً، كما في كشف الحساب." onChange={(e) => set({ iban: e.target.value })} onBlur={blur('iban')} error={err('iban')} />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <TextField label="رقم الحساب" value={d.bank_account_number} inputMode="numeric" ltr maxLength={40} onChange={(e) => set({ bank_account_number: e.target.value })} onBlur={blur('bank_account_number')} error={err('bank_account_number')} />
+            <TextField label="رقم الآيبان" optional value={d.iban} ltr placeholder="EG00 0000 0000 0000 0000 0000 0000 0" maxLength={40} autoCapitalize="characters" spellCheck={false}
+              help="EG ثم 27 رقماً، كما في كشف الحساب." onChange={(e) => set({ iban: e.target.value })} onBlur={blur('iban')} error={err('iban')} />
+          </div>
         </>
       )}
       <div className="flex flex-col gap-1.5">
@@ -383,7 +407,7 @@ const MethodPanel: React.FC<{
         )}>
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
           <div className="rounded-card bg-surface p-4 sm:p-0">{form}</div>
-          <PaymentPreview draft={d} others={others} className="lg:self-start" />
+          <PaymentPreview draft={out} others={others} className="lg:self-start" />
           {saved && <Button kind="dangerQuiet" icon="trash" full className="sm:hidden" disabled={!online} onClick={() => onDelete(saved)}>حذف الوسيلة</Button>}
         </div>
       </SidePanel>

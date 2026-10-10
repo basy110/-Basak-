@@ -21,6 +21,9 @@ import 'package:basak_mobile/features/student/home/presentation/ride_sheet.dart'
 import 'package:basak_mobile/features/student/home/presentation/student_home_screen.dart';
 import 'package:basak_mobile/features/student/invites/invites.dart';
 import 'package:basak_mobile/features/student/subscription/models/subscription_model.dart';
+import 'package:basak_mobile/features/student/subscription/presentation/pay_screen.dart';
+import 'package:basak_mobile/features/student/subscription/presentation/subscription_screen.dart'
+    show allSubscriptionsProvider, paymentMethodsProvider, subscriptionReceiptsProvider;
 
 import 'support/notification_fakes.dart';
 
@@ -121,9 +124,17 @@ Widget _home({
   VoidCallback? toCard,
   double textScale = 1,
   List<LineSupervisor> supervisors = const [],
+  List<ReceiptModel> receipts = const [],
+  List<String>? receiptReads,
 }) =>
     ProviderScope(
       overrides: [
+        subscriptionReceiptsProvider.overrideWith((ref, id) async {
+          receiptReads?.add(id);
+          return receipts;
+        }),
+        allSubscriptionsProvider.overrideWith((ref) async => [if (sub != null) sub]),
+        paymentMethodsProvider.overrideWith((ref, id) async => const []),
         sessionUserIdProvider.overrideWithValue('student-1'),
         authStateProvider.overrideWith((ref) => _Auth()),
         currentSubscriptionProvider.overrideWith(() => _Sub(sub, error: error)),
@@ -554,7 +565,61 @@ void main() {
       await tester.pumpWidget(_home(sub: _sub('rejected')));
       await _settle(tester);
       expect(find.text('إيصال مرفوض'), findsOneWidget);
-      expect(find.text('إيصال جديد'), findsOneWidget);
+      expect(find.text('ارفع إيصالاً جديداً'), findsOneWidget);
+      await tester.pumpWidget(const SizedBox());
+    });
+
+    ReceiptModel refused(int attempt, String? reason) => ReceiptModel(
+          id: 'r$attempt',
+          subscriptionId: 'sub',
+          imageUrl: 'student-1/sub_$attempt.jpg',
+          status: 'rejected',
+          rejectionReason: reason,
+          attemptNumber: attempt,
+          createdAt: '2026-10-08T10:00:00Z',
+        );
+
+    testWidgets('a refused receipt: the reason and the attempt on the pass, and straight to a new receipt',
+        (tester) async {
+      var toSubscription = 0;
+      await tester.pumpWidget(_home(
+        sub: _sub('pending_payment'),
+        receipts: [refused(1, 'الصورة غير واضحة')],
+        toSubscription: () => toSubscription++,
+      ));
+      await _settle(tester);
+      expect(find.text('إيصال مرفوض'), findsOneWidget);
+      expect(find.text('بانتظار الدفع'), findsNothing);
+      expect(find.text('ادفع الآن'), findsNothing);
+      expect(find.text('سبب الرفض · المحاولة 2 من 5'), findsOneWidget);
+      expect(find.text('الصورة غير واضحة'), findsOneWidget);
+      await tester.tap(find.text('ارفع إيصالاً جديداً'));
+      // Not pumpAndSettle: the pay page may hold a skeleton.
+      for (var i = 0; i < 6; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      expect(find.byType(PayScreen), findsOneWidget);
+      expect(toSubscription, 0);
+      await tester.pumpWidget(const SizedBox());
+    });
+
+    testWidgets('awaiting payment with an accepted or pending last receipt is not a refusal', (tester) async {
+      await tester.pumpWidget(_home(sub: _sub('pending_payment'), receipts: [
+        ReceiptModel(
+            id: 'r1', subscriptionId: 'sub', imageUrl: 'x.jpg', status: 'approved', attemptNumber: 1,
+            createdAt: '2026-10-08T10:00:00Z'),
+      ]));
+      await _settle(tester);
+      expect(find.text('بانتظار الدفع'), findsOneWidget);
+      expect(find.text('ادفع الآن'), findsOneWidget);
+      await tester.pumpWidget(const SizedBox());
+    });
+
+    testWidgets('a running subscription reads no receipts', (tester) async {
+      final reads = <String>[];
+      await tester.pumpWidget(_home(sub: _sub('active'), receiptReads: reads));
+      await _settle(tester);
+      expect(reads, isEmpty);
       await tester.pumpWidget(const SizedBox());
     });
 
@@ -646,9 +711,14 @@ void main() {
       final now = DateTime.now();
       for (final offline in [false, true]) {
         if (offline) OfflineCache.markOffline(DateTime(now.year, now.month, now.day, 8, 15));
-        for (final status in ['active', 'pending_review', 'pending_payment', 'rejected']) {
+        for (final status in ['active', 'pending_review', 'pending_payment', 'rejected', 'refused']) {
           await tester.pumpWidget(const SizedBox());
-          await tester.pumpWidget(_home(sub: _sub(status), textScale: 1.3));
+          await tester.pumpWidget(status == 'refused'
+              ? _home(
+                  sub: _sub('pending_payment'),
+                  textScale: 1.3,
+                  receipts: [refused(3, 'المبلغ في الإيصال 4,000 ج.م والمطلوب 4,500 ج.م. حوّل الفرق ثم ارفع الإيصال.')])
+              : _home(sub: _sub(status), textScale: 1.3));
           await _settle(tester);
           expect(tester.takeException(), isNull, reason: '$status, offline: $offline');
         }

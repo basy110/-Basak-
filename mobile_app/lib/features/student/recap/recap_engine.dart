@@ -158,6 +158,13 @@ class RecapData {
   final Set<int> offWeekdays;
   final Set<DateTime> offDates;
 
+  /// Whether the platform has published the recap of this term. Null when the
+  /// server does not say (an older database): the dates alone decide, as before.
+  final bool? published;
+
+  /// The platform's words with it, when it wrote some.
+  final String? publishedMessage;
+
   const RecapData({
     required this.today,
     required this.from,
@@ -183,6 +190,8 @@ class RecapData {
     this.typicalMinutes,
     this.offWeekdays = const {5},
     this.offDates = const {},
+    this.published,
+    this.publishedMessage,
   });
 
   /// Null when [json] is not an answer of `get_my_term_recap`.
@@ -267,6 +276,8 @@ class RecapData {
         for (final d in off['dates'] as List? ?? const [])
           if (_date(d) != null) _date(d)!,
       },
+      published: root.containsKey('published') ? root['published'] == true : null,
+      publishedMessage: _text(root['published_message']),
     );
   }
 }
@@ -609,8 +620,11 @@ class TermRecap {
       recapFill(RecapCopy.bannerHours, {'س': (hours ?? 0) >= RecapRules.hoursPageFrom ? hours : null}) ??
       recapFill(RecapCopy.bannerDays, {'ي': rideDays})!;
 
-  /// Whether Home shows the banner on [today] (the server's day by default).
-  bool bannerOpen([DateTime? today]) => recapWindowOpen(today ?? data.today, data.termEnd ?? data.to);
+  /// Whether Home shows the banner on [today] (the server's day by default):
+  /// the platform has published it (or the server does not say) and the
+  /// window is open.
+  bool bannerOpen([DateTime? today]) =>
+      data.published != false && recapWindowOpen(today ?? data.today, data.termEnd ?? data.to);
 
   /// Null with no rides at all: no recap, and no banner.
   /// [studentKey] fixes the draw of the title and of the poster's colours.

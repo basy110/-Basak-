@@ -42,6 +42,9 @@ export const COMPANY_NAV: NavGroup[] = [
 
 export const PLATFORM_NAV: NavGroup[] = [
   { group: null, items: [{ id: 'p-today', slug: '', label: 'اليوم', icon: 'home', preload: routes.PlatformTodayPage.preload }] },
+  { group: 'المال والتحليلات', items: [
+    { id: 'p-analytics', slug: 'analytics', label: 'تحليلات المنصة', icon: 'trend', preload: routes.PlatformAnalyticsPage.preload },
+    { id: 'p-billing', slug: 'billing', label: 'الحسابات', icon: 'card', preload: routes.PlatformBillingPage.preload }] },
   { group: 'يحتاج قرارك', items: [
     { id: 'p-corrections', slug: 'corrections', label: 'طلبات تصحيح البيانات', icon: 'pencil', badge: 'corrections', preload: routes.CorrectionsPage.preload },
     { id: 'p-password-requests', slug: 'password-requests', label: 'طلبات كلمة المرور', icon: 'key', badge: 'requests', preload: routes.PlatformPasswordRequestsPage.preload }] },
@@ -54,6 +57,7 @@ export const PLATFORM_NAV: NavGroup[] = [
   { group: 'إعدادات المنصة', items: [
     { id: 'p-universities', slug: 'universities', label: 'الجامعات والكليات', icon: 'school', preload: routes.UniversitiesPage.preload },
     { id: 'p-defaults', slug: 'defaults', label: 'الإعدادات الافتراضية', icon: 'sliders', preload: routes.PlatformDefaultsPage.preload },
+    { id: 'p-recap', slug: 'recap', label: 'ملخص الفصل', icon: 'calendar', preload: routes.PlatformRecapPage.preload },
     { id: 'p-app-versions', slug: 'app-versions', label: 'إصدارات التطبيق', icon: 'smartphone', preload: routes.AppVersionsPage.preload }] },
 ];
 

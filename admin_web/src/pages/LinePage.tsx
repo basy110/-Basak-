@@ -9,11 +9,26 @@ import { useLines, useSupervisorLines, useSupervisors, useUniversities, type Lin
 import { statsFor, useLinesStats, useSaleContext, type LineStats } from '../lib/linesData';
 import { countOf, joinAnd, lineVisibility, unitWord, W, type StepNo } from '../lib/lines';
 import { SALE_OPTIONS, optionName } from '../lib/saleOptions';
-import { LineMenu, useLineActions } from '../components/lines/LineActions';
-import { departureWidth, DepartureTable, PhoneTrips, ReturnList } from '../components/lines/LineTimetable';
+import { LineMenu, useLineActions, type MenuItem, type MenuTrigger } from '../components/lines/LineActions';
+import { DepartureTable, PhoneTrips, ReturnList } from '../components/lines/LineTimetable';
 import { LineWizard } from '../components/lines/LineWizard';
 
 const n = (v: number) => v.toLocaleString('en-US');
+
+/** What «تعديل الخط» opens: each part of the line straight at its own step of the editor. */
+const EDIT_PARTS: { step: StepNo; label: string; icon: MenuItem['icon'] }[] = [
+  { step: 1, label: 'الاسم والجامعات والمقاعد', icon: 'school' },
+  { step: 2, label: 'المحطات', icon: 'pin' },
+  { step: 3, label: 'المواعيد والرحلات', icon: 'clock' },
+  { step: 4, label: 'الأسعار', icon: 'card' },
+];
+const EditMenu: React.FC<{ to: (s: StepNo) => string; go: (to: string) => void; trigger: MenuTrigger; sm?: boolean }> = ({ to, go, trigger, sm = false }) => (
+  <LineMenu label="تعديل الخط" sm={sm} trigger={trigger} items={EDIT_PARTS.map((p) => ({ label: p.label, icon: p.icon, onClick: () => go(to(p.step)) }))} />
+);
+/** A quiet «✎ تعديل …» link beside a section's title. */
+const EditLink: React.FC<{ to: string; disabled?: boolean; children: React.ReactNode }> = ({ to, disabled, children }) => (
+  <Button kind="link" sm icon="pencil" to={to} disabled={disabled}>{children}</Button>
+);
 
 /** A line's own page: who rides it tomorrow, its timetable, prices and supervisors (docs/canvas/AdmLine*). */
 export const LinePage: React.FC = () => {
@@ -82,11 +97,11 @@ const LineView: React.FC<{ line: LineRow }> = ({ line }) => {
             { label: 'حذف الخط', icon: 'trash', danger: true, sep: true, onClick: () => actions.ask('delete', line), disabled: !actions.online },
           ]} />
           {off ? <>
-            <Button kind="outline" icon="pencil" to={editTo()} disabled={!actions.online}>تعديل الخط</Button>
+            <EditMenu to={editTo} go={navigate} trigger={{ text: 'تعديل الخط', icon: 'pencil', kind: 'outline', disabled: !actions.online }} />
             <Button icon="power" onClick={() => actions.ask('start', line)} disabled={!actions.online}>تشغيل الخط</Button>
           </> : <>
             <Button kind="outline" icon="power" onClick={() => actions.ask('stop', line)} disabled={!actions.online}>إيقاف الخط</Button>
-            <Button icon="pencil" to={editTo()} disabled={!actions.online}>تعديل الخط</Button>
+            <EditMenu to={editTo} go={navigate} trigger={{ text: 'تعديل الخط', icon: 'pencil', disabled: !actions.online }} />
           </>}
         </>} />
 
@@ -103,26 +118,31 @@ const LineView: React.FC<{ line: LineRow }> = ({ line }) => {
         </Note>
       )}
 
-      <Stats stats={stats} going={going.length} back={back.length} editTo={editTo(1)} />
+      <Stats stats={stats} going={going.length} back={back.length} editTo={editTo(1)} online={actions.online} />
 
-      {/* Desktop and tablet. The way there and the way back share a row when the timetable is narrow (few
-          trips) and stack when it is wide. From 1280 the prices and supervisors sit beside them and stay in view. */}
-      <div className="hidden grid-cols-1 items-start gap-6 sm:grid xl:grid-cols-[minmax(0,1fr)_400px]">
-        <div className="flex min-w-0 flex-wrap items-start gap-6">
-          <section className="flex min-w-0 max-w-full flex-[0_1_auto] flex-col gap-3" style={going.length ? { width: departureWidth(going.length) } : { width: '100%' }}>
-            <SectionHead title="رحلات الذهاب" meta={rideDay ? <Badge tone="teal">ركاب {rideDay}</Badge> : undefined}
-              end={<span className="text-label text-ink-2">{countOf(stations.length, W.station)} · {countOf(going.length, W.trip)}{voteState}</span>} />
-            {going.length ? <DepartureTable stations={stations} trips={going} stats={stats} uniName={uniName} />
-              : <EmptyState card icon="bus" title="لا رحلات ذهاب" text="أضف رحلة ذهاب بمواعيدها على المحطات، فالطلاب يختارون منها." action={<Button to={editTo(3)} icon="plus">أضف رحلة</Button>} />}
-          </section>
-          <section className="flex min-w-[min(100%,340px)] flex-1 basis-[340px] flex-col gap-3">
-            <SectionHead title="العودة من الجامعة" end={<span className="text-label text-ink-2">يعيد كل طالب إلى محطته</span>} />
-            <ReturnList trips={back} stats={stats} uniName={uniName} />
-          </section>
-        </div>
-        {/* 48 = a section head and its gap, so the cards line up with the card beside them; under the 64 top bar when stuck. */}
-        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2 xl:sticky xl:top-[calc(var(--ws-top,0px)+80px)] xl:mt-[48px] xl:grid-cols-1">
-          <PricesCard line={line} sold={sale.sold} daily={sale.daily} companyId={company.id} />
+      {/* Desktop and tablet */}
+      <section className="hidden flex-col gap-3 sm:flex">
+        <SectionHead title="رحلات الذهاب" meta={rideDay ? <Badge tone="teal">ركاب {rideDay}</Badge> : undefined}
+          end={<>
+            <span className="text-label text-ink-2">{countOf(stations.length, W.station)} · {countOf(going.length, W.trip)}{voteState}</span>
+            <span className="flex items-center gap-2">
+              <EditLink to={editTo(2)} disabled={!actions.online}>تعديل المحطات</EditLink>
+              <EditLink to={editTo(3)} disabled={!actions.online}>تعديل المواعيد</EditLink>
+            </span>
+          </>} />
+        {going.length ? <DepartureTable stations={stations} trips={going} stats={stats} uniName={uniName} />
+          : <EmptyState card icon="bus" title="لا رحلات ذهاب" text="أضف رحلة ذهاب بمواعيدها على المحطات، فالطلاب يختارون منها." action={<Button to={editTo(3)} icon="plus">أضف رحلة</Button>} />}
+      </section>
+      <div className="hidden grid-cols-1 gap-6 sm:grid lg:grid-cols-[minmax(0,1fr)_452px]">
+        <section className="flex flex-col gap-3">
+          <SectionHead title="العودة من الجامعة" end={<>
+            <span className="text-label text-ink-2">يتحرك الباص من الجامعة ويعيد كل طالب إلى محطته</span>
+            <EditLink to={editTo(3)} disabled={!actions.online}>تعديل المواعيد</EditLink>
+          </>} />
+          <ReturnList trips={back} stats={stats} uniName={uniName} />
+        </section>
+        <div className="flex flex-col gap-6 lg:pt-[48px]">
+          <PricesCard line={line} sold={sale.sold} daily={sale.daily} companyId={company.id} editTo={editTo(4)} online={actions.online} />
           <SupervisorsCard sups={sups} companyId={company.id} />
         </div>
       </div>
@@ -131,9 +151,13 @@ const LineView: React.FC<{ line: LineRow }> = ({ line }) => {
       <section className="flex flex-col gap-3 sm:hidden">
         <SectionHead title="الرحلات" meta={rideDay ? <Badge tone="teal">ركاب {rideDay}</Badge> : undefined} />
         <PhoneTrips stations={stations} going={going} back={back} stats={stats} uniName={uniName} />
+        <div className="flex flex-wrap items-center gap-x-4">
+          <EditLink to={editTo(2)} disabled={!actions.online}>تعديل المحطات</EditLink>
+          <EditLink to={editTo(3)} disabled={!actions.online}>تعديل المواعيد</EditLink>
+        </div>
       </section>
       <div className="flex flex-col gap-5 sm:hidden">
-        <PricesCard line={line} sold={sale.sold} daily={sale.daily} companyId={company.id} />
+        <PricesCard line={line} sold={sale.sold} daily={sale.daily} companyId={company.id} editTo={editTo(4)} online={actions.online} />
         <SupervisorsCard sups={sups} companyId={company.id} />
         <div className="flex flex-col gap-2">
           {off ? <Button kind="outline" full icon="power" onClick={() => actions.ask('start', line)} disabled={!actions.online}>تشغيل الخط</Button>
@@ -141,13 +165,13 @@ const LineView: React.FC<{ line: LineRow }> = ({ line }) => {
           <Button kind="link" full className="!text-bad" onClick={() => actions.ask('delete', line)} disabled={!actions.online}>حذف الخط</Button>
         </div>
       </div>
-      <PhoneBar><Button full icon="pencil" to={editTo()} disabled={!actions.online}>تعديل الخط</Button></PhoneBar>
+      <PhoneBar><EditMenu to={editTo} go={navigate} trigger={{ text: 'تعديل الخط', icon: 'pencil', full: true, disabled: !actions.online }} /></PhoneBar>
       {actions.dialogs}
     </Page>
   );
 };
 
-const Stats: React.FC<{ stats: LineStats; going: number; back: number; editTo: string }> = ({ stats, going, back, editTo }) => {
+const Stats: React.FC<{ stats: LineStats; going: number; back: number; editTo: string; online: boolean }> = ({ stats, going, back, editTo, online }) => {
   const v = (x: number | null) => (x == null ? '—' : n(x));
   return (
     <div className="grid grid-cols-2 gap-3 sm:gap-6 lg:grid-cols-4">
@@ -155,13 +179,14 @@ const Stats: React.FC<{ stats: LineStats; going: number; back: number; editTo: s
       <StatCard icon="aup" label="ذهاب الغد" value={v(stats.riders_departure)} unit={stats.riders_departure != null ? unitWord(stats.riders_departure, W.rider) : undefined} hint={`في ${countOf(going, W.trip, 'رحلة واحدة')}`} />
       <StatCard icon="adown" label="عودة الغد" value={v(stats.riders_return)} unit={stats.riders_return != null ? unitWord(stats.riders_return, W.rider) : undefined} hint={`في ${countOf(back, W.time, 'موعد واحد')}`} />
       {stats.bus_capacity
-        ? <StatCard icon="bus" label="مقاعد الباص" value={stats.bus_capacity} unit={unitWord(stats.bus_capacity, W.seat)} hint="لكل رحلة" />
+        ? <StatCard icon="bus" label="مقاعد الباص" value={stats.bus_capacity} unit={unitWord(stats.bus_capacity, W.seat)}
+          hint={<>لكل رحلة{online && <> · <Link to={editTo} className="text-teal hover:underline">تعديل</Link></>}</>} />
         : <StatCard icon="bus" label="مقاعد الباص" value="—" hint={<Link to={editTo} className="text-teal hover:underline">لم تُحدد · حدّدها</Link>} />}
     </div>
   );
 };
 
-const PricesCard: React.FC<{ line: LineRow; sold: Record<string, boolean> | null; daily: boolean; companyId: string }> = ({ line, sold, daily, companyId }) => {
+const PricesCard: React.FC<{ line: LineRow; sold: Record<string, boolean> | null; daily: boolean; companyId: string; editTo: string; online: boolean }> = ({ line, sold, daily, companyId, editTo, online }) => {
   const rows = SALE_OPTIONS.map((o) => {
     const p = line.line_period_prices.find((x) => x.option === o);
     const price = p && Number(p.price) > 0 ? Number(p.price) : null;
@@ -173,13 +198,16 @@ const PricesCard: React.FC<{ line: LineRow; sold: Record<string, boolean> | null
     badge: Number(line.price_daily) > 0 ? (daily ? <Badge tone="success">يُباع</Badge> : <Badge tone="warning">شركتك لا تبيعه الآن</Badge>) : <Badge>لا يُباع</Badge> });
   return (
     <Card className="px-5 pb-4 pt-5">
-      <h2 className="m-0 mb-2 text-card">الأسعار على هذا الخط</h2>
+      <div className="mb-2 flex items-center gap-3">
+        <h2 className="m-0 flex-1 text-card">الأسعار على هذا الخط</h2>
+        <EditLink to={editTo} disabled={!online}>تعديل الأسعار</EditLink>
+      </div>
       <dl className="m-0">
         {rows.map((r, i) => (
           <div key={r.key} className={`flex min-h-11 items-center gap-3 py-1.5 ${i ? 'border-t border-hair' : ''}`}>
-            <dt className="min-w-0 flex-1 whitespace-nowrap text-small text-ink-2">{r.label}</dt>
-            <dd className="m-0 w-[84px] flex-none whitespace-nowrap text-small font-semibold sm:w-[96px]">{r.price != null ? <Money value={r.price} /> : <span className="font-normal text-ink-2">بلا سعر</span>}</dd>
-            <dd className="m-0 flex flex-none justify-end">{r.badge}</dd>
+            <dt className="min-w-0 flex-1 text-small text-ink-2">{r.label}</dt>
+            <dd className="m-0 w-[84px] flex-none text-small font-semibold sm:w-[110px]">{r.price != null ? <Money value={r.price} /> : <span className="font-normal text-ink-2">بلا سعر</span>}</dd>
+            <dd className="m-0 flex flex-none justify-end sm:w-[150px]">{r.badge}</dd>
           </div>
         ))}
       </dl>
@@ -192,7 +220,7 @@ const SupervisorsCard: React.FC<{ sups: { id: string; full_name: string; phone: 
   <Card className="px-5 pb-4 pt-5">
     <div className="mb-2 flex items-center gap-3">
       <h2 className="m-0 flex-1 text-card">مشرفو الخط</h2>
-      <Link to={`/c/${companyId}/supervisors`} className="inline-flex min-h-11 items-center gap-1 text-label font-semibold text-teal hover:underline">{sups.length ? 'تغيير المشرفين' : 'عيّن مشرفاً'}<span aria-hidden="true">‹</span></Link>
+      <EditLink to={`/c/${companyId}/supervisors`}>تعيين مشرف</EditLink>
     </div>
     {sups.length === 0 ? <p className="m-0 py-2 text-small text-ink-2">لا مشرف على هذا الخط بعد. بدون مشرف لا يُسجَّل صعود الطلاب.</p> : (
       <ul className="m-0 flex list-none flex-col gap-3 p-0">

@@ -148,7 +148,9 @@ void main() {
 
       await tester.tap(find.text('فودافون كاش'));
       await frames(tester);
-      expect(find.text('محفظة فودافون كاش'), findsOneWidget);
+      // The chip already names the wallet: no "محفظة فودافون كاش" under it.
+      expect(find.text('محفظة فودافون كاش'), findsNothing);
+      expect(find.text('فودافون كاش'), findsOneWidget);
       expect(find.text('رقم المحفظة'), findsOneWidget);
       expect(find.text('010 1234 5678'), findsOneWidget);
     });
@@ -169,6 +171,22 @@ void main() {
       await tester.tap(find.text('قبل التحويل'));
       await frames(tester);
       expect(find.text('حوّل المبلغ كاملاً في عملية واحدة.'), findsNothing);
+    });
+
+    testWidgets('one wallet and no chips: the card itself says which wallet it is', (tester) async {
+      await openPay(tester, 'pending_payment',
+          payOverrides(subs: [boardSub('pending_payment')], methods: [boardMethods()[1]]));
+      expect(find.byType(BasakChips<PaymentMethodModel>), findsNothing);
+      expect(find.text('محفظة فودافون كاش'), findsOneWidget);
+    });
+
+    test('the method caption is left out only where it repeats the chosen chip', () {
+      final m = boardMethods();
+      expect(PayScreen.methodCaption(m[1], chipShown: true), '');
+      expect(PayScreen.methodCaption(m[1], chipShown: false), 'محفظة فودافون كاش');
+      expect(PayScreen.methodCaption(m[0], chipShown: true), '');
+      expect(PayScreen.methodCaption(m[0], chipShown: false), 'InstaPay');
+      expect(PayScreen.methodCaption(m[3], chipShown: true), 'تحويل بنكي · البنك الأهلي المصري');
     });
 
     testWidgets('one method: no chips to pick from, its details at once', (tester) async {
@@ -387,6 +405,23 @@ void main() {
       // The reason makes way for the sending.
       expect(find.text('الإيصال مرفوض'), findsNothing);
       expect(find.byKey(const Key('receipt-phase-uploading')), findsOneWidget);
+    });
+
+    testWidgets('a refusal as the server leaves it (awaiting payment again) shows the same reason and attempt',
+        (tester) async {
+      await openPay(
+          tester,
+          'pending_payment',
+          payOverrides(subs: [
+            boardSub('pending_payment')
+          ], receipts: [
+            boardReceipt(1, 'rejected', reason: 'المبلغ في الإيصال 4,000 ج.م والمطلوب 4,500 ج.م.', method: 'm2'),
+          ]));
+      expect(find.text('الإيصال مرفوض'), findsOneWidget);
+      expect(find.text('المحاولة 2 من 5'), findsOneWidget);
+      expect(find.text('المبلغ في الإيصال 4,000 ج.م والمطلوب 4,500 ج.م.'), findsOneWidget);
+      expect(find.text('ارفع إيصالاً جديداً'), findsOneWidget);
+      expect(find.text('1 · حوّل المبلغ'), findsNothing);
     });
 
     testWidgets('a refusal without a written reason still says what to do', (tester) async {

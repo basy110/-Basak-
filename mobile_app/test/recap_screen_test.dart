@@ -1,6 +1,7 @@
 // The term recap around its engine: when the app asks for one (and when it
 // does not), the banner on Home, and the story — advance, back, close, the
 // short version, pages dropping out, share and save.
+import 'dart:io' show SocketException;
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -142,6 +143,29 @@ void main() {
       expect(recap!.rideDays, 62);
       expect(recap.title, recapOf(sara(), key: 'student-1')!.title);
     });
+
+    test('a tap on the notification asks the server, not the saved copy', () async {
+      var answer = sara()..['published'] = false;
+      final asked = <String>[];
+      final repo = TermRecapRepository(fetch: (id) async {
+        asked.add(id);
+        return answer;
+      });
+      expect((await repo.load(subscriptionId: 'sub-1', studentId: 'student-1'))!.bannerOpen(), isFalse);
+      answer = sara()..['published'] = true;
+      final fresh = await repo.load(subscriptionId: 'sub-1', studentId: 'student-1', fresh: true);
+      expect(fresh!.bannerOpen(), isTrue);
+      expect(asked, ['sub-1', 'sub-1']);
+    });
+
+    test('fresh, with no connection: the saved copy', () async {
+      final repo = TermRecapRepository(fetch: (_) async => sara()..['published'] = true);
+      await repo.load(subscriptionId: 'sub-1', studentId: 'student-1');
+      await pumpEventQueue(); // the copy is saved behind the answer
+      addTearDown(() => OfflineCache.offlineSince.value = null);
+      final offline = TermRecapRepository(fetch: (_) async => throw const SocketException('offline'));
+      expect((await offline.load(subscriptionId: 'sub-1', studentId: 'student-1', fresh: true))?.rideDays, 62);
+    });
   });
 
   group('the gate', () {
@@ -222,6 +246,46 @@ void main() {
       final (c, _, asked) = await open(DateTime.utc(2027, 1, 10), answer: recapJson(rides: const []));
       expect(await c.read(termRecapProvider.future), isNull);
       expect(asked, hasLength(1));
+    });
+
+    test('the platform has not published it: no banner, inside the window too', () async {
+      final (c, _, asked) = await open(DateTime.utc(2027, 1, 10), answer: sara()..['published'] = false);
+      expect(await c.read(termRecapProvider.future), isNull);
+      expect(asked, ['sub-1']);
+    });
+
+    test('published: the banner', () async {
+      final (c, _, _) = await open(DateTime.utc(2027, 1, 10), answer: sara()..['published'] = true);
+      expect((await c.read(termRecapProvider.future))?.rideDays, 62);
+    });
+
+    test('the tap on «ملخص فصلك جاهز» asks again and opens what the server says now', () async {
+      var answer = sara()..['published'] = false;
+      final asked = <String>[];
+      final c = ProviderContainer(overrides: [
+        sessionUserIdProvider.overrideWithValue('student-1'),
+        currentSubscriptionProvider.overrideWith(() => _Sub(_sub())),
+        recapTodayProvider.overrideWithValue(() => DateTime.utc(2027, 1, 10)),
+        termRecapRepoProvider.overrideWithValue(TermRecapRepository(fetch: (id) async {
+          asked.add(id);
+          return answer;
+        })),
+      ]);
+      addTearDown(c.dispose);
+      c.listen(termRecapProvider, (_, __) {});
+      await c.read(currentSubscriptionProvider.future);
+      await pumpEventQueue();
+      expect(await c.read(termRecapProvider.future), isNull, reason: 'not published yet');
+
+      answer = sara()..['published'] = true;
+      c.invalidate(termRecapNowProvider);
+      expect((await c.read(termRecapNowProvider.future))?.rideDays, 62);
+      expect(asked, ['sub-1', 'sub-1']);
+
+      // Stopped again: the tap opens nothing.
+      answer = sara()..['published'] = false;
+      c.invalidate(termRecapNowProvider);
+      expect(await c.read(termRecapNowProvider.future), isNull);
     });
 
     test('the server\'s term decides: an answer about a term still far from its end shows nothing', () async {

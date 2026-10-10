@@ -430,7 +430,8 @@ const AUDIENCE = (spec: Row) => {
 
 reg({
   get_company_notifications_page: ({ p_before, p_limit = 30, p_status }) => {
-    const list = HISTORY.filter((h) => !p_status || h.status === p_status)
+    // Like the server: a student's own automatic notices are not in the history.
+    const list = HISTORY.filter((h) => h.sender_role !== 'system' && (!p_status || h.status === p_status))
       .sort((a, b) => (b.sent_at ?? b.scheduled_at ?? b.created_at).localeCompare(a.sent_at ?? a.scheduled_at ?? a.created_at));
     const from = p_before ? list.findIndex((h) => (h.sent_at ?? h.scheduled_at ?? h.created_at) < p_before) : 0;
     const items = from < 0 ? [] : list.slice(from, from + p_limit);

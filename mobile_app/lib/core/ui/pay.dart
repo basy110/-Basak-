@@ -373,7 +373,7 @@ class PayeeCard extends StatelessWidget {
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                               style: text.body.copyWith(fontWeight: FontWeight.w600, height: 22 / 15)),
-                          Text(method, style: text.caption.copyWith(color: colors.ink3)),
+                          if (method.isNotEmpty) Text(method, style: text.caption.copyWith(color: colors.ink3)),
                         ],
                       ),
                     ),

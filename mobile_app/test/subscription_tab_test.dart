@@ -5,15 +5,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:basak_mobile/core/media/signed_photo.dart';
 import 'package:basak_mobile/core/storage/offline_cache.dart';
 import 'package:basak_mobile/core/ui/ui.dart';
+import 'package:basak_mobile/core/widgets/avatar_image.dart';
 import 'package:basak_mobile/features/student/subscription/models/subscription_model.dart';
 import 'package:basak_mobile/features/student/subscription/presentation/pay_screen.dart';
 import 'package:basak_mobile/features/student/subscription/presentation/purchase_flow.dart';
 import 'package:basak_mobile/features/student/subscription/presentation/receipt_screen.dart';
 import 'package:basak_mobile/features/student/subscription/presentation/subscription_screen.dart';
+import 'package:basak_mobile/features/student/subscription/presentation/uploaded_receipt.dart';
 
 import 'support/pay_fixtures.dart';
+import 'support/perf_fakes.dart' show onePixel;
 
 Future<void> open(WidgetTester tester, List<Override> overrides,
     {Size size = const Size(390, 844), double textScale = 1, bool visible = true}) async {
@@ -77,14 +81,19 @@ void main() {
   testWidgets('under review: when the receipt was sent, the amount and the method — and nothing to do',
       (tester) async {
     await open(tester, payOverrides(subs: [boardSub('pending_review')], receipts: [boardReceipt(1, 'pending')]));
-    expect(find.text('قيد المراجعة'), findsOneWidget);
+    // The subscription's state, and the same words on the receipt sent.
+    expect(find.descendant(of: find.byKey(const Key('sub-card-sub1')), matching: find.text('قيد المراجعة')),
+        findsOneWidget);
+    expect(find.text('قيد المراجعة'), findsNWidgets(2));
     expect(find.textContaining('أُرسل اليوم'), findsOneWidget);
     expect(tester.widget<Text>(find.byKey(const Key('amount-label'))).data, 'المبلغ');
     expect(tester.widget<Text>(find.byKey(const Key('amount-value'))).data, '4,500 ج.م');
     expect(find.text('طريقة الدفع'), findsOneWidget);
     expect(find.text('InstaPay'), findsOneWidget);
     expect(find.text('ادفع الآن'), findsNothing);
-    expect(find.byType(BasakButton), findsNothing);
+    // The one thing on the page that can be pressed: a look at the receipt sent.
+    expect(find.byType(BasakButton), findsOneWidget);
+    expect(find.text('عرض الإيصال'), findsOneWidget);
   });
 
   testWidgets('active: the ink pass with the days left, the receipt as a row, the next period as an offer',
@@ -221,12 +230,104 @@ void main() {
     expect(find.text('المحاولة 2 من 5'), findsOneWidget);
     expect(find.text('المبلغ غير مطابق'), findsOneWidget);
     expect(find.text('كوبري السرو'), findsOneWidget);
-    expect(tester.widget<Text>(find.byKey(const Key('amount-value'))).data, '4,500 ج.م');
+    expect(find.text('4,500 ج.م'), findsOneWidget);
 
-    await tester.tap(find.text('إيصال جديد'));
+    await tester.tap(find.text('ارفع إيصالاً جديداً'));
     await tester.pumpAndSettle();
     expect(find.byType(PayScreen), findsOneWidget);
     expect(find.text('الإيصال مرفوض'), findsOneWidget);
+  });
+
+  testWidgets('a refused receipt (the subscription back to awaiting payment) reads as refused, not "ادفع الآن"',
+      (tester) async {
+    await open(
+        tester,
+        payOverrides(subs: [
+          boardSub('pending_payment')
+        ], receipts: [
+          boardReceipt(2, 'rejected', reason: 'الصورة غير واضحة'),
+          boardReceipt(1, 'rejected', reason: 'المبلغ ناقص'),
+        ]));
+    expect(find.text('إيصال مرفوض'), findsWidgets);
+    expect(find.text('بانتظار الدفع'), findsNothing);
+    expect(find.text('ادفع الآن'), findsNothing);
+    expect(find.byKey(const Key('rejection-sub1')), findsOneWidget);
+    expect(find.text('الصورة غير واضحة'), findsOneWidget, reason: 'the newest refusal');
+    expect(find.text('المبلغ ناقص'), findsNothing);
+    expect(find.text('المحاولة 3 من 5'), findsOneWidget);
+    // The receipt that was sent, with its own state.
+    expect(find.byKey(const Key('uploaded-receipt-sub1')), findsOneWidget);
+    expect(find.text('الإيصال المرفوع'), findsOneWidget);
+    expect(find.text('مرفوض'), findsOneWidget);
+
+    await tester.tap(find.text('ارفع إيصالاً جديداً'));
+    await tester.pumpAndSettle();
+    expect(find.byType(PayScreen), findsOneWidget);
+    expect(find.text('الإيصال مرفوض'), findsOneWidget);
+    expect(find.text('ارفع إيصالاً جديداً'), findsOneWidget);
+  });
+
+  testWidgets('awaiting payment with no receipt sent: no refusal and no receipt row', (tester) async {
+    await open(tester, payOverrides(subs: [boardSub('pending_payment')]));
+    expect(find.text('ادفع الآن'), findsOneWidget);
+    expect(find.text('إيصال مرفوض'), findsNothing);
+    expect(find.byType(UploadedReceiptCard), findsNothing);
+  });
+
+  testWidgets('the receipt sent: its date and state, and "عرض الإيصال" opens its picture full screen',
+      (tester) async {
+    debugAvatarImage = (_) => MemoryImage(onePixel);
+    addTearDown(() => debugAvatarImage = null);
+    final signed = <StoragePhoto>[];
+    await open(tester, [
+      ...payOverrides(subs: [boardSub('pending_review')], receipts: [boardReceipt(1, 'pending')]),
+      signedPhotoProvider.overrideWith((ref, photo) async {
+        signed.add(photo);
+        return 'https://storage.test/${photo.bucket}/${photo.path}';
+      }),
+    ]);
+    expect(find.text('الإيصال المرفوع'), findsOneWidget);
+    expect(tester.widget<Text>(find.byKey(const Key('uploaded-receipt-date'))).data, startsWith('أُرسل اليوم'));
+    expect(find.descendant(of: find.byKey(const Key('uploaded-receipt-sub1')), matching: find.text('قيد المراجعة')),
+        findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('uploaded-receipt-view')));
+    await tester.pumpAndSettle();
+    expect(find.byType(ReceiptImageViewer), findsOneWidget);
+    expect(find.byType(InteractiveViewer), findsOneWidget);
+    expect(signed, [(bucket: 'receipts', path: 'me/sub1_1.jpg')]);
+
+    await tester.tap(find.byKey(const Key('receipt-image-close')));
+    await tester.pumpAndSettle();
+    expect(find.byType(ReceiptImageViewer), findsNothing);
+    expect(find.text('الإيصال المرفوع'), findsOneWidget);
+  });
+
+  testWidgets('a picture that cannot be signed says so, with a way to try again', (tester) async {
+    var fail = true;
+    await open(tester, [
+      ...payOverrides(subs: [boardSub('pending_review')], receipts: [boardReceipt(1, 'pending')]),
+      signedPhotoProvider.overrideWith((ref, photo) async {
+        if (fail) throw Exception('offline');
+        return 'https://storage.test/${photo.bucket}/${photo.path}';
+      }),
+    ]);
+    debugAvatarImage = (_) => MemoryImage(onePixel);
+    addTearDown(() => debugAvatarImage = null);
+    await tester.tap(find.byKey(const Key('uploaded-receipt-view')));
+    await tester.pumpAndSettle();
+    expect(find.text('تعذّر تحميل صورة الإيصال.'), findsOneWidget);
+    fail = false;
+    await tester.tap(find.text('إعادة المحاولة'));
+    await tester.pumpAndSettle();
+    expect(find.byType(InteractiveViewer), findsOneWidget);
+  });
+
+  testWidgets('a paid subscription shows the receipt it was paid with as accepted', (tester) async {
+    await open(tester, payOverrides(subs: [running()], doc: boardReceiptDoc, receipts: [boardReceipt(1, 'approved')]));
+    expect(find.text('نشط'), findsOneWidget);
+    expect(find.text('الإيصال المرفوع'), findsOneWidget);
+    expect(find.text('مقبول'), findsOneWidget);
   });
 
   testWidgets('paid and starting later: the light ticket with its first day, and its receipt', (tester) async {
@@ -348,6 +449,11 @@ void main() {
         payOverrides(subs: [boardSub('expired', phase: 'expired')], catalog: boardCatalog(withSecond: false)),
         payOverrides(subs: [
           boardSub('rejected')
+        ], receipts: [
+          boardReceipt(1, 'rejected', reason: 'المبلغ في الإيصال 4,000 ج.م والمطلوب 4,500 ج.م. حوّل الفرق.'),
+        ]),
+        payOverrides(subs: [
+          boardSub('pending_payment')
         ], receipts: [
           boardReceipt(1, 'rejected', reason: 'المبلغ في الإيصال 4,000 ج.م والمطلوب 4,500 ج.م. حوّل الفرق.'),
         ]),

@@ -34,6 +34,9 @@ export const PlatformNotificationsPage = page(() => import('../pages/platform/Pl
 export const UniversitiesPage = page(() => import('../pages/platform/UniversitiesPage'), 'UniversitiesPage');
 export const PlatformDefaultsPage = page(() => import('../pages/platform/PlatformDefaultsPage'), 'PlatformDefaultsPage');
 export const AppVersionsPage = page(() => import('../pages/platform/AppVersionsPage'), 'AppVersionsPage');
+export const PlatformAnalyticsPage = page(() => import('../pages/platform/PlatformAnalyticsPage'), 'PlatformAnalyticsPage');
+export const PlatformBillingPage = page(() => import('../pages/platform/PlatformBillingPage'), 'PlatformBillingPage');
+export const PlatformRecapPage = page(() => import('../pages/platform/PlatformRecapPage'), 'PlatformRecapPage');
 
 // One company's workspace.
 export const TodayPage = page(() => import('../pages/TodayPage'), 'TodayPage');

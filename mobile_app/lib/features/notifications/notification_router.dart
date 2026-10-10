@@ -6,6 +6,9 @@ enum NotificationDestination {
   subscription,
   card,
 
+  /// The end-of-term recap, once the platform has published it.
+  recap,
+
   /// The Notification Center: also where anything unknown ends up.
   center;
 
@@ -15,6 +18,7 @@ enum NotificationDestination {
         'home' => NotificationDestination.home,
         'subscription' => NotificationDestination.subscription,
         'card' => NotificationDestination.card,
+        'recap' => NotificationDestination.recap,
         _ => NotificationDestination.center,
       };
 }

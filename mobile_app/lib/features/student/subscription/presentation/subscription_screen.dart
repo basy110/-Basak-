@@ -23,6 +23,7 @@ import 'pay_screen.dart';
 import 'purchase_flow.dart';
 import 'receipt_card.dart';
 import 'receipt_screen.dart';
+import 'uploaded_receipt.dart';
 
 // These stay loaded for the session, so opening the page again is instant. They
 // are refreshed when the server announces a change (SyncHub) and on app resume,
@@ -197,12 +198,15 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
   }
 
   /// A notification was about a subscription: the tab shows it at its top, so
-  /// there is nothing to open — the request is only taken off.
+  /// there is nothing to open — the request is only taken off. Its receipts
+  /// are read again: the notice may be a refusal ("رُفض إيصال الدفع") that
+  /// this phone has not heard of yet.
   void _focus(String? subscriptionId) {
     if (subscriptionId == null) return;
     Future.microtask(() {
       if (!mounted) return;
       ref.read(focusedSubscriptionProvider.notifier).state = null;
+      ref.invalidate(subscriptionReceiptsProvider(subscriptionId));
     });
   }
 
@@ -246,11 +250,13 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
     if (created != null && mounted) _onCreated(created);
   }
 
-  static BasakStatus _statusOf(SubscriptionModel sub) {
+  /// [latest] is the subscription's newest receipt: a refusal puts the
+  /// subscription back to 'pending_payment', and only the receipt says why.
+  static BasakStatus _statusOf(SubscriptionModel sub, ReceiptModel? latest) {
     if (sub.isExpired) return BasakStatus.expired;
     if (sub.isActive) return sub.isUpcoming ? BasakStatus.upcoming : BasakStatus.active;
     if (sub.isPendingReview) return BasakStatus.pendingReview;
-    if (sub.isRejected) return BasakStatus.rejected;
+    if (needsNewReceipt(sub, latest)) return BasakStatus.rejected;
     return BasakStatus.pendingPayment;
   }
 
@@ -348,7 +354,11 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
   // ── The subscription that counts now ───────────────────────────────
 
   List<Widget> _current(SubscriptionModel sub) {
-    final status = _statusOf(sub);
+    // A cash day ride has no receipts to read.
+    final receipts = sub.isDaily ? null : _receiptsOf(sub);
+    final latest = receipts == null || receipts.isEmpty ? null : receipts.first;
+    final status = _statusOf(sub, latest);
+    final uploaded = _uploaded(sub, latest);
     final money = formatMoney(sub.price);
     final company = (sub.companyName ?? '').trim();
     final key = Key('sub-card-${sub.id}');
@@ -378,14 +388,14 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
               actionKey: Key('pay-now-${sub.id}'),
             ),
           ),
+          if (uploaded != null) uploaded,
           if (route.isNotEmpty) InfoRows(rows: route),
         ];
 
       case BasakStatus.rejected:
-        final receipts = _receiptsOf(sub);
-        final latest = receipts == null || receipts.isEmpty ? null : receipts.first;
+        // The company refused the last receipt: what is due and the way to a
+        // new receipt on the ticket, then why, and the attempt the next one is.
         final reason = (latest?.rejectionReason ?? '').trim();
-        final attempts = receipts?.length ?? 0;
         final line = _lineTitle(sub);
         return [
           PassCard(
@@ -396,22 +406,22 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
             to: _withoutTitle(sub.destination) ?? line,
             toCaption: company.isEmpty ? line : '$line · $company',
             footer: PassAction(
-              caption: attempts >= 1 && attempts < PayScreen.maxAttempts
-                  ? 'المحاولة ${attempts + 1} من ${PayScreen.maxAttempts}'
-                  : 'المبلغ المطلوب',
-              value: reason.isNotEmpty ? reason : money,
-              actionLabel: 'إيصال جديد',
+              caption: 'المبلغ المطلوب',
+              value: money,
+              actionLabel: 'ارفع إيصالاً جديداً',
               onAction: () => _pay(sub),
             ),
           ),
-          InfoRows(rows: [
-            InfoRow(label: 'المبلغ المطلوب', value: money, labelKey: amountLabel, valueKey: amountValue),
-          ]),
+          RejectionCard(
+            key: Key('rejection-${sub.id}'),
+            attempt: nextAttemptLabel(receipts?.length ?? 0),
+            reason: reason.isNotEmpty ? reason : 'راجع سبب الرفض مع إدارة الشركة ثم ارفع إيصالاً جديداً.',
+          ),
+          if (uploaded != null) uploaded,
+          if (route.isNotEmpty) InfoRows(rows: route),
         ];
 
       case BasakStatus.pendingReview:
-        final receipts = _receiptsOf(sub);
-        final latest = receipts == null || receipts.isEmpty ? null : receipts.first;
         final method = _methodName(sub, latest);
         return [
           PeriodCard(
@@ -422,6 +432,7 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
             title: sub.periodName,
             note: latest == null ? null : SubscriptionScreenWords.sentAt(latest.createdAt),
           ),
+          if (uploaded != null) uploaded,
           InfoRows(rows: [
             ...route,
             InfoRow(label: 'المبلغ', value: money, labelKey: amountLabel, valueKey: amountValue),
@@ -450,6 +461,7 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
                 onInk: false),
           ),
           if (receipt != null) InfoRows(rows: [receipt]),
+          if (uploaded != null) uploaded,
         ];
 
       case BasakStatus.active || BasakStatus.expired:
@@ -484,12 +496,23 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
             ),
           ),
           InfoRows(rows: [...route, if (receipt != null) receipt]),
+          if (uploaded != null) uploaded,
         ];
     }
   }
 
-  /// The receipts of a subscription under review or refused: when the last
-  /// one was sent, why it was refused. Read only while the tab is in front.
+  /// «الإيصال المرفوع»: the last receipt sent for [sub], with its picture.
+  Widget? _uploaded(SubscriptionModel sub, ReceiptModel? latest) {
+    if (latest == null || sub.isDaily || latest.imageUrl.trim().isEmpty) return null;
+    return UploadedReceiptCard(
+      key: Key('uploaded-receipt-${sub.id}'),
+      receipt: latest,
+      sentAt: SubscriptionScreenWords.sentAt(latest.createdAt),
+    );
+  }
+
+  /// The receipts of a subscription: whether the last one was refused and
+  /// why, when it was sent, and its picture. Read only while the tab is in front.
   List<ReceiptModel>? _receiptsOf(SubscriptionModel sub) {
     if (widget.visible) {
       final read = ref.watch(subscriptionReceiptsProvider(sub.id)).valueOrNull;

@@ -26,9 +26,24 @@ class TermRecapRepository {
   /// no such function on this database, no connection and nothing saved, or
   /// an answer that cannot be read. Never throws — a missing recap is not an
   /// error anyone should see.
-  Future<TermRecap?> load({required String subscriptionId, required String studentId}) async {
+  ///
+  /// [fresh]: asks the server first instead of showing the saved copy (a tap
+  /// on «ملخص فصلك جاهز»: the copy may be from before it was published). The
+  /// saved copy is still used when there is no connection.
+  Future<TermRecap?> load({required String subscriptionId, required String studentId, bool fresh = false}) async {
+    final key = 'recap.$subscriptionId';
     try {
-      final json = await OfflineCache.readThrough('recap.$subscriptionId', () => _fetch(subscriptionId));
+      Object? json;
+      if (fresh) {
+        try {
+          json = await _fetch(subscriptionId).timeout(OfflineCache.requestTimeout);
+          await OfflineCache.put(key, json);
+        } catch (_) {
+          json = await OfflineCache.readThrough(key, () => _fetch(subscriptionId));
+        }
+      } else {
+        json = await OfflineCache.readThrough(key, () => _fetch(subscriptionId));
+      }
       final data = RecapData.tryParse(json);
       return data == null ? null : TermRecap.build(data, studentKey: studentId);
     } catch (_) {
@@ -103,8 +118,9 @@ abstract final class RecapGate {
 /// The clock the gate reads (tests set their own day).
 final recapTodayProvider = Provider<DateTime Function()>((ref) => DateTime.now);
 
-/// The student's recap when one exists and its banner may show; otherwise
-/// null. At most one request per launch, and none outside the window.
+/// The student's recap when one exists and its banner may show (published by
+/// the platform and inside the window); otherwise null. At most one request
+/// per launch, and none outside the window.
 final termRecapProvider = FutureProvider<TermRecap?>((ref) async {
   final userId = ref.watch(sessionUserIdProvider);
   if (userId == null) return null;
@@ -119,5 +135,24 @@ final termRecapProvider = FutureProvider<TermRecap?>((ref) async {
   if (term == null) return null;
   final recap =
       await ref.watch(termRecapRepoProvider).load(subscriptionId: term.subscriptionId, studentId: userId);
+  return recap != null && recap.bannerOpen() ? recap : null;
+});
+
+/// A tap on the notification that the recap is out («ملخص فصلك جاهز»): the
+/// recap as the server has it now, when it may be shown; otherwise null. Read
+/// it after `ref.invalidate(termRecapNowProvider)` so each tap asks again.
+final termRecapNowProvider = FutureProvider<TermRecap?>((ref) async {
+  final userId = ref.watch(sessionUserIdProvider);
+  if (userId == null) return null;
+  SubscriptionModel? subscription;
+  try {
+    // Opened from a push while the app was closed: Home may not have it yet.
+    subscription = await ref.read(currentSubscriptionProvider.future);
+  } catch (_) {}
+  final term = await RecapGate.resolve(ref.read(recapTodayProvider)(), RecapGate.of(subscription));
+  if (term == null) return null;
+  final recap = await ref
+      .read(termRecapRepoProvider)
+      .load(subscriptionId: term.subscriptionId, studentId: userId, fresh: true);
   return recap != null && recap.bannerOpen() ? recap : null;
 });

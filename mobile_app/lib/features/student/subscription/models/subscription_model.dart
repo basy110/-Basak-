@@ -257,6 +257,8 @@ class ReceiptModel {
   });
 
   bool get isRejected => status == 'rejected';
+  bool get isPending => status == 'pending';
+  bool get isApproved => status == 'approved';
 
   factory ReceiptModel.fromJson(Map<String, dynamic> json) {
     return ReceiptModel(
@@ -273,3 +275,23 @@ class ReceiptModel {
     );
   }
 }
+
+/// A receipt may be sent five times for one subscription.
+const maxReceiptAttempts = 5;
+
+/// The company refused the student's receipt and a new one is needed.
+///
+/// A refusal moves the subscription back to 'pending_payment' on the server
+/// (the receipt itself carries 'rejected' and the reason), so the status alone
+/// reads like a subscription that was never paid: [latest] — the newest receipt
+/// of [sub], or null when none is known — tells the two apart. A subscription
+/// whose own status is 'rejected' (older data) needs a new receipt too.
+bool needsNewReceipt(SubscriptionModel sub, ReceiptModel? latest) {
+  if (sub.isRejected) return true;
+  return sub.status == 'pending_payment' && latest != null && latest.isRejected;
+}
+
+/// "المحاولة 2 من 5": the attempt the next receipt will be, after [sent]
+/// receipts. Null before the first one and once all five are used.
+String? nextAttemptLabel(int sent) =>
+    sent >= 1 && sent < maxReceiptAttempts ? 'المحاولة ${sent + 1} من $maxReceiptAttempts' : null;
