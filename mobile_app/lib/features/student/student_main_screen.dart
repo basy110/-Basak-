@@ -16,6 +16,9 @@ import 'home/presentation/student_home_screen.dart';
 import 'invites/invites.dart';
 import 'subscription/presentation/subscription_screen.dart';
 import 'qr/presentation/student_qr_screen.dart';
+import 'recap/recap_engine.dart' show TermRecap;
+import 'recap/recap_repository.dart';
+import 'recap/recap_screen.dart';
 import 'profile/presentation/profile_screen.dart';
 
 class StudentMainScreen extends ConsumerStatefulWidget {
@@ -83,9 +86,27 @@ class _StudentMainScreenState extends ConsumerState<StudentMainScreen> implement
         _selectTab(1);
       case NotificationDestination.card:
         _selectTab(2);
+      case NotificationDestination.recap:
+        _selectTab(0);
+        unawaited(_openRecap());
       case NotificationDestination.center:
         NotificationsScreen.open(context);
     }
+  }
+
+  /// «ملخص فصلك جاهز»: the recap, asked of the server now (Home's copy may be
+  /// from before it was published). Not there (stopped, outside its window,
+  /// no rides): Home stays open, as for any notification without a screen.
+  Future<void> _openRecap() async {
+    ref.invalidate(termRecapNowProvider);
+    TermRecap? recap;
+    try {
+      recap = await ref.read(termRecapNowProvider.future);
+    } catch (_) {}
+    if (!mounted) return;
+    // Home's banner follows what the server said.
+    ref.invalidate(termRecapProvider);
+    if (recap != null) await RecapScreen.open(context, recap);
   }
 
   // Every tab change shows the full bar again.

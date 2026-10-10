@@ -16,6 +16,7 @@ void main() {
     expect(NotificationDestination.parse('subscription'), NotificationDestination.subscription);
     expect(NotificationDestination.parse('home'), NotificationDestination.home);
     expect(NotificationDestination.parse('card'), NotificationDestination.card);
+    expect(NotificationDestination.parse('recap'), NotificationDestination.recap);
     expect(NotificationDestination.parse('notifications'), NotificationDestination.center);
     expect(NotificationDestination.parse('something_new'), NotificationDestination.center);
     expect(NotificationDestination.parse(null), NotificationDestination.center);
@@ -53,6 +54,20 @@ void main() {
     ]);
     expect(shell.intents.first.subscriptionId, 'sub-1');
     expect(opened, ['n2', 'n3', 'n4'], reason: 'pushes and banners are reported as opened; list rows are not');
+  });
+
+  test('the recap opens where the shell has it, else the Notification Center', () {
+    final student = FakeShell({...NotificationDestination.values});
+    NotificationRouter(currentUserId: () => 'a')
+      ..attach('a', student)
+      ..open(push('n1', route: 'recap'), NotificationTapSource.push);
+    expect(student.shown, [NotificationDestination.recap]);
+
+    final supervisor = FakeShell(const {NotificationDestination.home, NotificationDestination.center});
+    NotificationRouter(currentUserId: () => 'a')
+      ..attach('a', supervisor)
+      ..open(push('n2', route: 'recap'), NotificationTapSource.push);
+    expect(supervisor.shown, [NotificationDestination.center]);
   });
 
   test('a row that leads to the Notification Center stays where it is', () {

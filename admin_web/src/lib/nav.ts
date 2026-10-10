@@ -54,6 +54,7 @@ export const PLATFORM_NAV: NavGroup[] = [
   { group: 'إعدادات المنصة', items: [
     { id: 'p-universities', slug: 'universities', label: 'الجامعات والكليات', icon: 'school', preload: routes.UniversitiesPage.preload },
     { id: 'p-defaults', slug: 'defaults', label: 'الإعدادات الافتراضية', icon: 'sliders', preload: routes.PlatformDefaultsPage.preload },
+    { id: 'p-recap', slug: 'recap', label: 'ملخص الفصل', icon: 'calendar', preload: routes.PlatformRecapPage.preload },
     { id: 'p-app-versions', slug: 'app-versions', label: 'إصدارات التطبيق', icon: 'smartphone', preload: routes.AppVersionsPage.preload }] },
 ];
 
