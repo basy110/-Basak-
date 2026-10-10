@@ -1,9 +1,9 @@
 import React, { Suspense, lazy, useMemo } from 'react';
 import {
-  AttentionList, Badge, Button, ErrorState, Page, PageHeader, PhoneBar, Section, SkeletonList, SkeletonStat, SkeletonTable, StatCard,
+  AttentionList, Badge, Button, Note, ErrorState, Page, PageHeader, PhoneBar, Section, SkeletonList, SkeletonStat, SkeletonTable, StatCard,
   cairo, clock, countText, dayText, num, NOUN, useOnline,
 } from '../ui';
-import { useCompany } from '../lib/adminScope';
+import { useAdminScope, useCompany } from '../lib/adminScope';
 import { useResetRequestCount } from '../areas/Workspace';
 import { SUBSCRIBER, companyAttention, isFirstRun, nOf, rideDayText, ridersTitle, useCompanyToday, type CompanyToday } from '../lib/today';
 
@@ -22,7 +22,9 @@ export const TodayPage: React.FC = () => {
   const online = useOnline();
   const today = data?.today ?? cairo(new Date()).day;
 
-  if (data && isFirstRun(data)) return <Suspense fallback={<Page><PageHeader title="اليوم" sub={dayText(today, { weekday: true })} /><SkeletonList rows={3} /></Page>}><FirstRun data={data} base={base} /></Suspense>;
+  const platformAdmin = useAdminScope().role === 'super_admin';
+  const stopped = company.status !== 'active';
+  if (data && isFirstRun(data) && !stopped) return <Suspense fallback={<Page><PageHeader title="اليوم" sub={dayText(today, { weekday: true })} /><SkeletonList rows={3} /></Page>}><FirstRun data={data} base={base} /></Suspense>;
 
   const notify = (phone?: boolean) => (
     <Button kind="outline" icon="megaphone" to={`${base}/notifications`} disabled={!online} full={phone}>إرسال إشعار للطلاب</Button>
@@ -34,8 +36,17 @@ export const TodayPage: React.FC = () => {
         <ErrorState card title="تعذّر تحميل صفحة اليوم" text="لم نستطع جلب الإيصالات وأعداد الركاب. تأكد من اتصالك ثم حاول مرة أخرى." onRetry={refresh} />
       ) : (
         <>
+          {/* The platform admin inside a company (AdmPlatWsToday, AdmPlatWsSuspended). */}
+          {stopped ? (
+            <Note tone="warning" title={company.status === 'archived' ? 'هذه الشركة مؤرشفة' : 'هذه الشركة موقوفة'}
+              action={<Button kind="link" sm to="/platform/companies">أعد تشغيلها من «الشركات»</Button>}>
+              مديروها ومشرفوها لا يدخلون، وطلابها لا يرونها في التطبيق. أنت وحدك تراها. بياناتها كما كانت يوم الإيقاف.
+            </Note>
+          ) : platformAdmin && (
+            <Note tone="teal" icon="shield" title="تعمل هنا كمدير لهذه الشركة">ترى ما يراه مديرها وتستطيع كل ما يستطيعه. ما تقبله أو تغيّره يصل طلابها فوراً.</Note>
+          )}
           <div className="grid grid-cols-1 gap-5 sm:gap-6 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
-            <Attention data={data} base={base} passwordRequests={passwordRequests} stale={!online && !!updatedAt ? updatedAt : 0} loading={loading} />
+            <Attention data={data} base={base} passwordRequests={passwordRequests} stale={!online && !!updatedAt ? updatedAt : 0} loading={loading} platformAdmin={platformAdmin} stopped={stopped} />
             <Riders data={data} loading={loading} />
           </div>
           {loading ? <SkeletonTable rows={6} cols={7} /> : data && <Suspense fallback={<SkeletonTable rows={6} cols={7} />}><LinesTable data={data} base={base} /></Suspense>}
@@ -47,13 +58,15 @@ export const TodayPage: React.FC = () => {
 };
 
 /* ── يحتاج منك الآن ─────────────────────────────────────────────────── */
-const Attention: React.FC<{ data: CompanyToday | null; base: string; passwordRequests: number; stale: number; loading: boolean }> = ({ data, base, passwordRequests, stale, loading }) => {
-  const items = useMemo(() => (data ? companyAttention(data, { base, passwordRequests }) : []), [data, base, passwordRequests]);
+const Attention: React.FC<{ data: CompanyToday | null; base: string; passwordRequests: number; stale: number; loading: boolean; platformAdmin?: boolean; stopped?: boolean }> = ({ data, base, passwordRequests, stale, loading, platformAdmin, stopped }) => {
+  const items = useMemo(() => (data && !stopped ? companyAttention(data, { base, passwordRequests }).map((a) => (
+    platformAdmin && a.key === 'passwords' ? { ...a, sub: a.count === 1 ? 'يظهر أيضاً في طلبات المنصة' : 'يظهرون أيضاً في طلبات المنصة' } : a)) : []), [data, base, passwordRequests, platformAdmin, stopped]);
   return (
     <Section title="يحتاج منك الآن"
       meta={data && items.length > 0 ? <Badge>{countText(items.length, NOUN.item)}</Badge> : undefined}
       end={stale ? <span className="text-label text-ink-3">آخر تحديث {clock(cairo(new Date(stale)).time)}</span> : undefined}>
-      {loading || !data ? <SkeletonList rows={4} /> : <AttentionList items={items.map((a, i) => ({ ...a, primary: i === 0 }))} />}
+      {loading || !data ? <SkeletonList rows={4} /> : <AttentionList items={items.map((a, i) => ({ ...a, primary: i === 0 }))}
+        {...(stopped ? { zeroTitle: 'لا شيء يتحرك في شركة موقوفة', zeroSub: 'لا إيصالات جديدة ولا طلبات حتى يُعاد تشغيلها.' } : {})} />}
     </Section>
   );
 };

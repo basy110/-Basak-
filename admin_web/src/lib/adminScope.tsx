@@ -51,3 +51,6 @@ export const companyStatusLabel: Record<CompanyStatus, string> = {
   suspended: 'موقوفة',
   archived: 'مؤرشفة',
 };
+
+/** The same states said of «حساب الشركة» (masculine): «حساب شركة «X» موقوف حالياً». */
+export const companyAccountStatusLabel: Record<CompanyStatus, string> = { active: 'مفعّل', suspended: 'موقوف', archived: 'مؤرشف' };

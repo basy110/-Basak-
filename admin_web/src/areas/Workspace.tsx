@@ -14,7 +14,7 @@ import { useCompanyOverview } from '../lib/overview';
 import { useWorkspaceSync } from '../lib/sync';
 import { OPEN_RESET_STATUSES } from '../lib/resetRequests';
 import { COMPANY_NAV, MOVED_SLUGS } from '../lib/nav';
-import { AdminProfile, CompanyScope, CompanyScopeProvider, companyStatusLabel } from '../lib/adminScope';
+import { AdminProfile, CompanyScope, CompanyScopeProvider, companyAccountStatusLabel } from '../lib/adminScope';
 import {
   LineNewPage, LinePage, LinesPage, NotificationsPage, PasswordRequestsPage, PaymentMethodsPage, ReceiptDetailsPage,
   ReceiptsPage, ReportsPage, RideConfirmationPage, StudentsPage, SubscriptionPeriodsPage, SupervisorsPage, TeamPage,
@@ -68,7 +68,7 @@ export const Workspace: React.FC<{ admin: AdminProfile; onLogout: () => void }> 
   const { company } = loaded;
   if (admin.role === 'company_admin' && company.status !== 'active') {
     return (
-      <Notice title={`حساب «${company.name}» ${companyStatusLabel[company.status]} الآن`} onLogout={onLogout} icon="lock">
+      <Notice title={`حساب شركة «${company.name}» ${companyAccountStatusLabel[company.status]} حالياً`} onLogout={onLogout} icon="lock">
         لا يمكن استخدام اللوحة حتى يعيد مدير المنصة تفعيل الشركة. بياناتكم وبيانات طلابكم محفوظة كما هي، والطلاب لا يستطيعون الاشتراك حتى ذلك الحين.
       </Notice>
     );

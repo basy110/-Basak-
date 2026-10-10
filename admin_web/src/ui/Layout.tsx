@@ -34,9 +34,11 @@ export const PageHeader: React.FC<{
   back?: { label: string; to: string }; phoneActions?: boolean;
 }> = ({ title, sub, actions, meta, back, phoneActions = true }) => {
   useSetPhoneHead(title, back);
+  // On a phone the title lives in the top bar: with nothing else to show, the header takes no room.
+  const bare = !sub && !meta && !(actions && phoneActions) ? 'max-sm:contents' : '';
   return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:gap-6">
-      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+    <div className={`flex flex-col gap-3 sm:flex-row sm:items-end sm:gap-6 ${bare}`}>
+      <div className={`flex min-w-0 flex-1 flex-col gap-0.5 ${bare}`}>
         {back && (
           <Link to={back.to} className="mb-1 hidden items-center gap-1.5 self-start text-label font-medium text-teal sm:inline-flex">
             <Icon name="arrowBack" size={14} stroke={2} /><span>{back.label}</span>
