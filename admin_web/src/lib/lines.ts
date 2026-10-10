@@ -229,7 +229,9 @@ export function bothPriceNote(d: LineDraft): string | null {
 // ── The one request ─────────────────────────────────────────────────────────
 export interface SavePayload {
   id: string | null; company_id: string; name: string; origin_name: string; destination_university_id: null;
-  university_ids: string[]; price_termly: number; price_yearly: number; price_daily: number; is_active: boolean;
+  university_ids: string[]; price_termly: number; price_yearly: number; price_daily: number;
+  /** Only for a new line: an edit never switches a line on or off (save_line keeps it as it is). */
+  is_active?: boolean;
   bus_capacity: number | null;
   stations: { id: string | null; name: string }[];
   trips: { id: string | null; direction: Direction; label: string; start_time: string; arrival_time: string | null; university_id: string | null; is_active: boolean; stops: { station_index: number; time: string }[] }[];
@@ -249,7 +251,7 @@ export function buildSavePayload(d: LineDraft): SavePayload {
     id: d.id ?? null, company_id: d.company_id, name: d.name.trim(), origin_name: '', destination_university_id: null,
     university_ids: [...d.university_ids],
     price_termly: priceOf(d.prices.first), price_yearly: priceOf(d.prices.both),
-    price_daily: d.price_daily === '' ? 0 : Number(d.price_daily), is_active: d.is_active,
+    price_daily: d.price_daily === '' ? 0 : Number(d.price_daily), ...(d.id ? {} : { is_active: d.is_active }),
     bus_capacity: seats.ok ? seats.value : null,
     stations: d.stations.map((s) => ({ id: s.id ?? null, name: s.name.trim() })),
     trips: d.trips.map((t) => ({

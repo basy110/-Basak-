@@ -128,7 +128,7 @@ export const LinesPage: React.FC = () => {
   ];
 
   const header = (
-    <PageHeader title="الخطوط" sub="كل خط له محطات صعود بالترتيب، ورحلات ذهاب إلى الجامعة، ومواعيد عودة منها."
+    <PageHeader title="الخطوط" sub={<span className="hidden sm:inline">كل خط له محطات صعود بالترتيب، ورحلات ذهاب إلى الجامعة، ومواعيد عودة منها.</span>}
       actions={<Button icon="plus" to={`${base}/new`} disabled={!actions.online} className="hidden sm:inline-flex">خط جديد</Button>} />
   );
   const phoneBar = <PhoneBar><Button full icon="plus" to={`${base}/new`} disabled={!actions.online}>خط جديد</Button></PhoneBar>;
@@ -170,8 +170,7 @@ export const LinesPage: React.FC = () => {
       {header}
       <DataTable<Row>
         caption="خطوط الشركة" columns={one ? columns.filter((c) => c.key !== 'seats') : columns} rows={pageRows} rowKey={(r) => r.line.id}
-        onOpen={(r) => navigate(`${base}/${r.line.id}`)} toolbar={toolbar} rowH={64}
-        muted={(r) => r.vis.state === 'off'}
+        onOpen={(r) => navigate(`${base}/${r.line.id}`)} toolbar={toolbar}
         empty={shown.length === 0 ? (
           <EmptyState icon="search" title={term ? `لا خط ولا محطة باسم «${term}»` : 'لا خطوط في هذا التصنيف'}
             text={term ? 'جرّب اسماً أقصر، أو امسح البحث لترى كل الخطوط.' : 'اختر «الكل» لترى كل الخطوط.'}
@@ -191,7 +190,7 @@ export const LinesPage: React.FC = () => {
           ],
         })}
       />
-      {stats.data?.ride_date && (
+      {stats.data?.ride_date && shown.length > 0 && (
         <p className="m-0 text-label text-ink-2">«ركاب الغد» هم من أكّدوا الركوب ليوم {dayText(stats.data.ride_date, { weekday: true, year: false })}. الخط الذي «لا يظهر للطلاب» مكتوب تحته ما ينقصه.</p>
       )}
       {phoneBar}

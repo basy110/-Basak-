@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Button, Dialog, Icon, IconButton, errorText, useOnline, type IconName } from '../../ui';
 import { useGuard } from '../../lib/guard';
 import { notify, notifyError } from '../../lib/toasts';
@@ -114,15 +115,25 @@ export function useLineActions(companyId: string, statsOf: (lineId: string) => L
 /** A row's «⋮» menu with optional second lines and a separator (docs/canvas/AdmLines). */
 export interface MenuItem { label: string; sub?: string; icon: IconName; danger?: boolean; onClick: () => void; disabled?: boolean; sep?: boolean }
 export const LineMenu: React.FC<{ items: MenuItem[]; label?: string; sm?: boolean }> = ({ items, label = 'إجراءات الخط', sm = true }) => {
-  const [open, setOpen] = useState(false);
-  const box = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; left: number; up: boolean } | null>(null);
+  const btn = useRef<HTMLButtonElement>(null);
   const list = useRef<HTMLDivElement>(null);
+  const open = !!pos;
+  const toggle = () => {
+    if (pos) { setPos(null); return; }
+    const r = btn.current!.getBoundingClientRect();
+    // Below the button, aligned to its end side; above it when there is no room below.
+    const up = window.innerHeight - r.bottom < 300 && r.top > 300;
+    setPos({ top: up ? r.top - 4 : r.bottom + 4, left: r.left, up });
+  };
   useEffect(() => {
     if (!open) return undefined;
     list.current?.querySelector<HTMLButtonElement>('button:not([disabled])')?.focus();
-    const off = (e: MouseEvent) => { if (!box.current?.contains(e.target as Node)) setOpen(false); };
+    const off = (e: MouseEvent) => { if (!list.current?.contains(e.target as Node) && !btn.current?.contains(e.target as Node)) setPos(null); };
+    const shut = () => setPos(null);
     const key = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { setOpen(false); box.current?.querySelector<HTMLButtonElement>('button')?.focus(); }
+      if (e.key === 'Escape') { setPos(null); btn.current?.focus(); }
+      if (e.key === 'Tab') setPos(null);
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
         e.preventDefault();
         const all = [...(list.current?.querySelectorAll<HTMLButtonElement>('button:not([disabled])') ?? [])];
@@ -131,25 +142,30 @@ export const LineMenu: React.FC<{ items: MenuItem[]; label?: string; sm?: boolea
       }
     };
     document.addEventListener('mousedown', off); document.addEventListener('keydown', key);
-    return () => { document.removeEventListener('mousedown', off); document.removeEventListener('keydown', key); };
+    window.addEventListener('scroll', shut, true); window.addEventListener('resize', shut);
+    return () => {
+      document.removeEventListener('mousedown', off); document.removeEventListener('keydown', key);
+      window.removeEventListener('scroll', shut, true); window.removeEventListener('resize', shut);
+    };
   }, [open]);
   return (
-    <div ref={box} className="relative" onClick={(e) => e.stopPropagation()}>
-      <IconButton icon="dots" label={label} sm={sm} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((o) => !o)} />
-      {open && (
-        <div ref={list} role="menu" className="enter absolute end-0 top-full z-30 mt-1 min-w-[232px] overflow-hidden rounded-inner bg-surface p-1.5 shadow-floating ring-1 ring-hair">
+    <div className="relative" onClick={(e) => e.stopPropagation()}>
+      <IconButton ref={btn} icon="dots" label={label} sm={sm} aria-haspopup="menu" aria-expanded={open} onClick={toggle} />
+      {pos && createPortal(
+        <div ref={list} role="menu" aria-label={label} onClick={(e) => e.stopPropagation()}
+          className="enter fixed z-[65] min-w-[232px] overflow-hidden rounded-inner bg-surface p-1.5 shadow-floating ring-1 ring-hair"
+          style={{ left: pos.left, ...(pos.up ? { bottom: window.innerHeight - pos.top } : { top: pos.top }) }}>
           {items.map((i) => (
             <React.Fragment key={i.label}>
               {i.sep && <div role="separator" className="my-1.5 h-px bg-hair" />}
-              <button type="button" role="menuitem" disabled={i.disabled} onClick={() => { setOpen(false); i.onClick(); }}
+              <button type="button" role="menuitem" disabled={i.disabled} onClick={() => { setPos(null); i.onClick(); }}
                 className={`flex min-h-11 w-full items-center gap-3 rounded-control px-3 py-2 text-start text-small hover:bg-ground focus-visible:bg-ground disabled:text-disabled ${i.danger ? 'text-bad' : 'text-ink'}`}>
                 <span className="flex min-w-0 flex-1 flex-col"><span className="font-semibold">{i.label}</span>{i.sub && <span className="text-cap font-normal text-ink-2">{i.sub}</span>}</span>
                 <Icon name={i.icon} size={18} className={i.danger ? 'text-bad' : 'text-ink-2'} />
               </button>
             </React.Fragment>
           ))}
-        </div>
-      )}
+        </div>, document.body)}
     </div>
   );
 };

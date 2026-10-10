@@ -136,6 +136,9 @@ describe('the save payload', () => {
   it('keeps the line id once known, so a second save edits instead of adding a line', () => {
     const d = { ...ready(), id: 'line-1' };
     expect(buildSavePayload(d).id).toBe('line-1');
+    // An edit never switches the line on or off: a stale copy cannot revive or stop it.
+    expect('is_active' in buildSavePayload(d)).toBe(false);
+    expect(buildSavePayload(ready()).is_active).toBe(true);
   });
   it('an empty seats field clears the capacity; an option switched on with no price is sent off', () => {
     const d = ready();

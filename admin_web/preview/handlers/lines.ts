@@ -67,7 +67,7 @@ function saveLine(p: Row, full: boolean): string {
   const row: Row = {
     ...(existing ?? { created_at: new Date().toISOString(), company_id: COMPANY_ID, bus_capacity: null }),
     id, name: (p.name || p.stations[0].name).trim(), origin_name: p.stations[0].name, destination_university_id: p.university_ids[0],
-    price_termly: p.price_termly, price_yearly: p.price_yearly, price_daily: p.price_daily, is_active: p.is_active !== false,
+    price_termly: p.price_termly, price_yearly: p.price_yearly, price_daily: p.price_daily, is_active: 'is_active' in p ? p.is_active !== false : existing?.is_active ?? true,
     stations: [...stations, ...retired], line_trips: [...trips, ...gone],
     line_universities: (p.university_ids as string[]).map((u) => ({ university_id: u })),
     line_period_prices: full && p.prices

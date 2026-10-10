@@ -193,7 +193,7 @@ export const LineWizard: React.FC<{ mode: 'new' | 'edit'; line?: LineRow; startS
         sub={<span className="hidden sm:inline">{edit ? 'انتقل بين الخطوات كما تشاء. لا يتغيّر شيء عند الطلاب حتى تضغط «حفظ التعديلات».' : 'خمس خطوات. لا يُحفظ شيء ولا يراه الطلاب حتى تضغط «حفظ الخط» في آخر خطوة.'}</span>}
         actions={<Button kind="outline" icon="x" onClick={close}>إغلاق</Button>} />
       {edit && subscribers > 0 && (
-        <Note tone="warning" title={`للخط ${students(subscribers)}: ما تغيّره يصلهم`} className="max-sm:hidden">
+        <Note tone="warning" title={`للخط ${students(subscribers)}: ما تغيّره يصلهم`}>
           تغيير اسم محطة أو موعدها يظهر عند طلابها فور الحفظ، ويتغيّر موعد الركوب في اشتراكاتهم. محطة أو رحلة عليها طلاب لا تُحذف: تتوقف وتختفي من الخط، ويبقى طلابها عليها حتى تنقلهم. الاسم، الجامعات، المقاعد، الأسعار والمحطات والرحلات الخالية تتغيّر بحرية.
         </Note>
       )}

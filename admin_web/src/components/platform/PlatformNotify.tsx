@@ -70,7 +70,6 @@ export const PlatformCompose: React.FC = () => {
   const bad = Object.values(errors).some(Boolean);
   const show = (k: keyof typeof errors) => (tried ? errors[k] : undefined);
   const toggle = (id: string, on: boolean) => setChosen((x) => (on ? [...new Set([...x, id])] : x.filter((y) => y !== id)));
-  const dirty = !!(title.trim() || body.trim());
 
   const ask = () => { setTried(true); setError(''); if (!bad && preview.status === 'ready') setAsking(true); };
   const send = () => void guard('send', async () => {
@@ -137,7 +136,7 @@ export const PlatformCompose: React.FC = () => {
               </div>
             )}
             <div className="flex flex-col gap-1">
-              <TextField label={<span className="flex w-full"><span className="flex-1">العنوان</span></span>} value={title} onChange={(e) => setTitle(e.target.value)} maxLength={TITLE_MAX + 20} error={show('title')}
+              <TextField label="العنوان" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={TITLE_MAX + 20} error={show('title')}
                 end={<span className="text-cap text-ink-3 tabular" dir="ltr">{title.trim().length}/{TITLE_MAX}</span>} />
             </div>
             <TextArea label="نص الإشعار" rows={4} value={body} onChange={(e) => setBody(e.target.value)} maxLength={BODY_MAX + 50} error={show('body')} help={`${body.trim().length}/${BODY_MAX}`} />
@@ -169,7 +168,6 @@ export const PlatformCompose: React.FC = () => {
           {when === 'later' ? ' تستطيع إلغاءه من السجل قبل موعده.' : ' لا يمكن استرجاعه بعد الإرسال.'}
         </p>
       </Dialog>
-      {dirty && <span className="sr-only" aria-live="polite">لم يُرسل بعد</span>}
     </>
   );
 };
@@ -220,7 +218,7 @@ export const NoteDetails: React.FC<{
         </section>
       )}
       {r.status === 'failed' && <Note tone="danger" title="لم يُرسل">{r.status_note && /[؀-ۿ]/.test(r.status_note) ? r.status_note : 'تعذّر الإرسال من جهتنا. أعد كتابته وأرسله من جديد.'}</Note>}
-      {g.platform && g.rows.length > 1 && (
+      {done && g.platform && g.rows.length > 1 && (
         <section className="flex flex-col gap-1">
           <h3 className="m-0 text-card">في كل شركة</h3>
           <InfoRows labelW={220} rows={g.rows.slice(0, 4).map((x) => [<span className="text-small text-ink">{x.company_name}</span>, <span className="text-ink-2">{done ? `${num(x.students)} مستلماً` : '—'}</span>])} />
