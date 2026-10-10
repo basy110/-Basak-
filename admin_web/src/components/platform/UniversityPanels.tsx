@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Badge, Button, Dialog, FieldRow, Icon, Note, SidePanel, StatePill, TextField, countText, num, NOUN } from '../../ui';
+import { Badge, Button, Dialog, FieldRow, Note, SidePanel, StatePill, TextField, countText, num, NOUN } from '../../ui';
 import { collegeProblem, collegeStudents, sameName, universityProblem, type CollegeRow, type UniversityCounts, type UniversityRow } from '../../lib/platform';
 import { GENERAL_COLLEGES, isPlaceholderCollege } from '../../lib/colleges';
 
@@ -95,19 +95,11 @@ export const UniversityPanel: React.FC<{
           <Button type="submit" kind="secondary" icon="plus" loading={busy === 'college'} disabled={!online}>أضف كلية</Button>
         </form>
         {mine.length === 0 ? (
-          <div className="flex flex-col gap-3 rounded-inner bg-teal-tint/60 p-4">
-            <div className="flex items-start gap-3">
-              <span className="flex h-9 w-9 flex-none items-center justify-center rounded-lg bg-teal text-white"><Icon name="school" size={18} /></span>
-              <div className="min-w-0 flex-1">
-                <div className="text-small font-bold">يرى طلابها الآن القائمة العامة</div>
-                <div className="text-label text-ink-2">لم تُضف كليات خاصة بهذه الجامعة، فيختار الطالب من {num(GENERAL_COLLEGES.length)} كلية عامة أو يكتب كليته. أضف كلياتها لتظهر هي وحدها.</div>
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {GENERAL_COLLEGES.map((c) => <span key={c} className="inline-flex h-7 items-center rounded-control bg-surface px-2.5 text-cap font-semibold text-ink-2 ring-1 ring-hair">{c}</span>)}
-            </div>
+          <div className="flex flex-col gap-3">
+            <Note title="يرى طلابها الآن القائمة العامة">لم تُضف كليات خاصة بهذه الجامعة، فيختار الطالب من {num(GENERAL_COLLEGES.length)} كلية عامة أو يكتب كليته. أضف كلياتها لتظهر هي وحدها.</Note>
+            <p className="m-0 text-label leading-7 text-ink-2">{GENERAL_COLLEGES.join('، ')}</p>
             <div className="flex">
-              <Button kind="primary" sm icon="plus" className="w-full !h-12 sm:w-auto sm:!h-9" loading={busy === 'colleges'} disabled={!online}
+              <Button kind="tonal" sm icon="plus" className="w-full !h-12 sm:w-auto sm:!h-9" loading={busy === 'colleges'} disabled={!online}
                 onClick={() => onAddColleges([...GENERAL_COLLEGES])}>انسخ القائمة العامة إليها ({num(GENERAL_COLLEGES.length)})</Button>
             </div>
             <p className="m-0 text-cap text-ink-3">بعد النسخ أخفِ ما لا يوجد فيها من كليات بزر «أخفِ» بجانب كل كلية.</p>

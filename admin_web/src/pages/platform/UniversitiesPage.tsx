@@ -219,7 +219,7 @@ export const UniversitiesPage: React.FC = () => {
   const columns: Column<UniversityRow>[] = [
     { key: 'name', label: <span className="inline-flex items-center gap-1">الجامعة{sort === 'name' && <Icon name="aup" size={14} stroke={2} />}</span>, render: (u) => <Cell2 main={u.name} sub={shownColleges(u.id) === 0 && u.is_active ? 'بلا كليات خاصة: يختار طلابها من القائمة العامة' : undefined} /> },
     { key: 'city', label: 'المدينة', w: 170, render: (u) => <span className="truncate">{u.city}</span> },
-    { key: 'colleges', label: 'الكليات', w: 110, render: (u) => (shownColleges(u.id) === 0 ? <span className="inline-flex h-6 items-center rounded-md bg-amber-bg px-2 text-cap font-bold text-amber">العامة</span> : <span className="inline-flex h-6 min-w-8 items-center justify-center rounded-md bg-violet-bg px-2 text-cap font-bold tabular text-violet">{num(shownColleges(u.id))}</span>) },
+    { key: 'colleges', label: 'الكليات', w: 110, render: (u) => (shownColleges(u.id) === 0 ? <span className="text-ink-3">العامة</span> : muted(u, shownColleges(u.id))) },
     { key: 'students', label: 'الطلاب', w: 96, render: (u) => (statsOf(u.id) ? muted(u, statsOf(u.id)!.students) : dash) },
     { key: 'companies', label: 'شركات تخدمها', w: 120, hideTablet: true, render: (u) => (statsOf(u.id) ? muted(u, statsOf(u.id)!.companies.length) : dash) },
     { key: 'state', label: 'الحالة', w: 112, render: (u) => <UniState on={u.is_active} /> },
@@ -284,7 +284,7 @@ export const UniversitiesPage: React.FC = () => {
       bulk={{
         count: selected.size, onClear: () => setSelected(new Set()), total: shown.length, onAll: () => setSelected(new Set(shown.map((u) => u.id))),
         actions: <>
-          <ExportButton label="تصدير المحدد" count={selected.size} onExport={() => exportRows(rows.filter((u) => selected.has(u.id)))} className="!bg-white !text-teal" />
+          <ExportButton label="تصدير المحدد" count={selected.size} onExport={() => exportRows(rows.filter((u) => selected.has(u.id)))}  />
           <Button sm kind="secondary" icon="eye" disabled={!online} onClick={() => setBulk('show')}>أظهر</Button>
           <Button sm kind="secondary" icon="eyeOff" disabled={!online} onClick={() => setBulk('hide')}>أخفِ</Button>
         </>,

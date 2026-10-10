@@ -23,13 +23,6 @@ export default {
         warn: { DEFAULT: '#8A5300', bg: '#FCF1DC' },
         bad: { DEFAULT: '#B3261E', bg: '#FCEBE9', hover: '#9F2019', pressed: '#8C1B15', quiet: '#F8DBD8' },
         badge: '#C8372D',
-        // Accents: one per kind of thing, so the dashboard reads at a glance (navigation groups, number cards).
-        violet: { DEFAULT: '#6B4FD3', bg: '#EFEBFC' },
-        amber: { DEFAULT: '#B86A00', bg: '#FDF1DE' },
-        green: { DEFAULT: '#0F7A55', bg: '#E2F5EC' },
-        pink: { DEFAULT: '#C02F72', bg: '#FBE8F1' },
-        blue: { DEFAULT: '#1F5FCC', bg: '#E6EEFC' },
-        orange: { DEFAULT: '#C4521F', bg: '#FCECE4' },
       },
       fontFamily: {
         // The dashboard's own pair, as before the redesign: Inter for Latin letters and digits, Cairo for Arabic.

@@ -111,7 +111,7 @@ export function ImportPanel<K extends string, T>({
     <ul className="flex flex-col divide-y divide-hair overflow-hidden rounded-inner bg-surface ring-1 ring-hair">
       {items.slice(0, 200).map((p) => (
         <li key={`${p.row}-${p.error}`} className="flex items-start gap-3 px-3 py-2.5">
-          <span className={`mt-0.5 flex h-6 min-w-[2.25rem] flex-none items-center justify-center rounded-md px-1.5 text-cap font-bold tabular ${tone === 'danger' ? 'bg-bad-bg text-bad' : 'bg-amber-bg text-amber'}`}>{num(p.row)}</span>
+          <span className={`mt-0.5 flex h-6 min-w-[2.25rem] flex-none items-center justify-center rounded-md px-1.5 text-cap font-bold tabular ${tone === 'danger' ? 'bg-bad-bg text-bad' : 'bg-warn-bg text-warn'}`}>{num(p.row)}</span>
           <span className="min-w-0 flex-1"><span className="block truncate text-small font-semibold">{p.label || '—'}</span><span className="block text-label text-ink-2">{p.error}</span></span>
         </li>
       ))}
@@ -136,16 +136,16 @@ export function ImportPanel<K extends string, T>({
           {note && <Note icon="info">{note}</Note>}
           <section className="flex flex-col gap-3 rounded-card bg-surface p-4 ring-1 ring-hair">
             <div className="flex items-center gap-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-bg text-green"><Icon name="download" size={20} /></span>
+              <span className="flex text-ink-2"><Icon name="download" size={20} /></span>
               <div className="min-w-0 flex-1"><div className="text-small font-bold">١. نزّل القالب</div><div className="text-label text-ink-2">أعمدته: {fields.map((f) => f.label + (f.required ? '' : ' (اختياري)')).join('، ')}</div></div>
             </div>
             <Button kind="tonal" icon="download" onClick={() => void exportTemplate(templateName, fields.map((f) => f.label), [fields.map((f) => f.example ?? null)]).catch((e) => notifyError('لم يُنزَّل القالب', errorText(e)))}>
               تنزيل القالب
             </Button>
           </section>
-          <label className="flex cursor-pointer flex-col items-center gap-2 rounded-card border-2 border-dashed border-teal/40 bg-teal-tint/40 px-4 py-8 text-center hover:bg-teal-tint"
+          <label className="flex cursor-pointer flex-col items-center gap-2 rounded-card border-2 border-dashed border-hair bg-surface px-4 py-8 text-center hover:bg-ground"
             onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) void load(f); }}>
-            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-teal text-white"><Icon name="upload" size={22} /></span>
+            <span className="flex text-teal"><Icon name="upload" size={24} /></span>
             <span className="text-small font-bold text-ink">٢. اختر الملف أو اسحبه هنا</span>
             <span className="text-label text-ink-2">Excel (.xlsx) أو CSV · الصف الأول للعناوين</span>
             <input ref={input} type="file" accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" className="sr-only"
@@ -157,14 +157,14 @@ export function ImportPanel<K extends string, T>({
       {stage === 'review' && (
         <>
           <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-card bg-green-bg p-4"><div className="text-num-phone tabular text-green">{num(total)}</div><div className="text-label font-semibold text-ink">جاهز للإضافة</div></div>
-            <div className={`rounded-card p-4 ${problems.length ? 'bg-amber-bg' : 'bg-sunken'}`}><div className={`text-num-phone tabular ${problems.length ? 'text-amber' : 'text-ink-3'}`}>{num(problems.length)}</div><div className="text-label font-semibold text-ink">فيه مشكلة ولن يُضاف</div></div>
+            <div className="rounded-card bg-ok-bg p-4"><div className="text-num-phone tabular text-ok">{num(total)}</div><div className="text-label font-semibold text-ink">جاهز للإضافة</div></div>
+            <div className={`rounded-card p-4 ${problems.length ? 'bg-warn-bg' : 'bg-sunken'}`}><div className={`text-num-phone tabular ${problems.length ? 'text-warn' : 'text-ink-3'}`}>{num(problems.length)}</div><div className="text-label font-semibold text-ink">فيه مشكلة ولن يُضاف</div></div>
           </div>
           {problems.length > 0 && <div className="flex flex-col gap-2"><h3 className="text-card">صفوف تحتاج تصحيحاً في الملف</h3>{list(problems, 'warning')}</div>}
           {total > 0 && (
             <div className="flex flex-col gap-2"><h3 className="text-card">أول ما سيُضاف</h3>
               <ul className="flex flex-col divide-y divide-hair overflow-hidden rounded-inner bg-surface ring-1 ring-hair">
-                {ready.slice(0, 8).map((r) => <li key={r.row} className="flex items-center gap-3 px-3 py-2.5"><span className="flex h-6 min-w-[2.25rem] items-center justify-center rounded-md bg-green-bg px-1.5 text-cap font-bold text-green tabular">{num(r.row)}</span><span className="truncate text-small font-semibold">{r.label}</span></li>)}
+                {ready.slice(0, 8).map((r) => <li key={r.row} className="flex items-center gap-3 px-3 py-2.5"><span className="flex h-6 min-w-[2.25rem] items-center justify-center rounded-md bg-ok-bg px-1.5 text-cap font-bold text-ok tabular">{num(r.row)}</span><span className="truncate text-small font-semibold">{r.label}</span></li>)}
                 {total > 8 && <li className="px-3 py-2 text-label text-ink-3">و{num(total - 8)} آخرون.</li>}
               </ul>
             </div>

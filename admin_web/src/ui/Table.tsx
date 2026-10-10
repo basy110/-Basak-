@@ -42,15 +42,14 @@ export interface BulkBar {
   total?: number; onAll?: () => void;
 }
 export const Toolbar: React.FC<{ search?: React.ReactNode; filters?: React.ReactNode; count?: React.ReactNode; sort?: React.ReactNode; actions?: React.ReactNode; bulk?: BulkBar | null }> = ({ search, filters, count, sort, actions, bulk }) => bulk && bulk.count > 0 ? (
-  <div className="flex min-h-[60px] flex-wrap items-center gap-x-3 gap-y-2 rounded-inner bg-teal px-4 py-2 text-white sm:rounded-none">
-    <span className="flex h-7 min-w-7 items-center justify-center rounded-full bg-white px-2 text-label font-extrabold tabular text-teal">{bulk.count.toLocaleString('en-US')}</span>
-    <span className="text-small font-bold">{bulk.total != null && bulk.count >= bulk.total ? 'كل الصفوف محددة' : 'محدد'}</span>
+  <div className="flex min-h-[60px] flex-wrap items-center gap-x-3 gap-y-2 rounded-inner bg-teal-tint px-4 py-2 sm:rounded-none sm:border-b sm:border-hair">
+    <span className="text-small font-semibold text-teal">{bulk.total != null && bulk.count >= bulk.total ? `كل الـ ${bulk.count.toLocaleString('en-US')} محددة` : `تم تحديد ${bulk.count.toLocaleString('en-US')}`}</span>
     {bulk.onAll && bulk.total != null && bulk.count < bulk.total && (
-      <button type="button" onClick={bulk.onAll} className="rounded-control px-2 py-1 text-label font-bold underline underline-offset-4 hover:bg-white/15">حدّد كل الـ {bulk.total.toLocaleString('en-US')}</button>
+      <Button kind="link" sm onClick={bulk.onAll}>حدّد كل الـ {bulk.total.toLocaleString('en-US')}</Button>
     )}
-    <button type="button" onClick={bulk.onClear} className="rounded-control px-2 py-1 text-label font-semibold text-white/85 hover:bg-white/15">إلغاء التحديد</button>
+    <Button kind="link" sm onClick={bulk.onClear}>إلغاء التحديد</Button>
     <span className="flex-1" />
-    <div className="flex flex-wrap items-center gap-2 [&_button]:shadow-none">{bulk.actions}</div>
+    <div className="flex flex-wrap items-center gap-2">{bulk.actions}</div>
   </div>
 ) : (
   <div className="flex flex-col gap-3 sm:min-h-[60px] sm:flex-row sm:flex-wrap sm:items-center sm:border-b sm:border-hair sm:px-4 sm:py-2">
@@ -125,11 +124,11 @@ export function DataTable<T>({ columns, rows, rowKey, onOpen, openKey, selectabl
             <table className="w-full table-fixed border-collapse">
               {caption && <caption className="sr-only">{caption}</caption>}
               <thead>
-                <tr className="h-12 bg-teal-tint/70">
+                <tr className="h-12 bg-ground">
                   {sel && <th className="w-12 text-center"><Checkbox hideLabel label="تحديد كل الصفوف" checked={allOn ? true : someOn ? 'mixed' : false} onChange={(on) => { const next = new Set(selected); rows.forEach((r) => (on ? next.add(rowKey(r)) : next.delete(rowKey(r)))); onSelect!(next); }} /></th>}
                   {columns.map((c, i) => (
                     <th key={c.key} scope="col" style={c.w ? { width: c.w } : undefined}
-                      className={`whitespace-nowrap px-3 text-label font-bold text-ink ${al(c)} ${tab(c)} ${i === 0 && !sel ? 'ps-4' : ''} ${i === columns.length - 1 ? 'pe-4' : ''}`}>{c.label}</th>
+                      className={`whitespace-nowrap px-3 text-label font-semibold text-ink-2 ${al(c)} ${tab(c)} ${i === 0 && !sel ? 'ps-4' : ''} ${i === columns.length - 1 ? 'pe-4' : ''}`}>{c.label}</th>
                   ))}
                 </tr>
               </thead>

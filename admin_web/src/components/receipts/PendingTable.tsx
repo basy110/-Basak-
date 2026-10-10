@@ -96,7 +96,7 @@ export const PendingTable: React.FC<{
               total: visible.length, onAll: () => onSelect(new Set(visible.map((r) => r.id))),
               actions: (
                 <>
-                  <span className="hidden whitespace-nowrap text-label font-semibold text-white/90 sm:inline">مجموعها <span className="tabular">{Math.round(chosenAmount).toLocaleString('en-US')}</span> ج.م</span>
+                  <span className="hidden whitespace-nowrap text-label font-semibold text-ink-2 sm:inline">مجموعها <span className="tabular">{Math.round(chosenAmount).toLocaleString('en-US')}</span> ج.م</span>
                   <Button sm kind="secondary" icon="check" disabled={!online || !chosen.length} onClick={() => onBulk('approve', chosen)}>قبول المحدد</Button>
                   <Button sm kind="secondary" icon="x" disabled={!online || !chosen.length} onClick={() => onBulk('reject', chosen)}>رفض المحدد</Button>
                 </>

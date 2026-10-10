@@ -19,8 +19,8 @@ const assets = join(dist, 'assets');
  *   company admin, first page          536,395 raw / 158,899 gzip  (17 files)
  * 438 kB of each is the three vendor chunks (supabase, react, query).
  * 2026-10-10: the first page measured 176,068 gzip after the dashboard's own drop-down
- * list (ui/Select, replacing the browser's), the tables' select-all bar and the number
- * cards' colours, all shared by every page; its gzip budget moved from 174,800 to 178,000.
+ * list (ui/Select, replacing the browser's) and the tables' select-all bar, both shared
+ * by every page; its gzip budget moved from 174,800 to 178,000.
  * The Excel libraries stay out of it (loaded only on export or import).
  */
 const BUDGETS = {

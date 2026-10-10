@@ -17,7 +17,7 @@ Edge functions `admin-reset-supervisor-password` and `admin-update-supervisor` a
 
 ## Round 2 (after the first merge, #21)
 - Fonts back to Cairo + Inter; the app logo in the frame; larger, bolder type; pages up to 1920px wide.
-- Colour: one accent per navigation group and per kind of number card.
+- Colour stays as the boards have it: teal for action, green/amber/red only for status (a round of extra accent colours was removed at the owner's request).
 - `ui/Select` replaces every native `<select>`.
 - Tables: select-all («حدّد كل الـ N») and a teal bulk bar; `components/BulkDialog.tsx` runs bulk writes row by row through the single-row path.
 - Excel: `lib/excel.ts` (lazy `write-excel-file` / `read-excel-file`) and `ui/Transfer.tsx` (`ExportButton`, `ImportPanel`; import them from `ui/Transfer`, not the `ui` index, to keep the first page's bundle).
