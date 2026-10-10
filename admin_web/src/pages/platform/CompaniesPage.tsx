@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import {
-  Badge, Button, Cell2, Chips, DataTable, EmptyState, ErrorState, Icon, Page, PageHeader, Pager, PhoneBar, SearchBox, SkeletonTable,
-  SortSelect, Toolbar, cairo, dayText, errorText, num, useOnline, type Column,
-} from '../../ui';
+import { Badge, Button, Cell2, Chips, DataTable, EmptyState, ErrorState, Icon, Page, PageHeader, Pager, PhoneBar, SearchBox, SkeletonTable, SortSelect, Toolbar, cairo, dayText, errorText, num, useOnline, type Column } from '../../ui';
+import { ExportButton } from '../../ui/Transfer';
+import { exportSheet } from '../../lib/excel';
+import { DAY_FORMAT, excelDay } from '../../lib/excelCells';
 import { supabase } from '../../lib/supabase';
 import { keys, queryClient } from '../../lib/query';
 import { useGuard } from '../../lib/guard';
@@ -16,7 +16,7 @@ import {
   companiesKey, companyCounts, companyDetailKey, listCompanies, usePlatformCompanyList,
   type CompanyFilter, type CompanySort, type CompanyStatus, type PlatformCompany, type CompanyDetail,
 } from '../../lib/platform';
-import { CompanyPanel, CompanyState, StatusDialog } from '../../components/platform/CompanyPanel';
+import { CompanyPanel, CompanyState, STATUS_STATE, StatusDialog } from '../../components/platform/CompanyPanel';
 
 const PAGE = 25;
 const since = (iso: string) => `منذ ${dayText(cairo(iso).day)}`;
@@ -112,6 +112,22 @@ export const CompaniesPage: React.FC = () => {
   }
 
   const one = rows.length === 1;
+  const exportRows = () => exportSheet<PlatformCompany>({
+    name: 'الشركات', rows: shown,
+    columns: [
+      { label: 'الشركة', value: (c) => c.name, width: 28 },
+      { label: 'الحالة', value: (c) => STATUS_STATE[c.status][1], width: 12 },
+      { label: 'على المنصة منذ', value: (c) => excelDay(cairo(c.created_at).day), format: DAY_FORMAT, width: 15 },
+      { label: 'خطوط تعمل', value: (c) => c.active_lines, width: 12 },
+      { label: 'كل الخطوط', value: (c) => c.lines, width: 11 },
+      { label: 'الطلاب', value: (c) => c.students, width: 10 },
+      { label: 'المديرون', value: (c) => c.admins, width: 10 },
+      { label: 'المشرفون', value: (c) => c.supervisors, width: 10 },
+      { label: 'وسائل الدفع', value: (c) => c.payment_methods, width: 12 },
+      { label: 'معروض للبيع', value: (c) => (c.status !== 'active' || c.selling == null ? null : c.selling ? 'معروض' : 'لا شيء معروض'), width: 14 },
+      { label: 'هاتف التواصل', value: (c) => c.contact_phone, width: 16 },
+    ],
+  });
   const toolbar = (
     <Toolbar
       search={<SearchBox value={search} onChange={setSearch} placeholder="ابحث باسم الشركة" />}
@@ -121,6 +137,7 @@ export const CompaniesPage: React.FC = () => {
       ]} />}
       count={one ? 'شركة واحدة' : <span className="sm:hidden">{num(shown.length)} شركة</span>}
       sort={one ? undefined : <SortSelect value={sort} onChange={setSort} options={[{ value: 'name', label: 'بالاسم' }, { value: 'newest', label: 'الأحدث' }, { value: 'students', label: 'الأكثر طلاباً' }]} />}
+      actions={<ExportButton count={shown.length} className="hidden sm:inline-flex" onExport={exportRows} />}
     />
   );
   const noMatch = shown.length === 0 ? (

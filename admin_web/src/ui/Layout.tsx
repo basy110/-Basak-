@@ -123,7 +123,9 @@ export const StatCard: React.FC<{
   icon?: IconName; tone?: Tone; accent?: Accent; to?: string; bar?: number; className?: string;
 }> = ({ label, value, unit, hint, icon, tone, accent, to, bar, className = '' }) => {
   const a = ACCENT[accent ?? (icon && ICON_ACCENT[icon]) ?? 'teal'];
-  const tile = tone && tone !== 'teal' ? TONE[tone] : a.tile;
+  const toned = tone && tone !== 'teal' && tone !== 'neutral';
+  const tile = toned ? TONE[tone] : a.tile;
+  const edge = toned ? { success: 'before:bg-ok', warning: 'before:bg-warn', danger: 'before:bg-bad' }[tone as 'success' | 'warning' | 'danger'] : a.edge;
   const body = (
     <>
       <div className="flex items-center gap-2.5 text-label font-bold text-ink-2">
@@ -137,7 +139,7 @@ export const StatCard: React.FC<{
     </>
   );
   // A coloured strip along the card's start edge.
-  const cls = `relative flex min-w-0 flex-col overflow-hidden rounded-card bg-surface px-4 py-3.5 text-ink shadow-card before:absolute before:inset-y-0 before:start-0 before:w-1 sm:px-5 sm:py-[18px] ${a.edge} ${className}`;
+  const cls = `relative flex min-w-0 flex-col overflow-hidden rounded-card bg-surface px-4 py-3.5 text-ink shadow-card before:absolute before:inset-y-0 before:start-0 before:w-1 sm:px-5 sm:py-[18px] ${edge} ${className}`;
   return to ? <Link to={to} className={`${cls} hover:shadow-[0_1px_2px_rgba(23,56,74,.05),inset_0_0_0_1px_#9DB0BB]`}>{body}</Link> : <div className={cls}>{body}</div>;
 };
 

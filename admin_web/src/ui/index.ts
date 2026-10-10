@@ -6,7 +6,6 @@ export * from './Layout';
 export * from './Menu';
 export * from './Overlay';
 export * from './Select';
-export * from './Transfer';
 export * from './Status';
 export * from './Table';
 export * from './format';

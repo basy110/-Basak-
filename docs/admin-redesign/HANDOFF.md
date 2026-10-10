@@ -15,10 +15,23 @@ Step 6 of the team test deletes a supervisor and could not run through the conne
 
 Edge functions `admin-reset-supervisor-password` and `admin-update-supervisor` are deployed (version 1 each).
 
+## Round 2 (after the first merge, #21)
+- Fonts back to Cairo + Inter; the app logo in the frame; larger, bolder type; pages up to 1920px wide.
+- Colour: one accent per navigation group and per kind of number card.
+- `ui/Select` replaces every native `<select>`.
+- Tables: select-all («حدّد كل الـ N») and a teal bulk bar; `components/BulkDialog.tsx` runs bulk writes row by row through the single-row path.
+- Excel: `lib/excel.ts` (lazy `write-excel-file` / `read-excel-file`) and `ui/Transfer.tsx` (`ExportButton`, `ImportPanel`; import them from `ui/Transfer`, not the `ui` index, to keep the first page's bundle).
+  Export on every list; import for students (through `admin-create-student`) and universities/colleges. No supervisor import (needs a password per row).
+- Receipts: «السجل» tab (accepted / rejected, reviewer, reason, export) and bulk accept/reject.
+  Migration `20261117000001_admin_receipts_history.sql` (`admin_reviewed_receipts`) is **applied** (10 October 2026); test in `supabase/tests/local/e2e_admin_receipts_history.sql`.
+- Universities: the `colleges` table was empty, so students saw the app's built-in list. The page now says so, copies that list into a university in one step, and lists the colleges students typed.
+  The app (`mobile_app`) now offers a university's own colleges when any are listed, else the built-in list. That needs an app release to reach students.
+
 ## What is left
 The temporary QA account was deleted on 10 October 2026.
 
-1. Merge the branch (pull request) and let Vercel deploy the dashboard.
+1. Merge the round-2 pull request and let Vercel deploy the dashboard.
+2. Ship an app build for the college change (optional; the dashboard does not depend on it).
 
 ## Run locally
 ```

@@ -17,10 +17,10 @@ import {
   createSupervisor, deleteSupervisor, normalizePhone, resetSupervisorPassword, setSupervisorActive, setSupervisorLines, updateSupervisor,
   useSupervisorRecords, type SupervisorFilter, type SupervisorSort,
 } from '../lib/team';
-import {
-  Badge, Button, Chips, DataTable, EmptyState, ErrorState, Note, Page, PageHeader, Pager, PhoneBar, SearchBox, SkeletonTable,
-  Icon, SortSelect, StatePill, Toolbar, countText, errorText, useOnline, type Column,
-} from '../ui';
+import { Badge, Button, Chips, DataTable, EmptyState, ErrorState, Note, Page, PageHeader, Pager, PhoneBar, SearchBox, SkeletonTable, Icon, SortSelect, StatePill, Toolbar, countText, errorText, useOnline, type Column } from '../ui';
+import { ExportButton } from '../ui/Transfer';
+import { exportSheet } from '../lib/excel';
+import { BulkExportButton } from '../components/BulkDialog';
 import { LineTag, PersonCell, PhoneLtr } from '../components/team/parts';
 import { RowMenu } from '../components/team/RowMenu';
 import { SupervisorAddPanel, SupervisorEditPanel, SupervisorLinesPanel, SupervisorPanel, type AddDraft, type LineFacts } from '../components/team/SupervisorPanels';
@@ -72,6 +72,8 @@ export const SupervisorsPage: React.FC = () => {
   const counts = supervisorCounts(supervisors, linesOf);
   const shown = useMemo(() => filterSupervisors(supervisors, linesOf, { search, filter, sort }), [supervisors, linesOf, search, filter, sort]);
   const pageRows = shown.slice((page - 1) * PAGE, page * PAGE);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const chosen = supervisors.filter((s) => selected.has(s.id));
   const uncovered = useMemo(() => linesWithoutSupervisor(lines, supervisors, supervisorsOf), [lines, supervisors, supervisorsOf]);
   const uncoveredSet = useMemo(() => new Set(uncovered.map((l) => l.id)), [uncovered]);
 
@@ -239,6 +241,18 @@ export const SupervisorsPage: React.FC = () => {
     setBusy(false);
   });
 
+  // ── Excel ───────────────────────────────────────────────────────────
+  const exportRows = (rows: Sup[]) => exportSheet<Sup>({
+    name: 'المشرفون', rows,
+    columns: [
+      { label: 'المشرف', value: (s) => s.full_name, width: 28 },
+      { label: 'رقم الهاتف', value: (s) => s.phone, width: 16 },
+      { label: 'الخطوط', value: (s) => names(linesOf.get(s.id) ?? []).join('، '), width: 40 },
+      { label: 'عدد الخطوط', value: (s) => (linesOf.get(s.id) ?? []).length, width: 12 },
+      { label: 'الحالة', value: (s) => (s.is_active ? 'يعمل' : 'متوقف'), width: 12 },
+    ],
+  });
+
   // ── Page ────────────────────────────────────────────────────────────
   const loading = supervisorsQ.loading || linesQ.loading || assignQ.loading;
   const loadError = supervisorsQ.error || linesQ.error || assignQ.error;
@@ -302,8 +316,14 @@ export const SupervisorsPage: React.FC = () => {
               )}
               <DataTable<Sup>
                 caption="مشرفو الشركة" columns={columns} rows={pageRows} rowKey={(s) => s.id} onOpen={(s) => openRecord(s.id)} openKey={panelId}
-                muted={(s) => !s.is_active}
+                muted={(s) => !s.is_active} selectable selected={selected} onSelect={setSelected}
                 toolbar={<Toolbar
+                  bulk={{
+                    count: chosen.length, onClear: () => setSelected(new Set()), total: shown.length,
+                    onAll: () => setSelected(new Set(shown.map((s) => s.id))),
+                    actions: <BulkExportButton count={chosen.length} onExport={() => exportRows(chosen)} />,
+                  }}
+                  actions={<ExportButton count={shown.length} onExport={() => exportRows(shown)} className="hidden sm:inline-flex" />}
                   search={<SearchBox value={search} onChange={(v) => { setSearch(v); setPage(1); }} placeholder="ابحث بالاسم أو رقم الهاتف" />}
                   filters={<Chips<SupervisorFilter> value={filter} onChange={(v) => { setFilter(v); setPage(1); }} options={[
                     { value: 'all', label: 'الكل', count: counts.all }, { value: 'on', label: 'يعمل', count: counts.on },

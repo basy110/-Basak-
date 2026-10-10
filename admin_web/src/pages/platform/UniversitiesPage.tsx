@@ -1,10 +1,8 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
-import {
-  Button, Cell2, Chips, Dialog, Icon, DataTable, EmptyState, ErrorState, ExportButton, ImportPanel, Note, Page, PageHeader, Pager, PhoneBar, SearchBox, SkeletonTable,
-  SortSelect, Toolbar, errorText, num, useOnline, type Column, type ImportCheck,
-} from '../../ui';
+import { Button, Cell2, Chips, Dialog, Icon, DataTable, EmptyState, ErrorState, Note, Page, PageHeader, Pager, PhoneBar, SearchBox, SkeletonTable, SortSelect, Toolbar, errorText, num, useOnline, type Column } from '../../ui';
+import { ExportButton, ImportPanel, type ImportCheck } from '../../ui/Transfer';
 import { exportSheet } from '../../lib/excel';
 import { supabase } from '../../lib/supabase';
 import { unwrap } from '../../lib/query';

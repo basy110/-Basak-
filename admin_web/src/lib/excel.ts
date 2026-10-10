@@ -22,6 +22,15 @@ export interface ExportColumn<T> {
 
 const HEADER = { fontWeight: 'bold' as const, backgroundColor: '#E1EFF5', textColor: '#17384A', borderColor: '#B9D3E0', borderStyle: 'thin' as const };
 
+/** Hands the browser a file under our name (some browsers ignore the library's own). */
+function save(blob: Blob, fileName: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = fileName; a.rel = 'noopener'; a.style.display = 'none';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 30_000);
+}
+
 /** «الطلاب-2026-10-10.xlsx»: the page's name and today's date (Cairo). */
 export const fileNameFor = (name: string) => `${name.replace(/[\\/:*?"<>|]+/g, ' ').trim()}-${cairoToday()}.xlsx`;
 
@@ -45,7 +54,7 @@ export async function exportSheet<T>({ name, sheet, columns, rows }: { name: str
     rightToLeft: true,
     stickyRowsCount: 1,
     columns: columns.map((c) => ({ width: c.width ?? Math.min(40, Math.max(12, c.label.length + 4)) })),
-  } as never, { fontFamily: 'Arial', fontSize: 12 }).toFile(fileNameFor(name));
+  } as never, { fontFamily: 'Arial', fontSize: 12 }).toBlob().then((blob) => save(blob, fileNameFor(name)));
 }
 
 /** A blank file with just the header row (and optional example rows) to fill and import back. */
@@ -55,7 +64,7 @@ export async function exportTemplate(name: string, headers: string[], examples: 
   await writeXlsxFile(data as never, {
     sheet: name.slice(0, 31), rightToLeft: true, stickyRowsCount: 1,
     columns: headers.map((h) => ({ width: Math.max(16, h.length + 6) })),
-  } as never, { fontFamily: 'Arial', fontSize: 12 }).toFile(`${name}.xlsx`);
+  } as never, { fontFamily: 'Arial', fontSize: 12 }).toBlob().then((blob) => save(blob, `${name}.xlsx`));
 }
 
 /** Arabic-Indic and Persian digits to Latin ones; trims and collapses spaces. */

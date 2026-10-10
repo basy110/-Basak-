@@ -1,9 +1,10 @@
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  Badge, Button, Chips, DataTable, EmptyState, ErrorState, Icon, Page, PageHeader, Pager, PhoneBar, Pill, SearchBox,
-  SkeletonTable, SortSelect, StatePill, Toolbar, dayText, type Column,
-} from '../ui';
+import { Badge, Button, Chips, DataTable, EmptyState, ErrorState, Icon, Page, PageHeader, Pager, PhoneBar, Pill, SearchBox, SkeletonTable, SortSelect, StatePill, Toolbar, dayText, type Column } from '../ui';
+import { ExportButton } from '../ui/Transfer';
+import { exportSheet, type ExportColumn } from '../lib/excel';
+import { excelNumber, MONEY_FORMAT } from '../lib/excelCells';
+import { SALE_OPTIONS, optionName } from '../lib/saleOptions';
 import { useCompany } from '../lib/adminScope';
 import { useLines, useSupervisorLines, useSupervisors, useUniversities, type LineRow } from '../lib/reference';
 import { statsFor, useLinesStats, useSaleContext, type LineStats } from '../lib/linesData';
@@ -127,9 +128,31 @@ export const LinesPage: React.FC = () => {
     { key: 'menu', label: <span className="sr-only">إجراءات</span>, w: 56, align: 'end', render: menu },
   ];
 
+  const priceOf = (r: Row, o: (typeof SALE_OPTIONS)[number]) => {
+    const p = r.line.line_period_prices.find((x) => x.option === o);
+    return p && p.is_enabled && Number(p.price) > 0 ? Number(p.price) : null;
+  };
+  const exportColumns = (): ExportColumn<Row>[] => [
+    { label: 'الخط', value: (r) => r.line.name, width: 24 },
+    { label: 'الجامعات', value: (r) => r.unis.join('، '), width: 30 },
+    { label: 'المحطات', value: (r) => r.stations, width: 10 },
+    { label: 'رحلات الذهاب', value: (r) => r.going, width: 12 },
+    { label: 'رحلات العودة', value: (r) => r.back, width: 12 },
+    { label: 'المشتركون', value: (r) => excelNumber(r.stats.subscribers), width: 12 },
+    { label: 'ركاب ذهاب الغد', value: (r) => excelNumber(r.stats.riders_departure), width: 14 },
+    { label: 'ركاب عودة الغد', value: (r) => excelNumber(r.stats.riders_return), width: 14 },
+    { label: 'مقاعد الباص', value: (r) => excelNumber(r.stats.bus_capacity), width: 12 },
+    { label: 'المشرف', value: (r) => r.sups.map((x) => x.name).join('، ') || 'بلا مشرف', width: 28 },
+    { label: 'للطلاب', value: (r) => (r.vis.state === 'on' ? 'يظهر للطلاب' : r.vis.state === 'off' ? 'متوقف' : `لا يظهر للطلاب: ${r.vis.reason}`), width: 34 },
+    ...SALE_OPTIONS.filter((o) => !sale.sold || sale.sold[o]).map((o): ExportColumn<Row> => ({ label: `سعر ${optionName[o]} (ج.م)`, value: (r) => priceOf(r, o), format: MONEY_FORMAT, width: 18 })),
+    ...(sale.daily ? [{ label: 'سعر الاشتراك اليومي (ج.م)', value: (r: Row) => (Number(r.line.price_daily) > 0 ? Number(r.line.price_daily) : null), format: MONEY_FORMAT, width: 16 }] : []),
+  ];
   const header = (
     <PageHeader title="الخطوط" sub={<span className="hidden sm:inline">كل خط له محطات صعود بالترتيب، ورحلات ذهاب إلى الجامعة، ومواعيد عودة منها.</span>}
-      actions={<Button icon="plus" to={`${base}/new`} disabled={!actions.online} className="hidden sm:inline-flex">خط جديد</Button>} />
+      actions={<>
+        {shown.length > 0 && <ExportButton sm={false} count={shown.length} className="hidden sm:inline-flex" onExport={() => exportSheet({ name: 'الخطوط', columns: exportColumns(), rows: shown })} />}
+        <Button icon="plus" to={`${base}/new`} disabled={!actions.online} className="hidden sm:inline-flex">خط جديد</Button>
+      </>} />
   );
   const phoneBar = <PhoneBar><Button full icon="plus" to={`${base}/new`} disabled={!actions.online}>خط جديد</Button></PhoneBar>;
 

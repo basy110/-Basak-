@@ -18,10 +18,14 @@ const assets = join(dist, 'assets');
  *   sign-in page                       491,146 raw / 141,596 gzip  (8 files)
  *   company admin, first page          536,395 raw / 158,899 gzip  (17 files)
  * 438 kB of each is the three vendor chunks (supabase, react, query).
+ * 2026-10-10: the first page measured 176,068 gzip after the dashboard's own drop-down
+ * list (ui/Select, replacing the browser's), the tables' select-all bar and the number
+ * cards' colours, all shared by every page; its gzip budget moved from 174,800 to 178,000.
+ * The Excel libraries stay out of it (loaded only on export or import).
  */
 const BUDGETS = {
   'sign-in page': { lazy: ['LoginPage'], raw: 540_000, gzip: 155_700 },
-  'company admin, first page (today)': { lazy: ['Workspace', 'TodayPage'], raw: 590_000, gzip: 174_800 },
+  'company admin, first page (today)': { lazy: ['Workspace', 'TodayPage'], raw: 590_000, gzip: 178_000 },
 };
 
 const files = readdirSync(assets).filter((name) => name.endsWith('.js'));

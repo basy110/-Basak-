@@ -123,11 +123,11 @@ export function ImportPanel<K extends string, T>({
   const pct = total ? Math.round((progress.done / total) * 100) : 0;
   const footer = stage === 'review' ? (
     <>
-      <Button full kind="secondary" onClick={reset}>ملف آخر</Button>
-      <Button full icon="upload" disabled={!total} onClick={() => void run()}>{total ? `أضف ${num(total)} ${what}` : 'لا صفوف جاهزة'}</Button>
+      <Button full className="sm:w-auto sm:flex-1" kind="secondary" onClick={reset}>ملف آخر</Button>
+      <Button full className="sm:w-auto sm:flex-1" icon="upload" disabled={!total} onClick={() => void run()}>{total ? `أضف ${num(total)} ${what}` : 'لا صفوف جاهزة'}</Button>
     </>
-  ) : stage === 'running' ? <Button full kind="secondary" onClick={() => { stop.current = true; }}>أوقف بعد الصف الحالي</Button>
-    : stage === 'done' ? (<><Button full kind="secondary" onClick={reset}>استيراد ملف آخر</Button><Button full onClick={close}>تم</Button></>) : undefined;
+  ) : stage === 'running' ? <Button full className="sm:w-auto sm:flex-1" kind="secondary" onClick={() => { stop.current = true; }}>أوقف بعد الصف الحالي</Button>
+    : stage === 'done' ? (<><Button full className="sm:w-auto sm:flex-1" kind="secondary" onClick={reset}>استيراد ملف آخر</Button><Button full className="sm:w-auto sm:flex-1" onClick={close}>تم</Button></>) : undefined;
 
   return (
     <SidePanel open={open} onClose={close} title={title} sub={file ?? `من ملف Excel (.xlsx) أو CSV · حتى ${num(MAX_IMPORT_ROWS)} صف`} w={560} footer={footer}>

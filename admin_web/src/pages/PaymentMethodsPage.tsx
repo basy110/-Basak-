@@ -11,10 +11,9 @@ import {
   DISPLAY_NAME_MAX, INSTRUCTIONS_MAX, METHOD_LABEL, METHOD_TYPES, emptyMethod, inOrder, methodErrors, methodRow, methodToDraft,
   methodsWord, moved, namesList, type MethodDraft, type MethodType, type PaymentMethod,
 } from '../lib/money';
-import {
-  Button, Card, Dialog, EmptyState, ErrorState, Icon, IconButton, Menu, Note, Page, PageHeader, PhoneBar, Pill, RadioCards, RecordCard,
-  SidePanel, SkeletonTable, TextArea, TextField, Toggle, errorText, useOnline,
-} from '../ui';
+import { Button, Card, Dialog, EmptyState, ErrorState, Icon, IconButton, Menu, Note, Page, PageHeader, PhoneBar, Pill, RadioCards, RecordCard, SidePanel, SkeletonTable, TextArea, TextField, Toggle, errorText, useOnline } from '../ui';
+import { ExportButton } from '../ui/Transfer';
+import { exportSheet } from '../lib/excel';
 import { AccountText, METHOD_ICON, PaymentPreview } from '../components/money/PaymentPreview';
 
 const COLUMNS = 'id, company_id, method_type, display_name, account_holder, instapay_address, wallet_phone, bank_name, bank_account_number, iban, instructions, is_active, sort_order, created_at';
@@ -130,8 +129,22 @@ export const PaymentMethodsPage: React.FC = () => {
           )}
           {/* Desktop and tablet */}
           <Card className="hidden overflow-hidden sm:block">
-            <div className="flex min-h-[60px] items-center border-b border-hair px-4 text-label text-ink-2">
-              {methodsWord(methods.length)} · {active.length === 0 ? 'لا واحدة تظهر للطلاب' : methods.length === 1 ? 'تظهر للطلاب' : `${active.length === methods.length ? 'كلها تظهر' : `${active.length} تظهر`} للطلاب بهذا الترتيب`}
+            <div className="flex min-h-[60px] items-center gap-3 border-b border-hair px-4 text-label text-ink-2">
+              <span className="min-w-0 flex-1">{methodsWord(methods.length)} · {active.length === 0 ? 'لا واحدة تظهر للطلاب' : methods.length === 1 ? 'تظهر للطلاب' : `${active.length === methods.length ? 'كلها تظهر' : `${active.length} تظهر`} للطلاب بهذا الترتيب`}</span>
+              <ExportButton count={methods.length} onExport={() => exportSheet<PaymentMethod>({
+                name: 'وسائل الدفع', rows: methods,
+                columns: [
+                  { label: 'الترتيب', value: (m) => methods.indexOf(m) + 1, width: 9 },
+                  { label: 'الوسيلة', value: (m) => m.display_name, width: 26 },
+                  { label: 'النوع', value: (m) => METHOD_LABEL[m.method_type], width: 14 },
+                  { label: 'الحساب الذي يحوّل عليه الطالب', value: (m) => m.instapay_address ?? m.wallet_phone ?? m.bank_account_number, width: 28 },
+                  { label: 'البنك والفرع', value: (m) => m.bank_name, width: 26 },
+                  { label: 'رقم الآيبان', value: (m) => m.iban, width: 32 },
+                  { label: 'صاحب الحساب', value: (m) => m.account_holder, width: 24 },
+                  { label: 'تعليمات للطالب', value: (m) => m.instructions, width: 40 },
+                  { label: 'الحالة', value: (m) => (m.is_active ? 'تظهر للطلاب' : 'متوقفة'), width: 14 },
+                ],
+              })} />
             </div>
             <table className="w-full table-fixed border-collapse">
               <caption className="sr-only">وسائل الدفع بترتيبها عند الطالب</caption>

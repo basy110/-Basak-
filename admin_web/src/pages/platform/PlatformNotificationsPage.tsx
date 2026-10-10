@@ -1,16 +1,18 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Select } from '../../ui/Select';
 import { useSearchParams } from 'react-router-dom';
-import {
-  Button, Cell2, Chips, DataTable, Dialog, EmptyState, ErrorState, Icon, Note, Page, PageHeader, Pager, PhoneBar, SearchBox, SectionHead,
-  SkeletonStat, SkeletonTable, SortSelect, StatCard, StatePill, Toolbar, errorText, num, useOnline, type Column,
-} from '../../ui';
+import { Button, Cell2, Chips, DataTable, Dialog, EmptyState, ErrorState, Icon, Note, Page, PageHeader, Pager, PhoneBar, SearchBox, SectionHead, SkeletonStat, SkeletonTable, SortSelect, StatCard, StatePill, Toolbar, errorText, num, useOnline, type Column } from '../../ui';
+import { ExportButton } from '../../ui/Transfer';
+import { supabase } from '../../lib/supabase';
+import { unwrap } from '../../lib/query';
+import { exportSheet } from '../../lib/excel';
+import { allPages, excelMoment, MOMENT_FORMAT } from '../../lib/excelCells';
 import { useGuard } from '../../lib/guard';
 import { notifyDone, notifyError } from '../../lib/toasts';
-import type { HistoryRow, StatusFilter } from '../../lib/notifications';
+import type { HistoryRow, PlatformHistoryPage, StatusFilter } from '../../lib/notifications';
 import { usePlatformNotificationActions, usePlatformNotificationHistory } from '../../lib/notificationsData';
 import { groupNotes, matches, usePlatformCompanyList, whenText, type NoteGroup } from '../../lib/platform';
-import { NoteDetails, NoteState, PlatformCompose } from '../../components/platform/PlatformNotify';
+import { NOTE_STATE, NoteDetails, NoteState, PlatformCompose } from '../../components/platform/PlatformNotify';
 
 const PAGE = 25;
 type G = NoteGroup<HistoryRow>;
@@ -65,6 +67,29 @@ const HistoryView: React.FC<{ params: URLSearchParams; setParams: ReturnType<typ
     setBusy(false);
   });
 
+  // «تصدير Excel»: the whole history of this status and company (not only what was read so far), searched and ordered as on screen.
+  const exportAll = async () => {
+    const all = await allPages<HistoryRow>((before) => unwrap<PlatformHistoryPage>(supabase.rpc('get_platform_notifications_page', {
+      p_before: before, p_limit: 100, p_status: filter === 'all' ? null : filter, p_company_id: companyId || null,
+    })));
+    const list = groupNotes(all).filter((x) => matches(search, x.first.title, x.first.body, x.first.company_name));
+    const reached = (g: G) => g.first.status === 'sent' || g.first.status === 'failed';
+    await exportSheet<G>({
+      name: 'إشعارات المنصة', rows: sort === 'old' ? [...list].reverse() : list,
+      columns: [
+        { label: 'الإشعار', value: (g) => g.first.title, width: 30 },
+        { label: 'النص', value: (g) => g.first.body, width: 50 },
+        { label: 'المرسل', value: (g) => (g.platform ? 'المنصة' : g.first.company_name), width: 22 },
+        { label: 'الشركات', value: (g) => g.rows.map((r) => r.company_name).filter(Boolean).join('، '), width: 36 },
+        { label: 'عدد الشركات', value: (g) => g.rows.length, width: 12 },
+        { label: 'الحالة', value: (g) => (NOTE_STATE[g.first.status] ?? NOTE_STATE.sent)[1], width: 13 },
+        { label: 'الموعد', value: (g) => excelMoment(atOf(g.first)), format: MOMENT_FORMAT, width: 18 },
+        { label: 'المستلمون', value: (g) => (reached(g) ? g.students : null), width: 12 },
+        { label: 'قرأه', value: (g) => (reached(g) ? g.read : null), width: 10 },
+      ],
+    });
+  };
+
   const push = history.push;
   const header = (
     <PageHeader title="إشعارات المنصة" sub="ما أرسلته المنصة وما أرسلته كل شركة لطلابها. الإشعار يظهر داخل التطبيق دائماً، وكتنبيه على الهاتف إن كانت التنبيهات مفعّلة."
@@ -89,9 +114,12 @@ const HistoryView: React.FC<{ params: URLSearchParams; setParams: ReturnType<typ
       ]} />}
       sort={<SortSelect value={sort} onChange={setSort} options={[{ value: 'new', label: 'الأحدث أولاً' }, { value: 'old', label: 'الأقدم أولاً' }]} />}
       actions={(
+        <>
+        {groups.length > 0 && <ExportButton className="hidden sm:inline-flex" onExport={exportAll} />}
         <Select value={companyId} onChange={setCompanyId} ariaLabel="الشركة" icon="building" minListWidth={240}
           options={[{ value: '', label: 'كل الشركات' }, ...companies.filter((c) => c.status !== 'archived').map((c) => ({ value: c.id, label: c.name }))]}
           className="inline-flex h-10 max-w-[220px] flex-none items-center gap-1.5 rounded-control px-2.5 text-label font-semibold shadow-ring hover:bg-ground sm:h-9" />
+        </>
       )}
     />
   );
