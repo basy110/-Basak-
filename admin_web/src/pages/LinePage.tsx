@@ -10,7 +10,7 @@ import { statsFor, useLinesStats, useSaleContext, type LineStats } from '../lib/
 import { countOf, joinAnd, lineVisibility, unitWord, W, type StepNo } from '../lib/lines';
 import { SALE_OPTIONS, optionName } from '../lib/saleOptions';
 import { LineMenu, useLineActions } from '../components/lines/LineActions';
-import { DepartureTable, PhoneTrips, ReturnList } from '../components/lines/LineTimetable';
+import { departureWidth, DepartureTable, PhoneTrips, ReturnList } from '../components/lines/LineTimetable';
 import { LineWizard } from '../components/lines/LineWizard';
 
 const n = (v: number) => v.toLocaleString('en-US');
@@ -105,19 +105,23 @@ const LineView: React.FC<{ line: LineRow }> = ({ line }) => {
 
       <Stats stats={stats} going={going.length} back={back.length} editTo={editTo(1)} />
 
-      {/* Desktop and tablet */}
-      <section className="hidden flex-col gap-3 sm:flex">
-        <SectionHead title="رحلات الذهاب" meta={rideDay ? <Badge tone="teal">ركاب {rideDay}</Badge> : undefined}
-          end={<span className="text-label text-ink-2">{countOf(stations.length, W.station)} · {countOf(going.length, W.trip)}{voteState}</span>} />
-        {going.length ? <DepartureTable stations={stations} trips={going} stats={stats} uniName={uniName} />
-          : <EmptyState card icon="bus" title="لا رحلات ذهاب" text="أضف رحلة ذهاب بمواعيدها على المحطات، فالطلاب يختارون منها." action={<Button to={editTo(3)} icon="plus">أضف رحلة</Button>} />}
-      </section>
-      <div className="hidden grid-cols-1 gap-6 sm:grid lg:grid-cols-[minmax(0,1fr)_452px]">
-        <section className="flex flex-col gap-3">
-          <SectionHead title="العودة من الجامعة" end={<span className="text-label text-ink-2">يتحرك الباص من الجامعة ويعيد كل طالب إلى محطته</span>} />
-          <ReturnList trips={back} stats={stats} uniName={uniName} />
-        </section>
-        <div className="flex flex-col gap-6 lg:pt-[48px]">
+      {/* Desktop and tablet. The way there and the way back share a row when the timetable is narrow (few
+          trips) and stack when it is wide. From 1280 the prices and supervisors sit beside them and stay in view. */}
+      <div className="hidden grid-cols-1 items-start gap-6 sm:grid xl:grid-cols-[minmax(0,1fr)_400px]">
+        <div className="flex min-w-0 flex-wrap items-start gap-6">
+          <section className="flex min-w-0 max-w-full flex-[0_1_auto] flex-col gap-3" style={going.length ? { width: departureWidth(going.length) } : { width: '100%' }}>
+            <SectionHead title="رحلات الذهاب" meta={rideDay ? <Badge tone="teal">ركاب {rideDay}</Badge> : undefined}
+              end={<span className="text-label text-ink-2">{countOf(stations.length, W.station)} · {countOf(going.length, W.trip)}{voteState}</span>} />
+            {going.length ? <DepartureTable stations={stations} trips={going} stats={stats} uniName={uniName} />
+              : <EmptyState card icon="bus" title="لا رحلات ذهاب" text="أضف رحلة ذهاب بمواعيدها على المحطات، فالطلاب يختارون منها." action={<Button to={editTo(3)} icon="plus">أضف رحلة</Button>} />}
+          </section>
+          <section className="flex min-w-[min(100%,340px)] flex-1 basis-[340px] flex-col gap-3">
+            <SectionHead title="العودة من الجامعة" end={<span className="text-label text-ink-2">يعيد كل طالب إلى محطته</span>} />
+            <ReturnList trips={back} stats={stats} uniName={uniName} />
+          </section>
+        </div>
+        {/* 48 = a section head and its gap, so the cards line up with the card beside them; under the 64 top bar when stuck. */}
+        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2 xl:sticky xl:top-[calc(var(--ws-top,0px)+80px)] xl:mt-[48px] xl:grid-cols-1">
           <PricesCard line={line} sold={sale.sold} daily={sale.daily} companyId={company.id} />
           <SupervisorsCard sups={sups} companyId={company.id} />
         </div>
@@ -173,9 +177,9 @@ const PricesCard: React.FC<{ line: LineRow; sold: Record<string, boolean> | null
       <dl className="m-0">
         {rows.map((r, i) => (
           <div key={r.key} className={`flex min-h-11 items-center gap-3 py-1.5 ${i ? 'border-t border-hair' : ''}`}>
-            <dt className="min-w-0 flex-1 text-small text-ink-2">{r.label}</dt>
-            <dd className="m-0 w-[84px] flex-none text-small font-semibold sm:w-[110px]">{r.price != null ? <Money value={r.price} /> : <span className="font-normal text-ink-2">بلا سعر</span>}</dd>
-            <dd className="m-0 flex flex-none justify-end sm:w-[150px]">{r.badge}</dd>
+            <dt className="min-w-0 flex-1 whitespace-nowrap text-small text-ink-2">{r.label}</dt>
+            <dd className="m-0 w-[84px] flex-none whitespace-nowrap text-small font-semibold sm:w-[96px]">{r.price != null ? <Money value={r.price} /> : <span className="font-normal text-ink-2">بلا سعر</span>}</dd>
+            <dd className="m-0 flex flex-none justify-end">{r.badge}</dd>
           </div>
         ))}
       </dl>

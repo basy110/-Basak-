@@ -135,3 +135,36 @@ export const tables: Record<string, Row[]> = {
   blocked_phones: [],
   notifications: [],
 };
+
+/**
+ * Two lines of the second company for the line page's timetable: one with a
+ * single departure trip, one with many (it scrolls sideways). Kept out of
+ * LINES so the first company's pages and their per-line tables are unchanged.
+ * Open as the platform admin: /c/<COMPANY2_ID>/lines/<id> with ?as=platform.
+ */
+const EXTRA_LINE_DEFS: [string, string[], string[], number, number][] = [
+  // name, stations, departure start times, subscribers, capacity
+  ['طلخا', ['موقف طلخا', 'كوبري طلخا', 'المشاية', 'بوابة الجامعة'], ['07:00'], 22, 30],
+  ['ميت غمر', ['موقف ميت غمر', 'دقادوس', 'أجا', 'سندوب', 'بوابة الجامعة'], ['06:00', '06:30', '07:00', '07:30', '08:00', '09:00', '10:00'], 236, 50],
+];
+export const EXTRA_LINES: Row[] = EXTRA_LINE_DEFS.map(([name, stations, starts, , cap], li) => {
+  const st = stations.map((s, si) => ({ id: uid(`5c${li}`, si + 1), name: s, order_index: si, is_active: true }));
+  const hm = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}:00`;
+  const dep = starts.map((start, t) => {
+    const m0 = Number(start.slice(0, 2)) * 60 + Number(start.slice(3));
+    return {
+      id: uid(`d9${li}`, t + 1), direction: 'departure', label: t === 0 && starts.length > 1 ? 'المبكرة' : '', start_time: `${start}:00`, arrival_time: hm(m0 + 10 * st.length + 15),
+      university_id: t === 5 ? UNIVERSITIES[2].id : null, is_active: true,
+      line_trip_stops: st.filter((_, si) => !(li === 1 && t === 2 && si === 2)).map((s) => ({ station_id: s.id, stop_time: hm(m0 + 10 * st.indexOf(s)) })),
+    };
+  });
+  const ret = ['14:00', '16:30', '18:00'].slice(0, li ? 3 : 1).map((s, t) => ({ id: uid(`e9${li}`, t + 1), direction: 'return', label: '', start_time: `${s}:00`, arrival_time: null, university_id: null, is_active: true, line_trip_stops: [] }));
+  return {
+    id: uid('12e', li + 1), name, company_id: COMPANY2_ID, origin_name: stations[0], destination_university_id: UNIVERSITIES[1].id,
+    price_termly: 3000, price_yearly: 5600, price_daily: 45, is_active: true, bus_capacity: cap, created_at: daysAgo(80 - li),
+    stations: st, line_trips: [...dep, ...ret], line_universities: [{ university_id: UNIVERSITIES[1].id }, ...(li ? [{ university_id: UNIVERSITIES[2].id }] : [])],
+    line_period_prices: [{ option: 'first', price: 3000, is_enabled: true }, { option: 'second', price: 3000, is_enabled: true }, { option: 'both', price: 5600, is_enabled: true }, { option: 'summer', price: 0, is_enabled: false }],
+  };
+});
+tables.lines.push(...EXTRA_LINES);
+EXTRA_LINE_DEFS.forEach(([, , , n], i) => { (LINE_SUBSCRIBERS as Record<string, number>)[EXTRA_LINES[i].id] = n; });
