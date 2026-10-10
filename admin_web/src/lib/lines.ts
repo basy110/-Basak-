@@ -278,7 +278,7 @@ export function unitWord(n: number, forms: readonly [string, string, string, str
 }
 /** «5 محطات», «محطة واحدة», «محطتان». */
 export function countOf(n: number, forms: readonly [string, string, string, string], one?: string): string {
-  if (n === 1) return one ?? `${forms[0]} واحدة`;
+  if (n === 1) return one ?? `${forms[0]} ${forms[0].endsWith('ة') ? 'واحدة' : 'واحد'}`;
   if (n === 2) return forms[1];
   return `${n.toLocaleString('en-US')} ${unitWord(n, forms)}`;
 }
