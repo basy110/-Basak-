@@ -152,7 +152,7 @@ export const PendingReceiptsTable: React.FC<PendingReceiptsProps> = ({
       {/* Table */}
       <div className="mt-4 overflow-x-auto">
         {loading ? (
-          <SkeletonTable rows={6} columns={6} />
+          <SkeletonTable rows={6} cols={6} />
         ) : receipts.length === 0 ? (
           <div className="py-12 text-center">
             <div className="h-12 w-12 rounded-full bg-[#DDF3E6] text-[#2E9E5B] flex items-center justify-center mx-auto mb-2">

@@ -21,7 +21,7 @@ const assets = join(dist, 'assets');
  */
 const BUDGETS = {
   'sign-in page': { lazy: ['LoginPage'], raw: 540_000, gzip: 155_700 },
-  'company admin, first page (overview)': { lazy: ['Workspace', 'OverviewPage'], raw: 590_000, gzip: 174_800 },
+  'company admin, first page (today)': { lazy: ['Workspace', 'TodayPage'], raw: 590_000, gzip: 174_800 },
 };
 
 const files = readdirSync(assets).filter((name) => name.endsWith('.js'));

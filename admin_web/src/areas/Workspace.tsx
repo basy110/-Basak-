@@ -1,24 +1,33 @@
 import React, { Suspense, useEffect } from 'react';
-import { Link, Navigate, Route, Routes, useParams } from 'react-router-dom';
+import { Navigate, Route, Routes, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Shell } from '../components/Shell';
-import { SkeletonPage, SkeletonShell } from '../components/Skeleton';
-import { WorkspaceBar } from '../components/WorkspaceBar';
+import { AppShell, type Who } from '../shell/AppShell';
+import { WorkspaceBar } from '../shell/WorkspaceBar';
 import { CompanyMark } from '../components/CompanyMark';
+import { SkeletonPage, SkeletonShell } from '../components/Skeleton';
+import { Button } from '../ui/Button';
+import { Icon } from '../ui/Icon';
 import { supabase } from '../lib/supabase';
 import { keys, queryClient, STALE, usePageData } from '../lib/query';
 import type { CompanyOption } from '../lib/reference';
 import { useCompanyOverview } from '../lib/overview';
 import { useWorkspaceSync } from '../lib/sync';
 import { OPEN_RESET_STATUSES } from '../lib/resetRequests';
-import { workspaceNav } from '../lib/nav';
+import { COMPANY_NAV, MOVED_SLUGS } from '../lib/nav';
 import { AdminProfile, CompanyScope, CompanyScopeProvider, companyStatusLabel } from '../lib/adminScope';
 import {
-  CompanySettingsPage, LinesPage, NotificationsPage, OverviewPage, PaymentMethodsPage, ReceiptsPage, ReportsPage,
-  StudentsPage, SupervisorsPage, TeamPage, WalletCardDesignPage,
+  LineNewPage, LinePage, LinesPage, NotificationsPage, PasswordRequestsPage, PaymentMethodsPage, ReceiptDetailsPage,
+  ReceiptsPage, ReportsPage, RideConfirmationPage, StudentsPage, SubscriptionPeriodsPage, SupervisorsPage, TeamPage,
+  TodayPage, WalletCardPage,
 } from '../lib/routes';
 
 type Loaded = { state: 'loading' } | { state: 'missing' } | { state: 'ready'; company: CompanyScope };
+
+export const whoOf = (admin: AdminProfile): Who => ({
+  name: admin.full_name || admin.email,
+  roleLabel: admin.role === 'super_admin' ? 'مدير المنصة' : 'مدير الشركة',
+  initial: (admin.full_name || admin.email || '؟').trim().charAt(0),
+});
 
 /** Opens one company. Everything rendered inside reads and writes that company only. */
 export const Workspace: React.FC<{ admin: AdminProfile; onLogout: () => void }> = ({ admin, onLogout }) => {
@@ -49,17 +58,18 @@ export const Workspace: React.FC<{ admin: AdminProfile; onLogout: () => void }> 
   if (loaded.state === 'loading') return <SkeletonShell />;
   if (loaded.state === 'missing') {
     return (
-      <Notice title={companyQuery.error ? 'تعذر فتح مساحة الشركة' : 'الشركة غير موجودة'} onLogout={onLogout}>
-        {companyQuery.error && <p role="alert">{companyQuery.error.message} <button className="font-bold underline" onClick={() => void companyQuery.refetch()}>إعادة المحاولة</button></p>}
-        {admin.role === 'super_admin' && <Link to="/platform/companies" className="font-bold text-[#3E8FBF] underline">العودة إلى كل الشركات</Link>}
+      <Notice title={companyQuery.error ? 'تعذّر فتح لوحة الشركة' : 'هذه الشركة غير موجودة'} onLogout={onLogout}
+        action={companyQuery.error ? <Button kind="secondary" icon="refresh" onClick={() => void companyQuery.refetch()}>إعادة المحاولة</Button>
+          : admin.role === 'super_admin' ? <Button kind="secondary" icon="arrowBack" to="/platform/companies">العودة إلى الشركات</Button> : undefined}>
+        {companyQuery.error ? 'تأكد من الاتصال بالإنترنت وحاول مرة أخرى.' : 'ربما حُذفت أو تغيّر رابطها.'}
       </Notice>
     );
   }
   const { company } = loaded;
   if (admin.role === 'company_admin' && company.status !== 'active') {
     return (
-      <Notice title={`حساب شركة «${company.name}» ${companyStatusLabel[company.status]} حالياً`} onLogout={onLogout}>
-        لا يمكن استخدام لوحة التحكم حتى تعيد إدارة المنصة تفعيل الشركة. بياناتكم محفوظة كما هي.
+      <Notice title={`حساب «${company.name}» ${companyStatusLabel[company.status]} الآن`} onLogout={onLogout} icon="lock">
+        لا يمكن استخدام اللوحة حتى يعيد مدير المنصة تفعيل الشركة. بياناتكم وبيانات طلابكم محفوظة كما هي، والطلاب لا يستطيعون الاشتراك حتى ذلك الحين.
       </Notice>
     );
   }
@@ -69,21 +79,27 @@ export const Workspace: React.FC<{ admin: AdminProfile; onLogout: () => void }> 
   return (
     <CompanyScopeProvider company={company} key={company.id}>
       <WorkspaceSync companyId={company.id} />
-      <WorkspaceShell companyId={company.id} companyName={company.name} onLogout={onLogout}>
+      <WorkspaceShell admin={admin} company={company} onLogout={onLogout}>
         {/* The frame stays; only the page area waits for a page's code the first time it is opened. */}
         <Suspense fallback={<SkeletonPage />}>
           <Routes>
-            <Route index element={<OverviewPage />} />
-            <Route path="students" element={<StudentsPage />} />
+            <Route index element={<TodayPage />} />
             <Route path="receipts" element={<ReceiptsPage />} />
-            <Route path="lines" element={<LinesPage />} />
-            <Route path="supervisors" element={<SupervisorsPage />} />
+            <Route path="password-requests" element={<PasswordRequestsPage />} />
             <Route path="notifications" element={<NotificationsPage />} />
-            <Route path="reports" element={<ReportsPage />} />
-            <Route path="payment-methods" element={<PaymentMethodsPage />} />
-            <Route path="wallet-card" element={<WalletCardDesignPage />} />
+            <Route path="students" element={<StudentsPage />} />
+            <Route path="supervisors" element={<SupervisorsPage />} />
             <Route path="team" element={<TeamPage />} />
-            <Route path="settings" element={<CompanySettingsPage />} />
+            <Route path="lines" element={<LinesPage />} />
+            <Route path="lines/new" element={<LineNewPage />} />
+            <Route path="lines/:lineId" element={<LinePage />} />
+            <Route path="ride-confirmation" element={<RideConfirmationPage />} />
+            <Route path="subscription-periods" element={<SubscriptionPeriodsPage />} />
+            <Route path="payment-methods" element={<PaymentMethodsPage />} />
+            <Route path="reports" element={<ReportsPage />} />
+            <Route path="wallet-card" element={<WalletCardPage />} />
+            <Route path="receipt-details" element={<ReceiptDetailsPage />} />
+            {Object.entries(MOVED_SLUGS).map(([from, to]) => <Route key={from} path={from} element={<Navigate to={`/c/${company.id}/${to}`} replace />} />)}
             <Route path="*" element={<Navigate to={`/c/${company.id}`} replace />} />
           </Routes>
         </Suspense>
@@ -96,38 +112,44 @@ export const Workspace: React.FC<{ admin: AdminProfile; onLogout: () => void }> 
  * How many reset requests are waiting, without downloading them: the same function and
  * checks as the list, counted by the server, the handled ones left out.
  */
-async function countResetRequests(companyId: string): Promise<number> {
+async function countResetRequests(companyId: string | null): Promise<number> {
   const { count, error } = await supabase.rpc('admin_list_password_reset_requests', { p_company_id: companyId }, { head: true, count: 'exact' })
     .in('status', OPEN_RESET_STATUSES);
   if (error) throw new Error(error.message);
   return count ?? 0;
 }
+export const useResetRequestCount = (companyId: string | null) =>
+  usePageData(companyId ? keys.company(companyId, 'resetRequests', 'count') : keys.platform('resetRequests', 'count'), () => countResetRequests(companyId)).data ?? 0;
 
 /**
  * The workspace frame with what is waiting for the admin: receipts to review
- * on "فحص الإيصالات" and password-reset requests on "الطلاب", as red badges.
- * The total is in the browser tab's title too, for when the tab is in the back.
+ * and password-reset requests, as red counts. The total is in the browser tab's
+ * title too, for when the tab is in the back.
  */
-const WorkspaceShell: React.FC<{ companyId: string; companyName: string; onLogout: () => void; children: React.ReactNode }> =
-  ({ companyId, companyName, onLogout, children }) => {
-    const overview = useCompanyOverview(companyId).data;
-    const receipts = overview?.pending_receipts ?? 0;
-    // Under the list's own key prefix, so the live topic refreshes both together.
-    const requests = usePageData(keys.company(companyId, 'resetRequests', 'count'), () => countResetRequests(companyId)).data ?? 0;
-    useEffect(() => {
-      const base = document.title.replace(/^\(\d+\+?\)\s*/, '');
-      const total = receipts + requests;
-      document.title = total > 0 ? `(${total > 99 ? '99+' : total}) ${base}` : base;
-      return () => { document.title = base; };
-    }, [receipts, requests]);
-    return (
-      <Shell items={workspaceNav(companyId)} areaLabel={companyName} onLogout={onLogout} banner={<WorkspaceBar />}
-        mark={<CompanyMark name={companyName} brand={overview?.company} />}
-        badges={{ receipts, requests }}>
-        {children}
-      </Shell>
-    );
-  };
+const WorkspaceShell: React.FC<{ admin: AdminProfile; company: CompanyScope; onLogout: () => void; children: React.ReactNode }> = ({ admin, company, onLogout, children }) => {
+  const overview = useCompanyOverview(company.id).data;
+  const receipts = overview?.pending_receipts ?? 0;
+  const requests = useResetRequestCount(company.id);
+  useTabCount(receipts + requests);
+  const isPlatform = admin.role === 'super_admin';
+  return (
+    <AppShell role={isPlatform ? 'workspace' : 'company'} groups={COMPANY_NAV} base={`/c/${company.id}`} scope="لوحة الشركة"
+      companyName={company.name} companyId={company.id} who={whoOf(admin)} onLogout={onLogout}
+      mark={overview?.company && (overview.company.emblem_path || overview.company.logo_path) ? <CompanyMark name={company.name} brand={overview.company} size="md" className="!h-9 !w-9 !rounded-control" /> : undefined}
+      badges={{ receipts, requests }} workspaceBar={isPlatform ? <WorkspaceBar company={company} /> : undefined}>
+      {children}
+    </AppShell>
+  );
+};
+
+/** «(9) باصك · لوحة الإدارة» while something waits. */
+export function useTabCount(total: number) {
+  useEffect(() => {
+    const base = document.title.replace(/^\(\d+\+?\)\s*/, '');
+    document.title = total > 0 ? `(${total > 99 ? '99+' : total}) ${base}` : base;
+    return () => { document.title = base; };
+  }, [total]);
+}
 
 /** Listens to the open company's topic for as long as its workspace is mounted. */
 const WorkspaceSync: React.FC<{ companyId: string }> = ({ companyId }) => {
@@ -135,12 +157,13 @@ const WorkspaceSync: React.FC<{ companyId: string }> = ({ companyId }) => {
   return null;
 };
 
-const Notice: React.FC<{ title: string; onLogout: () => void; children?: React.ReactNode }> = ({ title, onLogout, children }) => (
-  <div className="min-h-screen grid place-items-center p-6" dir="rtl">
-    <div className="glass-panel max-w-md p-8 text-center space-y-4">
-      <h1 className="text-xl font-extrabold text-[#1F2937]">{title}</h1>
-      <div className="text-sm leading-7 text-[#5B6B7A]">{children}</div>
-      <button onClick={onLogout} className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-200">تسجيل الخروج</button>
+const Notice: React.FC<{ title: string; onLogout: () => void; children?: React.ReactNode; action?: React.ReactNode; icon?: 'lock' | 'alert' }> = ({ title, onLogout, children, action, icon = 'alert' }) => (
+  <div className="grid min-h-screen place-items-center bg-ground p-4">
+    <div className="flex w-full max-w-[480px] flex-col items-center gap-2 rounded-card bg-surface p-8 text-center shadow-card">
+      <span aria-hidden="true" className={`mb-2 flex h-14 w-14 items-center justify-center rounded-full ${icon === 'lock' ? 'bg-warn-bg text-warn' : 'bg-bad-bg text-bad'}`}><Icon name={icon} size={26} /></span>
+      <h1 className="m-0 text-section">{title}</h1>
+      <p className="m-0 text-small text-ink-2">{children}</p>
+      <div className="mt-4 flex w-full flex-col gap-2 sm:w-auto sm:flex-row">{action}<Button kind="outline" icon="logout" onClick={onLogout}>تسجيل الخروج</Button></div>
     </div>
   </div>
 );
