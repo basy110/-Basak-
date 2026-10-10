@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "basak-web",
+      "runtimeExecutable": "powershell",
+      "runtimeArgs": ["-NoProfile", "-Command", "if (Test-Path mobile_app) { Set-Location mobile_app }; & 'C:/src/flutter/bin/flutter.bat' run -d web-server --web-port 5599 --web-hostname localhost"],
+      "port": 5599
+    },
+    {
+      "name": "basak-web-redesign",
+      "runtimeExecutable": "powershell",
+      "runtimeArgs": ["-NoProfile", "-Command", "if (Test-Path mobile_app) { Set-Location mobile_app }; & 'C:/src/flutter/bin/flutter.bat' run -d web-server --web-port 5601 --web-hostname localhost"],
+      "port": 5601
+    }
+  ]
+}
