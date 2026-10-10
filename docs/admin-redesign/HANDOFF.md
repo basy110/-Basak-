@@ -9,12 +9,12 @@ Branch: `admin-web-redesign-5n73en`. Read `BUILD.md` first (the contract), then 
 | اليوم | TodayPage, platform/PlatformTodayPage | `20261116000001_admin_today.sql` |
 | الإيصالات + بيانات الإيصال + طلبات كلمة المرور | ReceiptsPage, ReceiptDetailsPage, PasswordRequestsPage | `20261116000002_admin_receipts.sql` |
 | الطلاب + كل الطلاب + طلبات التصحيح | StudentsPage, platform/AllStudentsPage, platform/CorrectionsPage | `20261116000003_admin_students.sql` |
+| الخطوط + تأكيد الركوب | LinesPage, LinePage (edit = `?edit=<step>`), LineNewPage, RideConfirmationPage | `20261116000004_admin_lines.sql` (re-run its e2e file after applying: one case was fixed after the last full run) |
 | المشرفون + مديرو الشركة + مديرو الشركات | SupervisorsPage, TeamPage, platform/CompanyAdminsPage | `20261116000005_admin_team.sql` + edge functions `admin-update-supervisor`, `admin-reset-supervisor-password` |
 
 ## In progress when the cloud session ended (saved in "WIP checkpoint" commits, not reviewed)
 | Area | Files | Boards |
 |---|---|---|
-| الخطوط + تأكيد الركوب | LinesPage, LinePage, LineNewPage, RideConfirmationPage, `components/lines/*`, `lib/lines*.ts`, `20261116000004_admin_lines.sql` | AdmLines*, AdmLine*, AdmRide* |
 | مواعيد الاشتراك + وسائل الدفع + الإيرادات + بطاقة الطالب + الإشعارات | SubscriptionPeriodsPage, PaymentMethodsPage, ReportsPage, WalletCardPage, NotificationsPage, `components/money/*`, `components/notifications/*`, `lib/money*.ts`, `20261116000006_admin_money.sql` | AdmDates*, AdmPay*, AdmRevenue*, AdmCard*, AdmNotify* |
 | المنصة + الدخول | platform/CompaniesPage, CompanyNewPage, UniversitiesPage, PlatformDefaultsPage, AppVersionsPage, PlatformNotificationsPage, LoginPage, ResetPasswordPage, `components/platform/*`, `lib/platform.ts`, `20261116000007_admin_platform.sql` | AdmPlat* (except Today/Students/Corrections/Password/Admins), AdmSignIn* |
 

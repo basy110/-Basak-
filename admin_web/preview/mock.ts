@@ -12,9 +12,11 @@ import { rpcs, fns } from './registry';
 const params = new URLSearchParams(location.search);
 if (params.get('as')) sessionStorage.setItem('preview.as', params.get('as')!);
 if (params.has('state')) sessionStorage.setItem('preview.state', params.get('state') || '');
-export const as = (sessionStorage.getItem('preview.as') as 'company' | 'platform') || 'company';
+export const as = (sessionStorage.getItem('preview.as') as 'company' | 'platform' | 'none') || 'company';
 const state = sessionStorage.getItem('preview.state') || '';
-const admin = ADMINS[as];
+// `?as=none`: signed out, to see the sign-in pages (the e-mail decides who signs in: «wrong» in the
+// password fails, a «student» address is not an admin, «offline» cannot reach the server).
+const admin = ADMINS[as === 'none' ? 'company' : as];
 
 const delay = (ms = 120) => new Promise((r) => setTimeout(r, ms));
 const failure = (): Answer => ({ data: null, error: { message: 'Failed to fetch' }, count: null });
@@ -128,10 +130,18 @@ export const supabase = {
     return q;
   },
   auth: {
-    getSession: async () => ({ data: { session: { access_token: 'preview', user: { id: admin.id, email: admin.email } } }, error: null }),
+    getSession: async () => ({ data: { session: as === 'none' ? null : { access_token: 'preview', user: { id: admin.id, email: admin.email } } }, error: null }),
     getUser: async () => ({ data: { user: { id: admin.id, email: admin.email } }, error: null }),
     onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } }),
-    signInWithPassword: async () => ({ data: { user: { id: admin.id }, session: {} }, error: null }),
+    signInWithPassword: async ({ email = '', password = '' }: { email?: string; password?: string } = {}) => {
+      await delay(500);
+      if (as !== 'none') return { data: { user: { id: admin.id }, session: {} }, error: null };
+      if (email.includes('offline')) return { data: { user: null, session: null }, error: { message: 'Failed to fetch' } };
+      if (email.includes('unconfirmed')) return { data: { user: null, session: null }, error: { message: 'Email not confirmed' } };
+      if (password === 'wrong') return { data: { user: null, session: null }, error: { message: 'Invalid login credentials' } };
+      const who = email.includes('student') ? { id: crypto.randomUUID() } : email.startsWith('admin@') ? ADMINS.platform : ADMINS.company;
+      return { data: { user: { id: who.id }, session: {} }, error: null };
+    },
     signOut: async () => { sessionStorage.removeItem('preview.as'); location.href = '/'; return { error: null }; },
     updateUser: async () => ({ data: {}, error: null }),
     resetPasswordForEmail: async () => ({ data: {}, error: null }),
