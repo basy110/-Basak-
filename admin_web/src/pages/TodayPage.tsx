@@ -11,6 +11,8 @@ const loadLinesTable = () => import('../components/today/LinesTable');
 // Asked for as soon as this page's code runs, so it arrives together with the data.
 void loadLinesTable().catch(() => undefined);
 const LinesTable = lazy(() => loadLinesTable().then((m) => ({ default: m.LinesTable })));
+// «أهم التوصيات» reads «التحليلات», so its code and data come after the page.
+const TodayInsights = lazy(() => import('../components/today/TodayInsights'));
 const FirstRun = lazy(() => import('../components/today/FirstRun').then((m) => ({ default: m.FirstRun })));
 
 /** «اليوم» — the company admin's first page (docs/canvas/AdmToday, AdmTodayPhone, AdmTodayStates, AdmTodayNew, AdmTodayNewPhone). */
@@ -45,9 +47,10 @@ export const TodayPage: React.FC = () => {
           ) : platformAdmin && (
             <Note tone="teal" icon="shield" title="تعمل هنا كمدير لهذه الشركة">ترى ما يراه مديرها وتستطيع كل ما يستطيعه. ما تقبله أو تغيّره يصل طلابها فوراً.</Note>
           )}
+          <Riders data={data} loading={loading} base={base} />
           <div className="grid grid-cols-1 gap-5 sm:gap-6 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
             <Attention data={data} base={base} passwordRequests={passwordRequests} stale={!online && !!updatedAt ? updatedAt : 0} loading={loading} platformAdmin={platformAdmin} stopped={stopped} />
-            <Riders data={data} loading={loading} />
+            {!stopped && <Suspense fallback={<SkeletonList rows={3} />}><TodayInsights base={base} companyId={company.id} /></Suspense>}
           </div>
           {loading ? <SkeletonTable rows={6} cols={7} /> : data && <Suspense fallback={<SkeletonTable rows={6} cols={7} />}><LinesTable data={data} base={base} /></Suspense>}
           {data && <PhoneBar>{notify(true)}</PhoneBar>}
@@ -71,30 +74,29 @@ const Attention: React.FC<{ data: CompanyToday | null; base: string; passwordReq
   );
 };
 
-/* ── ركاب الغد ──────────────────────────────────────────────────────── */
-const Riders: React.FC<{ data: CompanyToday | null; loading: boolean }> = ({ data, loading }) => {
+/* ── ركاب الغد: the day's numbers in one row ─────────────────────────── */
+const Riders: React.FC<{ data: CompanyToday | null; loading: boolean; base: string }> = ({ data, loading, base }) => {
   if (loading || !data) {
-    return (
-      <Section title="ركاب الغد">
-        <div className="grid grid-cols-2 gap-x-4 gap-y-3"><SkeletonStat /><SkeletonStat /><div className="col-span-2"><SkeletonStat /></div></div>
-      </Section>
-    );
+    return <div className="grid grid-cols-2 gap-3 sm:gap-6 lg:grid-cols-4"><SkeletonStat /><SkeletonStat /><SkeletonStat /><SkeletonStat /></div>;
   }
   const riding = data.lines.filter((l) => l.going > 0).length;
   const share = data.subscribers > 0 ? Math.round((data.confirmed / data.subscribers) * 100) : 0;
   const voteLine = data.vote_open === false && data.vote_opens_at
     ? `يبدأ التأكيد ${clock(data.vote_opens_at)}`
     : data.vote_closes_at ? `التأكيد مفتوح حتى ${clock(data.vote_closes_at)}` : 'التأكيد مفتوح';
+  const when = ridersTitle(data.today, data.ride_date) === 'ركاب اليوم' ? 'اليوم' : 'الغد';
+  const day = rideDayText(data.ride_date);
   return (
-    <Section title={ridersTitle(data.today, data.ride_date)} meta={<Badge tone="teal">{rideDayText(data.ride_date)}</Badge>}>
-      <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-        <StatCard label="الذهاب" icon="aup" value={num(data.going)} unit="راكباً"
-          hint={riding === 0 ? 'لم يؤكد أحد بعد' : riding === 1 ? 'في خط واحد' : `في ${countText(riding, NOUN.line)}`} />
-        <StatCard label="العودة" icon="adown" value={num(data.returning)} unit="راكباً" hint="من الجامعات" />
-        <StatCard className="col-span-2" label="أكّدوا الركوب حتى الآن" icon="check" value={num(data.confirmed)} bar={share}
-          unit={<>من {nOf(data.subscribers, SUBSCRIBER)} · <span dir="ltr" className="tabular [unicode-bidi:isolate]">{share}%</span></>}
-          hint={`${voteLine} · الأعداد تتغيّر`} />
-      </div>
-    </Section>
+    <section aria-label={`${ridersTitle(data.today, data.ride_date)} · ${day}`} className="grid grid-cols-2 gap-3 sm:gap-6 lg:grid-cols-4">
+      <StatCard label="المشتركون" icon="users" value={num(data.subscribers)} to={`${base}/students`}
+        hint={data.members > data.subscribers ? `من ${num(data.members)} طالباً في الشركة` : 'اشتراكات سارية'} />
+      <StatCard label={`ذهاب ${when}`} icon="aup" value={num(data.going)} unit="راكباً"
+        hint={`${day} · ${riding === 0 ? 'لم يؤكد أحد بعد' : riding === 1 ? 'في خط واحد' : `في ${countText(riding, NOUN.line)}`}`} />
+      <StatCard label={`عودة ${when}`} icon="adown" value={num(data.returning)} unit="راكباً" hint={`${day} · من الجامعات`} />
+      <StatCard label="أكّدوا الركوب" icon="check" value={num(data.confirmed)} bar={share}
+        unit={<>من {nOf(data.subscribers, SUBSCRIBER)} · <span dir="ltr" className="tabular [unicode-bidi:isolate]">{share}%</span></>}
+        hint={`${voteLine} · الأعداد تتغيّر`} />
+    </section>
   );
 };
+

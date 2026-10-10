@@ -166,5 +166,6 @@ export const EXTRA_LINES: Row[] = EXTRA_LINE_DEFS.map(([name, stations, starts, 
     line_period_prices: [{ option: 'first', price: 3000, is_enabled: true }, { option: 'second', price: 3000, is_enabled: true }, { option: 'both', price: 5600, is_enabled: true }, { option: 'summer', price: 0, is_enabled: false }],
   };
 });
-tables.lines.push(...EXTRA_LINES);
+// A new array: tables.lines is LINES itself, which the first company's pages index by position.
+tables.lines = [...tables.lines, ...EXTRA_LINES];
 EXTRA_LINE_DEFS.forEach(([, , , n], i) => { (LINE_SUBSCRIBERS as Record<string, number>)[EXTRA_LINES[i].id] = n; });
