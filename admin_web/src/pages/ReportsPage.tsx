@@ -17,7 +17,7 @@ import {
 import { REVENUE_OPTION_LABEL, breakdownFromRows, type Breakdown, type RevenueOption } from '../lib/money';
 import {
   Button, Card, Cell2, Chips, DataTable, Dialog, EmptyState, ErrorState, Icon, Ltr, Money, Note, Page, PageHeader, Pager, Pill,
-  RadioCards, SearchBox, SidePanel, SkeletonBar, SkeletonStat, SkeletonTable, SortSelect, StatCard, StatusPill, TextField, Toolbar,
+  PhoneBar, RadioCards, SearchBox, SidePanel, SkeletonBar, SkeletonStat, SkeletonTable, SortSelect, StatCard, StatusPill, TextField, Toolbar,
   cairo, clock, dayText, errorText, num, phoneText, useOnline, type Column,
 } from '../ui';
 import { BreakdownCard, FilterSelect, ResetEffects } from '../components/money/Revenue';
@@ -364,7 +364,7 @@ const ResetView: React.FC = () => {
     <Page>
       <PageHeader title="تصفير الأرقام" back={{ label: 'الإيرادات', to: `/c/${companyId}/reports` }}
         sub="عند بداية فصل أو عام جديد: اجعل أرقام الإيرادات تبدأ من الصفر، دون أن تفقد شيئاً." />
-      <Note tone="warning" title="صفحة للاستخدام النادر">الأرقام التي تراها في «الإيرادات» ستبدأ من الصفر لكل مديري الشركة. يمكن إلغاء التصفير من السجل في أي وقت.</Note>
+      <Note tone="warning" className="hidden sm:flex" title="صفحة للاستخدام النادر">الأرقام التي تراها في «الإيرادات» ستبدأ من الصفر لكل مديري الشركة. يمكن إلغاء التصفير من السجل في أي وقت.</Note>
       <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,440px)] lg:gap-6">
         <Card className="flex flex-col gap-5 p-4 sm:p-6">
           <div><h2 className="m-0 text-section">ابدأ الحساب من جديد</h2><p className="m-0 text-small text-ink-2">تضع علامة «من هنا نبدأ العدّ». لا يُحذف شيء من النظام، وهذه العلامة لشركتك وحدها.</p></div>
@@ -374,7 +374,7 @@ const ResetView: React.FC = () => {
           ]} />
           <ResetEffects scope={scope} />
           <TextField label="سبب التصفير" optional value={note} maxLength={120} onChange={(e) => setNote(e.target.value)} placeholder="مثال: بداية الفصل الثاني" help="يُكتب في السجل لتتذكره لاحقاً." />
-          <div className="border-t border-hair pt-4">
+          <div className="hidden border-t border-hair pt-4 sm:block">
             <Button kind="dangerQuiet" icon="undo" disabled={!online} onClick={() => setAsking({ at: new Date().toISOString() })}>تصفير الأرقام</Button>
           </div>
         </Card>
@@ -406,6 +406,7 @@ const ResetView: React.FC = () => {
         </Card>
       </div>
 
+      <PhoneBar><Button full kind="dangerQuiet" icon="undo" disabled={!online} onClick={() => setAsking({ at: new Date().toISOString() })}>تصفير الأرقام</Button></PhoneBar>
       {asking && (
         <Dialog open onClose={() => setAsking(null)} title="تصفير أرقام الإيرادات؟" icon="alert" tone="danger" w={560}
           actions={[<Button key="b" kind="secondary" onClick={() => setAsking(null)} disabled={busy}>رجوع</Button>, <Button key="r" kind="danger" onClick={() => void doReset()} loading={busy}>صفّر الأرقام</Button>]}>

@@ -423,7 +423,7 @@ export const SubscriptionPeriodsPage: React.FC = () => {
         <SectionHead title="ما يراه الطلاب في كل خط" meta={<span className="hidden text-label text-ink-2 sm:inline">السعر، أو سبب عدم الظهور</span>} />
         {preview.length === 0 ? (
           <EmptyState card icon="sliders" title="لا توجد خطوط بعد"
-            text="المواعيد جاهزة، لكن الطالب لا يجد شيئاً يشترك فيه حتى تضيف خطاً وتكتب أسعاره. سترى هنا ما يظهر له في كل خط."
+            text={<>المواعيد جاهزة، لكن الطالب لا يجد شيئاً يشترك فيه حتى تضيف خطاً وتكتب أسعاره.<span className="hidden sm:inline"> سترى هنا ما يظهر له في كل خط.</span></>}
             action={<Button icon="plus" to={`/c/${companyId}/lines/new`}>أضف أول خط</Button>} />
         ) : (
           <>

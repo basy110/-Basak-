@@ -5,7 +5,8 @@ import { updateScheduledNotification, useAudiencePreview, useNotificationActions
 import { useLineOptions } from '../../lib/reference';
 import { useGuard } from '../../lib/guard';
 import { notifyDone } from '../../lib/toasts';
-import { Button, Note, SidePanel, errorText } from '../../ui';
+import { Button, Note, SidePanel, StatePill, errorText } from '../../ui';
+import { useCompanyOverview } from '../../lib/overview';
 import { NotificationForm } from './NotificationForm';
 
 /** A scheduled notification before it goes out: its words, its audience and its time can still change. */
@@ -19,6 +20,7 @@ export const EditScheduledDialog: React.FC<{ companyId: string; row: HistoryRow;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const options = useLineOptions(companyId);
+  const members = useCompanyOverview(companyId).data?.members ?? null;
   const guard = useGuard();
   const audience = audienceToPayload(draft.audience);
   const preview = useAudiencePreview(companyId, audience);
@@ -45,7 +47,7 @@ export const EditScheduledDialog: React.FC<{ companyId: string; row: HistoryRow;
   });
 
   return (
-    <SidePanel open onClose={() => { if (!busy) onClose(); }} title="تعديل إشعار مجدول" sub="لم يُرسل بعد: تستطيع تغيير كلماته ومستلميه وموعده." w={560} backLabel="الإشعارات"
+    <SidePanel open onClose={() => { if (!busy) onClose(); }} title="تعديل إشعار مجدول" meta={<StatePill state="scheduled" />} sub="لم يُرسل بعد: تستطيع تغيير كلماته ومستلميه وموعده." w={560} backLabel="الإشعارات"
       footer={(
         <>
           {onCancelSend && <Button kind="dangerQuiet" icon="x" onClick={onCancelSend} disabled={busy}>إلغاء الإرسال</Button>}
@@ -55,7 +57,7 @@ export const EditScheduledDialog: React.FC<{ companyId: string; row: HistoryRow;
         </>
       )}>
       {!row.audience_spec && <Note tone="warning" title="اختر المستلمين من جديد">تعذّرت قراءة المستلمين المحفوظين لهذا الإشعار ({row.audience || 'غير معروف'}).</Note>}
-      <NotificationForm draft={draft} onChange={(next) => { setDraft(next); setError(''); }} lines={options.data?.lines ?? []} plain showErrors
+      <NotificationForm draft={draft} onChange={(next) => { setDraft(next); setError(''); }} lines={options.data?.lines ?? []} plain showErrors companyCount={members}
         universities={options.data?.universities ?? []} optionsLoading={options.loading} today={today} scheduledOnly disabled={busy} />
       <div className="rounded-inner bg-ground px-4 py-3">
         <div className="text-small font-semibold">{preview.status === 'ready' && preview.data
