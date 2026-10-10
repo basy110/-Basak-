@@ -153,13 +153,13 @@ const TermsSection: React.FC<{ terms: TermRow[]; periods: Period[]; online: bool
         const p = problems[t.code];
         const show = (x: string | null) => (tried || x?.includes('ليس فيه') ? x : null);
         return (
-          <div key={t.code} className="grid grid-cols-2 items-start gap-3 border-b border-hair pb-4 last:border-0 last:pb-0 sm:grid-cols-[minmax(0,1.3fr)_minmax(0,1.6fr)_minmax(0,1.6fr)_150px] sm:border-0 sm:pb-0">
-            <div className="col-span-2 sm:col-span-1">
+          <div key={t.code} className="flex flex-col gap-3 rounded-inner bg-ground p-3 sm:grid sm:grid-cols-[minmax(0,1.3fr)_minmax(0,1.6fr)_minmax(0,1.6fr)_150px] sm:items-start sm:rounded-none sm:bg-transparent sm:p-0">
+            <div>
               <TextField aria-label="اسم الفصل" label={phone ? 'اسم الفصل' : undefined} value={draft[t.code].name} onChange={(e) => set(t.code, { name: e.target.value })} maxLength={40} error={show(p.name) ?? undefined} />
             </div>
             <div className="flex flex-col gap-1.5"><span className="text-label font-medium sm:hidden">يبدأ</span><div className="flex gap-2">{dayBox(t.code, 'start_day', `يوم بداية ${t.name}`, show(p.start))}{month(t.code, 'start_month', `شهر بداية ${t.name}`)}</div>{errLine(show(p.start))}</div>
             <div className="flex flex-col gap-1.5"><span className="text-label font-medium sm:hidden">ينتهي</span><div className="flex gap-2">{dayBox(t.code, 'end_day', `يوم نهاية ${t.name}`, show(p.end))}{month(t.code, 'end_month', `شهر نهاية ${t.name}`)}</div>{errLine(show(p.end))}</div>
-            <div className="col-span-2 flex items-center gap-2 sm:col-span-1 sm:h-11"><span className="text-label text-ink-2 sm:hidden">يُباع عند شركة جديدة:</span>
+            <div className="flex items-center justify-between gap-2 sm:h-11 sm:justify-start"><span className="text-label text-ink-2 sm:hidden">يُباع عند شركة جديدة:</span>
               {t.is_on_sale ? <Badge tone="success">نعم</Badge> : <Badge>لا، تفتحه الشركة</Badge>}</div>
           </div>
         );
