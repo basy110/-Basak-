@@ -1,17 +1,16 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
-import {
-  Button, Cell2, Chips, Icon, DataTable, EmptyState, ErrorState, Note, Page, PageHeader, Pager, PhoneBar, SearchBox, SkeletonTable,
-  SortSelect, Toolbar, errorText, num, useOnline, type Column,
-} from '../../ui';
+import { Button, Cell2, Chips, Dialog, Icon, DataTable, EmptyState, ErrorState, Note, Page, PageHeader, Pager, PhoneBar, SearchBox, SkeletonTable, SortSelect, Toolbar, errorText, num, useOnline, type Column } from '../../ui';
+import { ExportButton, ImportPanel, type ImportCheck } from '../../ui/Transfer';
+import { exportSheet } from '../../lib/excel';
 import { supabase } from '../../lib/supabase';
 import { unwrap } from '../../lib/query';
 import { useGuard } from '../../lib/guard';
 import { notifyDone, notifyError, notifyUndoable } from '../../lib/toasts';
 import { UNIVERSITY_COLUMNS, universitiesKey, useUniversities } from '../../lib/reference';
 import {
-  collegesKey, collegeStudents, matches, useColleges, useUniversityCounts, useIsPhone,
+  collegesKey, collegeStudents, matches, sameName, useColleges, useUniversityCounts, useIsPhone,
   type CollegeRow, type UniversityFilter, type UniversityRow,
 } from '../../lib/platform';
 import { HideCollegeDialog, HideUniversityDialog, UniState, UniversityAddPanel, UniversityPanel } from '../../components/platform/UniversityPanels';
@@ -50,6 +49,9 @@ export const UniversitiesPage: React.FC = () => {
   const [busy, setBusy] = useState<string | null>(null);
   const [hideUni, setHideUni] = useState(false);
   const [hideCollege, setHideCollege] = useState<CollegeRow | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulk, setBulk] = useState<'show' | 'hide' | null>(null);
+  const [importing, setImporting] = useState(false);
 
   const openId = params.get('university');
   const setOpen = (id: string | null) => setParams((p) => { const n = new URLSearchParams(p); if (id) n.set('university', id); else n.delete('university'); return n; }, { replace: !id });
@@ -119,6 +121,79 @@ export const UniversitiesPage: React.FC = () => {
     });
     return ok;
   };
+  /** Several colleges at once (the general list, or names its students typed); ones already there are skipped. */
+  const addColleges = (u: UniversityRow, names: string[]) => void guard(`colleges:${u.id}`, async () => {
+    setBusy('colleges');
+    try {
+      const fresh = names.filter((n) => !colleges.some((c) => c.university_id === u.id && sameName(c.name, n)));
+      const rows = fresh.length ? await unwrap<CollegeRow[]>(supabase.from('colleges')
+        .upsert(fresh.map((name) => ({ university_id: u.id, name, is_active: true })), { onConflict: 'university_id,name', ignoreDuplicates: true })
+        .select('id, university_id, name, is_active')) : [];
+      rows.forEach(putCollege);
+      notifyDone(rows.length === 1 ? `أُضيفت كلية ${rows[0].name.replace(/^كلية\s+/, '')}.` : `أُضيفت ${num(rows.length)} كلية إلى ${u.name}.`,
+        rows.length > 1 ? 'صار طلابها يختارون من كلياتها هي. أخفِ ما لا يوجد فيها.' : undefined);
+    } catch (e) { notifyError('لم تُضف الكليات', errorText(e)); }
+    setBusy(null);
+  });
+
+  /** «أظهر/أخفِ المحدد»: one write for every chosen university. */
+  const setManyShown = (show: boolean) => void guard('bulk', async () => {
+    const ids = [...selected].filter((id) => rows.find((u) => u.id === id)?.is_active !== show);
+    setBusy('bulk');
+    try {
+      const saved = ids.length ? await unwrap<UniversityRow[]>(supabase.from('universities').update({ is_active: show }).in('id', ids).select(UNIVERSITY_COLUMNS)) : [];
+      saved.forEach(putUni);
+      setBulk(null); setSelected(new Set());
+      notifyDone(show ? `صارت ${num(saved.length)} جامعة تظهر للطلاب والشركات.` : `أُخفيت ${num(saved.length)} جامعة. الطلاب المسجّلون بها لا يتأثرون.`);
+    } catch (e) { notifyError('لم يتغيّر شيء', errorText(e)); }
+    setBusy(null);
+  });
+
+  // ── Excel ──────────────────────────────────────────────────────────────────────
+  const exportRows = (list: UniversityRow[]) => exportSheet({
+    name: 'الجامعات والكليات',
+    rows: list.flatMap((u) => {
+      const mine = collegesOf(u.id);
+      return (mine.length ? mine : [null]).map((c) => ({ u, c }));
+    }),
+    columns: [
+      { label: 'الجامعة', value: (r) => r.u.name, width: 34 },
+      { label: 'المدينة', value: (r) => r.u.city, width: 18 },
+      { label: 'حالة الجامعة', value: (r) => (r.u.is_active ? 'تظهر' : 'مخفية') },
+      { label: 'الكلية', value: (r) => r.c?.name ?? 'القائمة العامة', width: 28 },
+      { label: 'حالة الكلية', value: (r) => (r.c ? (r.c.is_active ? 'تظهر' : 'مخفية') : '') },
+      { label: 'طلاب الكلية', value: (r) => (r.c ? collegeStudents(counts ?? undefined, r.u.id, r.c.name) : null) },
+      { label: 'طلاب الجامعة', value: (r) => statsOf(r.u.id)?.students ?? null },
+      { label: 'شركات تخدمها', value: (r) => statsOf(r.u.id)?.companies.length ?? null },
+    ],
+  });
+  type ImportRow = { university: string; city: string; college: string };
+  const created = useRef(new Map<string, UniversityRow>());
+  const checkImport = (r: Record<'university' | 'city' | 'college', string>, _i: number, all: Record<'university' | 'city' | 'college', string>[]): ImportCheck<ImportRow> => {
+    const label = [r.university, r.college].filter(Boolean).join(' · ');
+    if (r.university.length < 3) return { ok: false, label, error: 'اسم الجامعة فارغ أو قصير.' };
+    const known = rows.find((u) => sameName(u.name, r.university));
+    if (!known && r.city.length < 2) return { ok: false, label, error: 'جامعة جديدة: اكتب مدينتها لتُضاف.' };
+    if (r.college && known && colleges.some((c) => c.university_id === known.id && sameName(c.name, r.college))) return { ok: false, label, error: 'الكلية موجودة في هذه الجامعة من قبل.' };
+    if (!r.college && known) return { ok: false, label, error: 'الجامعة موجودة، ولا كلية في الصف.' };
+    const twice = all.filter((x) => sameName(x.university, r.university) && sameName(x.college, r.college)).length > 1;
+    if (twice && r.college) return { ok: false, label, error: 'مكرر في الملف.' };
+    return { ok: true, label, value: { university: r.university, city: r.city, college: r.college } };
+  };
+  const importOne = async (r: ImportRow) => {
+    let u = rows.find((x) => sameName(x.name, r.university)) ?? [...created.current.values()].find((x) => sameName(x.name, r.university));
+    if (!u) {
+      u = await unwrap<UniversityRow>(supabase.from('universities').insert({ name: r.university, city: r.city, is_active: true }).select(UNIVERSITY_COLUMNS).single());
+      created.current.set(u.id, u); putUni(u);
+    }
+    if (r.college) {
+      const rowsBack = await unwrap<CollegeRow[]>(supabase.from('colleges')
+        .upsert([{ university_id: u.id, name: r.college, is_active: true }], { onConflict: 'university_id,name', ignoreDuplicates: true })
+        .select('id, university_id, name, is_active'));
+      rowsBack.forEach(putCollege);
+    }
+  };
+
   const writeCollege = async (c: CollegeRow, show: boolean) => {
     putCollege(await unwrap<CollegeRow>(supabase.from('colleges').update({ is_active: show }).eq('id', c.id).select('id, university_id, name, is_active').single()));
   };
@@ -142,9 +217,9 @@ export const UniversitiesPage: React.FC = () => {
   const dash = <span className="text-ink-3">—</span>;
   const muted = (u: UniversityRow, n: number) => <span className={`tabular ${!u.is_active || n === 0 ? 'text-ink-3' : ''}`}>{num(n)}</span>;
   const columns: Column<UniversityRow>[] = [
-    { key: 'name', label: <span className="inline-flex items-center gap-1">الجامعة{sort === 'name' && <Icon name="aup" size={14} stroke={2} />}</span>, render: (u) => <Cell2 main={u.name} sub={shownColleges(u.id) === 0 && u.is_active ? 'بلا كليات: لا يستطيع طالب أن يختارها عند التسجيل' : undefined} /> },
+    { key: 'name', label: <span className="inline-flex items-center gap-1">الجامعة{sort === 'name' && <Icon name="aup" size={14} stroke={2} />}</span>, render: (u) => <Cell2 main={u.name} sub={shownColleges(u.id) === 0 && u.is_active ? 'بلا كليات خاصة: يختار طلابها من القائمة العامة' : undefined} /> },
     { key: 'city', label: 'المدينة', w: 170, render: (u) => <span className="truncate">{u.city}</span> },
-    { key: 'colleges', label: 'الكليات', w: 96, render: (u) => muted(u, shownColleges(u.id)) },
+    { key: 'colleges', label: 'الكليات', w: 110, render: (u) => (shownColleges(u.id) === 0 ? <span className="inline-flex h-6 items-center rounded-md bg-amber-bg px-2 text-cap font-bold text-amber">العامة</span> : <span className="inline-flex h-6 min-w-8 items-center justify-center rounded-md bg-violet-bg px-2 text-cap font-bold tabular text-violet">{num(shownColleges(u.id))}</span>) },
     { key: 'students', label: 'الطلاب', w: 96, render: (u) => (statsOf(u.id) ? muted(u, statsOf(u.id)!.students) : dash) },
     { key: 'companies', label: 'شركات تخدمها', w: 120, hideTablet: true, render: (u) => (statsOf(u.id) ? muted(u, statsOf(u.id)!.companies.length) : dash) },
     { key: 'state', label: 'الحالة', w: 112, render: (u) => <UniState on={u.is_active} /> },
@@ -153,15 +228,32 @@ export const UniversitiesPage: React.FC = () => {
 
   const startAdd = (name = '') => { setAddError(''); setAdding(name); };
   const addButton = <Button icon="plus" onClick={() => startAdd()}>إضافة جامعة</Button>;
-  const header = <PageHeader title="الجامعات والكليات" sub="القائمة التي يختار منها الطالب جامعته وكليته عند التسجيل، وتختار منها الشركات وجهات خطوطها." actions={rows.length || unis.loading ? addButton : undefined} phoneActions={false} />;
+  const headerActions = <><Button kind="secondary" icon="upload" onClick={() => setImporting(true)} disabled={!online}>استيراد من Excel</Button>{addButton}</>;
+  const header = <PageHeader title="الجامعات والكليات" sub="القائمة التي يختار منها الطالب جامعته وكليته عند التسجيل، وتختار منها الشركات وجهات خطوطها." actions={rows.length || unis.loading ? headerActions : undefined} phoneActions={false} />;
   const panels = (
     <>
       <UniversityAddPanel open={adding !== null} initialName={adding ?? ''} all={rows} busy={busy === 'add'} online={online} serverError={addError || undefined}
         onClose={() => setAdding(null)} onAdd={add} />
       <UniversityPanel u={open} all={rows} colleges={colleges} counts={counts} online={online} busy={busy} saveError={saveError || undefined}
-        onClose={() => { setOpen(null); setSaveError(''); }} onSave={(n, c) => open && save(open, n, c)} onAddCollege={(n) => (open ? addCollege(open, n) : Promise.resolve(false))}
+        onClose={() => { setOpen(null); setSaveError(''); }} onSave={(n, c) => open && save(open, n, c)} onAddCollege={(n) => (open ? addCollege(open, n) : Promise.resolve(false))} onAddColleges={(names) => open && addColleges(open, names)}
         onCollege={(c, show) => setCollegeShown(c, show)} onUniversity={(show) => (show ? open && setUniShown(open, true) : setHideUni(true))} />
       <HideUniversityDialog u={hideUni ? open : null} counts={counts} busy={busy === 'uni'} onClose={() => setHideUni(false)} onConfirm={() => open && setUniShown(open, false)} />
+      <ImportPanel open={importing} onClose={() => { setImporting(false); created.current.clear(); }} title="استيراد جامعات وكليات" what="صف" templateName="قالب الجامعات والكليات"
+        fields={[
+          { key: 'university', label: 'الجامعة', aliases: ['اسم الجامعة', 'university'], required: true, example: 'جامعة المنصورة' },
+          { key: 'city', label: 'المدينة', aliases: ['city'], example: 'المنصورة' },
+          { key: 'college', label: 'الكلية', aliases: ['اسم الكلية', 'college', 'faculty'], example: 'الهندسة' },
+        ]}
+        note="صف لكل كلية. الجامعة غير الموجودة تُضاف بمدينتها، والكلية الموجودة من قبل تُتخطّى."
+        check={checkImport} importOne={importOne} onFinished={() => void client.invalidateQueries({ queryKey: collegesKey })} />
+      <Dialog open={bulk !== null} onClose={() => setBulk(null)} icon="eye" tone={bulk === 'hide' ? 'danger' : 'teal'}
+        title={bulk === 'hide' ? `إخفاء ${num(selected.size)} جامعة؟` : `إظهار ${num(selected.size)} جامعة؟`}
+        actions={[<Button key="b" kind="secondary" onClick={() => setBulk(null)}>رجوع</Button>,
+          <Button key="g" kind={bulk === 'hide' ? 'danger' : 'primary'} loading={busy === 'bulk'} onClick={() => setManyShown(bulk === 'show')}>{bulk === 'hide' ? 'أخفِ الجامعات' : 'أظهر الجامعات'}</Button>]}>
+        <p className="m-0">{bulk === 'hide'
+          ? 'لن تظهر لطالب جديد عند التسجيل ولا لشركة عند إنشاء خط. الطلاب المسجّلون بها وخطوط الشركات لا يتغيّر فيها شيء، وتستطيع إظهارها في أي وقت.'
+          : 'تظهر للطلاب عند التسجيل وللشركات عند إنشاء خطوطها.'}</p>
+      </Dialog>
       <HideCollegeDialog c={hideCollege} uni={open?.name ?? ''} students={hideCollege ? collegeStudents(counts ?? undefined, hideCollege.university_id, hideCollege.name) ?? 0 : 0}
         busy={!!hideCollege && busy === `college:${hideCollege.id}`} onClose={() => setHideCollege(null)} onConfirm={() => hideCollege && setCollegeShown(hideCollege, false, true)} />
     </>
@@ -188,6 +280,15 @@ export const UniversitiesPage: React.FC = () => {
       ]} />}
       count={phone ? `${num(shown.length)} جامعة` : `${num(colleges.filter((c) => c.is_active).length)} كلية`}
       sort={<SortSelect value={sort} onChange={setSort} options={[{ value: 'name', label: 'بالاسم' }, { value: 'students', label: 'الأكثر طلاباً' }]} />}
+      actions={phone ? undefined : <ExportButton count={shown.length} onExport={() => exportRows(shown)} />}
+      bulk={{
+        count: selected.size, onClear: () => setSelected(new Set()), total: shown.length, onAll: () => setSelected(new Set(shown.map((u) => u.id))),
+        actions: <>
+          <ExportButton label="تصدير المحدد" count={selected.size} onExport={() => exportRows(rows.filter((u) => selected.has(u.id)))} className="!bg-white !text-teal" />
+          <Button sm kind="secondary" icon="eye" disabled={!online} onClick={() => setBulk('show')}>أظهر</Button>
+          <Button sm kind="secondary" icon="eyeOff" disabled={!online} onClick={() => setBulk('hide')}>أخفِ</Button>
+        </>,
+      }}
     />
   );
   const noMatch = shown.length === 0 ? (
@@ -201,7 +302,7 @@ export const UniversitiesPage: React.FC = () => {
     <Page>
       {header}
       <Note icon="school" title="الشركات لا تضيف جامعة بنفسها">مدير الشركة يختار من هذه القائمة فقط عند إنشاء خط. إن نقصته جامعة يتواصل معك خارج اللوحة، وتضيفها أنت هنا.</Note>
-      <DataTable caption="الجامعات" columns={columns} rows={pageRows} rowKey={(u) => u.id} onOpen={(u) => setOpen(u.id)} openKey={openId} toolbar={toolbar} empty={noMatch}
+      <DataTable caption="الجامعات" columns={columns} rows={pageRows} selectable selected={selected} onSelect={setSelected} rowKey={(u) => u.id} onOpen={(u) => setOpen(u.id)} openKey={openId} toolbar={toolbar} empty={noMatch}
         pager={<Pager page={page} total={shown.length} onPage={setPage} />} muted={(u) => !u.is_active}
         card={(u) => ({
           title: u.name, sub: u.city, end: <UniState on={u.is_active} />,

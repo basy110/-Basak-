@@ -1,17 +1,23 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '../../ui/Button';
 import { EmptyState, ErrorState } from '../../ui/Feedback';
 import { Icon } from '../../ui/Icon';
 import { STATUS, Ltr, Money } from '../../ui/Status';
-import { Chips, Cell2, DataTable, Pager, SearchBox, SortSelect, type Column } from '../../ui/Table';
-import { clock, countText, NOUN, num, phoneText } from '../../ui/format';
+import { Chips, Cell2, DataTable, Pager, SearchBox, SortSelect, Toolbar, type Column } from '../../ui/Table';
+import { Menu } from '../../ui/Menu';
+import { ExportButton } from '../../ui/Transfer';
+import { clock, countText, errorText, NOUN, num, phoneText } from '../../ui/format';
 import { keys, usePageData, VARIANT_GC } from '../../lib/query';
 import { useSignedUrls } from '../../lib/signedUrls';
+import { notifyDone, notifyError } from '../../lib/toasts';
+import { bulkTargets, type BulkAction } from '../../lib/studentsBulk';
 import {
-  fetchStudentsList, mainSubscription, openSubscriptions, periodName, SHOWN_ORDER, studentShown, studyLine,
+  fetchAllStudents, fetchStudentsList, mainSubscription, openSubscriptions, periodName, SHOWN_ORDER, studentShown, studyLine,
   type Shown, type StatusCounts, type StudentRow, type StudentSort, type StudentsListAnswer,
 } from '../../lib/students';
 import { Avatar, FilterSelect, LinkSelect, ShownPill, shortDay } from './parts';
+import { BULK, BULK_ORDER, BulkDialog } from './StudentsBulk';
+import { exportStudents } from './StudentsTransfer';
 
 export const PAGE_SIZE = 25;
 const SHOWN_LABEL: Record<Shown, string> = { ...Object.fromEntries(Object.entries(STATUS).map(([k, v]) => [k, v[0]])), none: 'بلا اشتراك' } as Record<Shown, string>;
@@ -41,12 +47,14 @@ const RowsSkeleton: React.FC = () => (
 
 /** The company's students (docs/canvas/AdmStudents, AdmStudentsPhone, AdmStudentsStates). */
 export const StudentsList: React.FC<{
-  companyId: string; today: string; q: string; onSearch: (q: string) => void;
+  companyId: string; companyName: string; today: string; q: string; onSearch: (q: string) => void;
   filter: ListFilter; onFilter: (f: ListFilter) => void;
   lines: { id: string; name: string }[]; universities: { id: string; name: string }[];
   openId: string | null; onOpen: (row: StudentRow) => void; onAdd: () => void; online: boolean;
+  /** «استيراد من Excel» (offered in the phone's ⋮; the page header has it on wider screens). */
+  onImport: () => void;
   onAnswer?: (answer: StudentsListAnswer | undefined, filtered: boolean) => void;
-}> = ({ companyId, today, q, onSearch, filter, onFilter, lines, universities, openId, onOpen, onAdd, online, onAnswer }) => {
+}> = ({ companyId, companyName, today, q, onSearch, filter, onFilter, lines, universities, openId, onOpen, onAdd, online, onImport, onAnswer }) => {
   const [typed, setTyped] = useState(q);
   useEffect(() => { setTyped(q); }, [q]);
   useEffect(() => {
@@ -69,6 +77,41 @@ export const StudentsList: React.FC<{
   const avatars = useSignedUrls('student-avatars', rows.map((r) => r.profile_image_url));
   const lineOptions = useMemo(() => lines.map((l) => ({ value: l.id, label: l.name })), [lines]);
   const uniOptions = useMemo(() => universities.map((u) => ({ value: u.id, label: u.name })), [universities]);
+
+  // The selection: ids, kept across pages; the rows behind them as last seen (or read by «حدّد كل…»).
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulk, setBulk] = useState<BulkAction | null>(null);
+  const known = useRef(new Map<string, StudentRow>());
+  useEffect(() => { rows.forEach((r) => known.current.set(r.id, r)); }, [rows]);
+  useEffect(() => { setSelected(new Set()); }, [companyId, q, filter.status, filter.lineId, filter.universityId]);
+  const chosen = useMemo(() => [...selected].map((id) => known.current.get(id)).filter((r): r is StudentRow => !!r), [selected, rows]); // eslint-disable-line react-hooks/exhaustive-deps
+  const query = { companyId, search: q, status: filter.status, lineId: filter.lineId, universityId: filter.universityId, sort: filter.sort };
+  const allMatching = () => fetchAllStudents(query, today);
+  const selectAll = async () => {
+    try {
+      const all = await allMatching();
+      all.forEach((r) => known.current.set(r.id, r));
+      setSelected(new Set(all.map((r) => r.id)));
+    } catch (e) { notifyError('لم نحدد كل الطلاب', errorText(e)); }
+  };
+  const exportAll = async () => { await exportStudents(await allMatching(), today, companyName); };
+  const exportFromMenu = async () => {
+    try { const all = await allMatching(); await exportStudents(all, today, companyName); notifyDone(`صُدّر ${num(all.length)} صفاً إلى ملف Excel.`); }
+    catch (e) { notifyError('لم يُصدَّر الملف', errorText(e)); }
+  };
+  const bulkBar = selected.size > 0 ? (
+    <Toolbar bulk={{
+      count: selected.size, total, onClear: () => setSelected(new Set()), onAll: () => void selectAll(),
+      actions: <>
+        <ExportButton sm label="تصدير المحدد" count={chosen.length} onExport={() => exportStudents(chosen, today, companyName, 'طلاب محددون من')} />
+        {BULK_ORDER.map((a) => {
+          const n = a === 'remove' ? chosen.length : bulkTargets(chosen, a, today).length;
+          return <Button key={a} sm kind="secondary" icon={BULK[a].icon} disabled={!online || n === 0} onClick={() => setBulk(a)}
+            title={n === 0 ? BULK[a].none : undefined}>{BULK[a].label}{a !== 'remove' && n > 0 ? ` (${num(n)})` : ''}</Button>;
+        })}
+      </>,
+    }} />
+  ) : null;
 
   const clear = () => { setTyped(''); onSearch(''); onFilter({ ...NO_FILTER, sort: filter.sort }); };
   const none = !list.loading && !list.error && !filtered && (counts ? counts.all === 0 : rows.length === 0) && filter.page === 1;
@@ -96,6 +139,11 @@ export const StudentsList: React.FC<{
         <div className="flex min-h-6 items-center gap-2 sm:contents">
           <span aria-live="polite" className="flex-1 whitespace-nowrap text-label text-ink-2 sm:flex-none">{countLabel}{list.refreshing && <span className="sr-only"> · جارٍ التحديث</span>}</span>
           {sort}
+          <ExportButton count={total} onExport={exportAll} disabled={list.loading || total === 0} className="max-sm:!hidden" />
+          <span className="sm:hidden"><Menu label="تصدير واستيراد" items={[
+            { label: 'تصدير Excel', icon: 'download', onClick: () => void exportFromMenu(), hidden: total === 0 },
+            { label: 'استيراد من Excel', icon: 'upload', onClick: onImport, hidden: !online },
+          ]} /></span>
         </div>
       </div>
       <div className="hidden sm:block">{chips}</div>
@@ -127,14 +175,16 @@ export const StudentsList: React.FC<{
   if (list.loading) empty = <><div className="hidden sm:block"><RowsSkeleton /></div><div className="flex flex-col gap-3 sm:hidden">{[0, 1, 2].map((i) => <div key={i} className="skeleton h-[136px] rounded-inner" />)}</div></>;
   else if (list.error && !list.data) empty = <ErrorState title="تعذّر تحميل الطلاب" text="لم نستطع جلب قائمة الطلاب. تأكد من اتصالك ثم حاول مرة أخرى." onRetry={() => void list.reload()} card />;
   else if (none) empty = <EmptyState icon="users" title="لا طلاب في شركتك بعد" text="يظهر الطالب هنا عندما يشترك في أحد خطوطك من التطبيق، أو عندما تضيفه أنت بنفسك." card
-    action={<Button icon="plus" disabled={!online} onClick={onAdd} full>إضافة طالب</Button>} />;
+    action={<div className="flex w-full flex-col gap-2"><Button icon="plus" disabled={!online} onClick={onAdd} full>إضافة طالب</Button>
+      <Button kind="outline" icon="upload" disabled={!online} onClick={onImport} full>استيراد من Excel</Button></div>} />;
   else if (rows.length === 0) empty = <EmptyState icon="search" title="لا طالب بهذه المواصفات" text="جرّب اسماً أقصر أو رقم الهاتف، أو أزل التصفية بالخط والحالة." card
     action={<Button kind="outline" onClick={clear} full>إزالة البحث والتصفية</Button>} />;
 
   return (
     <div id="panel-students" role="tabpanel" aria-labelledby="tab-students">
       <DataTable<StudentRow> caption="طلاب الشركة" columns={columns} rows={rows} rowKey={(r) => r.id} onOpen={onOpen} openKey={openId}
-        toolbar={toolbar} empty={empty ? <div className="sm:[&>div]:!rounded-none sm:[&>div]:!shadow-none">{empty}</div> : undefined}
+        selectable={!none} selected={selected} onSelect={setSelected}
+        toolbar={bulkBar ?? toolbar} empty={empty ? <div className="sm:[&>div]:!rounded-none sm:[&>div]:!shadow-none">{empty}</div> : undefined}
         pager={<Pager page={filter.page} total={total} onPage={(page) => { onFilter({ ...filter, page }); window.scrollTo({ top: 0 }); }} />}
         card={(r) => {
           const m = mainSubscription(r, today);
@@ -148,6 +198,8 @@ export const StudentsList: React.FC<{
             ],
           };
         }} />
+      <BulkDialog action={bulk} students={chosen} company={{ id: companyId, name: companyName }} today={today} onClose={() => setBulk(null)}
+        onDone={(ids) => setSelected((s) => { const n = new Set(s); ids.forEach((id) => n.delete(id)); return n; })} />
     </div>
   );
 };

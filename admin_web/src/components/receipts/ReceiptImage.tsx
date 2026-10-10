@@ -14,7 +14,7 @@ const ZOOMS = [1, 1.5, 2, 3];
  * box says so, and the page holds back accept and reject until the picture shows.
  */
 export const ReceiptImage: React.FC<{
-  row: PendingReceiptRow; url: string | null; onState: (state: ImageState) => void;
+  row: Pick<PendingReceiptRow, 'id' | 'imagePath' | 'studentName'>; url: string | null; onState: (state: ImageState) => void;
   /** Bumped by the page's «Z» shortcut. */ zoomSignal?: number; className?: string; phone?: boolean;
 }> = ({ row, url, onState, zoomSignal = 0, className = '', phone }) => {
   const [src, setSrc] = useState<string | null>(url);

@@ -9,6 +9,7 @@ import '../../../../core/ui/ui.dart';
 import '../../../../core/widgets/avatar_image.dart';
 import '../../../../core/widgets/basak_ui.dart';
 import '../../../../core/widgets/photo_adjust_screen.dart';
+import '../../../auth/data/colleges.dart';
 import '../../../auth/presentation/college_picker_sheet.dart';
 import '../../../auth/providers/auth_provider.dart';
 import '../../home/presentation/supervisor_contact_sheet.dart';
@@ -208,7 +209,17 @@ class _DetailsFormState extends ConsumerState<_DetailsForm> {
   }
 
   Future<void> _pickCollege() async {
-    final picked = await CollegePickerSheet.show(context, selected: _college.isEmpty ? null : _college);
+    // The university's own colleges when the platform listed them, else the general list.
+    var colleges = kColleges;
+    final universityId = _text('university_id');
+    if (universityId.isNotEmpty) {
+      try {
+        final own = await ref.read(universityCollegesProvider(universityId).future);
+        if (own.isNotEmpty) colleges = own;
+      } catch (_) {}
+      if (!mounted) return;
+    }
+    final picked = await CollegePickerSheet.show(context, selected: _college.isEmpty ? null : _college, colleges: colleges);
     if (picked != null && mounted) setState(() => _college = picked);
   }
 

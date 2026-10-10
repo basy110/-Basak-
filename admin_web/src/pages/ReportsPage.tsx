@@ -15,11 +15,10 @@ import {
   type ReportRow, type ReportTotals, type ResetRow,
 } from '../lib/reports';
 import { REVENUE_OPTION_LABEL, breakdownFromRows, type Breakdown, type RevenueOption } from '../lib/money';
-import {
-  Button, Card, Cell2, Chips, DataTable, Dialog, EmptyState, ErrorState, Icon, Ltr, Money, Note, Page, PageHeader, Pager, Pill,
-  PhoneBar, RadioCards, SearchBox, SidePanel, SkeletonBar, SkeletonStat, SkeletonTable, SortSelect, StatCard, StatusPill, TextField, Toolbar,
-  cairo, clock, dayText, errorText, num, phoneText, useOnline, type Column,
-} from '../ui';
+import { Button, Card, Cell2, Chips, DataTable, Dialog, EmptyState, ErrorState, Icon, Ltr, Money, Note, Page, PageHeader, Pager, Pill, PhoneBar, RadioCards, SearchBox, SidePanel, SkeletonBar, SkeletonStat, SkeletonTable, SortSelect, StatCard, StatusPill, TextField, Toolbar, STATUS, cairo, clock, dayText, errorText, num, phoneText, useOnline, type Column } from '../ui';
+import { ExportButton } from '../ui/Transfer';
+import { exportSheet } from '../lib/excel';
+import { allOffsets, DAY_FORMAT, excelDay, excelMoment, excelNumber, MOMENT_FORMAT, MONEY_FORMAT } from '../lib/excelCells';
 import { BreakdownCard, FilterSelect, ResetEffects } from '../components/money/Revenue';
 
 const PAGE = 25;
@@ -183,6 +182,35 @@ const RevenueView: React.FC = () => {
       ['تاريخ الدفع', r.paid_at ? dayText(cairo(r.paid_at).day, { year: false }) : '—'], ['يسري حتى', r.end_date ? dayText(r.end_date) : '—'],
     ] as [React.ReactNode, React.ReactNode][],
   });
+  // Every row the filters match (not only this page), 2,000 at a time as the report allows.
+  const exportAll = async () => {
+    const all = await allOffsets<ReportRow>(async (offset, limit) => {
+      const r = await unwrap<Report>(supabase.rpc('admin_subscription_report', {
+        p_filters: { ...applied, company_id: companyId, payment: payment || undefined, limit, offset },
+      }));
+      return { rows: r.rows ?? [], total: r.rows_total };
+    });
+    await exportSheet<ReportRow>({
+      name: 'الإيرادات', sheet: 'الاشتراكات ومدفوعاتها', rows: all,
+      columns: [
+        { label: 'الطالب', value: (r) => r.student_name, width: 28 },
+        { label: 'رقم الهاتف', value: (r) => r.phone, width: 15 },
+        { label: 'الجامعة', value: (r) => r.university, width: 24 },
+        { label: 'الخط', value: (r) => r.line, width: 20 },
+        { label: 'الاشتراك', value: (r) => optName(r), width: 16 },
+        { label: 'العام الدراسي', value: (r) => (r.academic_year ? `${r.academic_year}/${r.academic_year + 1}` : null), width: 13 },
+        { label: 'السعر (ج.م)', value: (r) => excelNumber(r.price), format: MONEY_FORMAT, width: 12 },
+        { label: 'المدفوع (ج.م)', value: (r) => (r.paid ? excelNumber(r.amount ?? r.price) : null), format: MONEY_FORMAT, width: 13 },
+        { label: 'الدفع', value: (r) => (r.paid ? 'مدفوع' : 'لم يُدفع'), width: 10 },
+        { label: 'وسيلة الدفع', value: (r) => (!r.paid ? null : r.payment_method ?? (r.type === 'daily' ? 'نقداً' : 'بلا إيصال')), width: 18 },
+        { label: 'رقم الإيصال', value: (r) => r.receipt_no ?? r.receipt_code ?? null, width: 12 },
+        { label: 'تاريخ الدفع', value: (r) => excelMoment(r.paid_at), format: MOMENT_FORMAT, width: 18 },
+        { label: 'يبدأ في', value: (r) => excelDay(r.start_date), format: DAY_FORMAT, width: 12 },
+        { label: 'يسري حتى', value: (r) => excelDay(r.end_date), format: DAY_FORMAT, width: 12 },
+        { label: 'الحالة', value: (r) => STATUS[rowStatus(r)][0], width: 14 },
+      ],
+    });
+  };
   const openStudent = (r: ReportRow) => navigate(r.student_id ? `${base}/students?student=${r.student_id}` : `${base}/students?q=${encodeURIComponent(r.phone)}`);
 
   const chips = (
@@ -263,7 +291,8 @@ const RevenueView: React.FC = () => {
                   search={<SearchBox value={search} onChange={setSearch} placeholder="ابحث باسم الطالب أو رقم الهاتف" />}
                   filters={<div className="flex items-center gap-2">{chips}<button type="button" onClick={() => setMoreFilters(true)} className="inline-flex h-10 flex-none items-center gap-1.5 rounded-full bg-surface px-3 text-label shadow-ring sm:hidden"><Icon name="filter" size={14} />تصفية أخرى</button></div>}
                   count={total === 0 ? 'لا نتائج' : counted(total, SUBS)}
-                  sort={<SortSelect value="paid" onChange={() => undefined} options={[{ value: 'paid', label: 'الأحدث دفعاً أولاً' }]} />} />
+                  sort={<SortSelect value="paid" onChange={() => undefined} options={[{ value: 'paid', label: 'الأحدث دفعاً أولاً' }]} />}
+                  actions={<ExportButton count={total} className="hidden sm:inline-flex" onExport={exportAll} />} />
               )}
               empty={tableEmpty}
               pager={<Pager page={page} total={total} onPage={setPage} />} />

@@ -197,6 +197,20 @@ export async function fetchStudentsList(q: StudentsQuery, today: string): Promis
     });
 }
 
+/**
+ * Every member matching the filters, all pages (exports, «حدّد كل الـ…»): pages of 100,
+ * the most the database gives at once, until it says there is no next one.
+ */
+export async function fetchAllStudents(q: Omit<StudentsQuery, 'limit' | 'offset' | 'studentId'>, today: string, onPage?: (loaded: number, total: number) => void): Promise<StudentRow[]> {
+  const out: StudentRow[] = [];
+  for (let offset = 0; ; offset += 100) {
+    const page = await fetchStudentsList({ ...q, limit: 100, offset }, today);
+    out.push(...page.rows);
+    onPage?.(out.length, page.total);
+    if (!page.has_next || page.rows.length === 0 || offset > 50_000) return out;
+  }
+}
+
 // ── Pure cache edits (what this page's own writes do to what is on screen) ──
 
 /** The page with one subscription changed to what the server answered. */
@@ -285,6 +299,16 @@ export const loadPlatformStudents = (q: { search: string; companyId: string; mem
   unwrap<{ total: number; rows: PlatformStudent[] }>(supabase.rpc('platform_students', {
     p_search: q.search || null, p_company_id: q.companyId || null, p_membership: q.membership || null, p_limit: q.limit, p_offset: q.offset,
   }));
+
+/** Every account matching the search and filters, all pages (the export). */
+export async function loadAllPlatformStudents(q: { search: string; companyId: string; membership: Membership }): Promise<PlatformStudent[]> {
+  const out: PlatformStudent[] = [];
+  for (let offset = 0; ; offset += 100) {
+    const page = await loadPlatformStudents({ ...q, limit: 100, offset });
+    out.push(...(page.rows ?? []));
+    if (!page.rows?.length || out.length >= page.total || offset > 50_000) return out;
+  }
+}
 
 /** The chips' numbers in one request; on an older database, three counting requests. */
 export async function loadPlatformCounts(search: string, companyId: string): Promise<PlatformCounts> {

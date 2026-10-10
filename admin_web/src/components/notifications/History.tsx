@@ -6,7 +6,10 @@ import { CAIRO_LABEL } from '../../lib/time';
 import type { HistoryActions, HistoryState } from '../../lib/notificationsData';
 import { useGuard } from '../../lib/guard';
 import type { CompanyBrand } from '../../lib/branding';
-import { Badge, Button, Chips, DataTable, EmptyState, ErrorState, IconButton, Menu, SearchBox, SkeletonTable, StatePill, Toolbar, errorText, type Column } from '../../ui';
+import { Badge, Button, Chips, DataTable, EmptyState, ErrorState, IconButton, Menu, SearchBox, SkeletonTable, STATE, StatePill, Toolbar, errorText, type Column } from '../../ui';
+import { ExportButton } from '../../ui/Transfer';
+import { exportSheet } from '../../lib/excel';
+import { excelMoment, MOMENT_FORMAT } from '../../lib/excelCells';
 import { notifyError } from '../../lib/toasts';
 import { CompanyMark } from '../CompanyMark';
 import { EditScheduledDialog } from './EditScheduledDialog';
@@ -28,6 +31,8 @@ interface Props {
   me?: string | null;
   /** The empty list's button: «اكتب أول إشعار». */
   onNew?: () => void;
+  /** Every notification of the current status filter (all pages), for «تصدير Excel». */
+  loadAll?: () => Promise<HistoryRow[]>;
 }
 
 type Open = { kind: 'details' | 'edit' | 'cancel' | 'delete'; row: HistoryRow };
@@ -54,14 +59,36 @@ const statePill = (r: HistoryRow) => <StatePill state={r.status} />;
  * or failed, 25 at a time. Numbers say who received and who read; the delivery
  * machinery behind the phone alerts is not shown to a company.
  */
-export const History: React.FC<Props> = ({ companyId, filter, onFilter, history, actions, filters, brands, me, onNew }) => {
+const matchesQuery = (row: HistoryRow, query: string) => {
+  const q = query.trim().toLowerCase();
+  return !q || [row.title, row.body, row.sender_name, row.audience, row.company_name].some((f) => (f || '').toLowerCase().includes(q));
+};
+
+export const History: React.FC<Props> = ({ companyId, filter, onFilter, history, actions, filters, brands, me, onNew, loadAll }) => {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState<Open | null>(null);
-  const shown = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return history.rows;
-    return history.rows.filter((row) => [row.title, row.body, row.sender_name, row.audience, row.company_name].some((f) => (f || '').toLowerCase().includes(q)));
-  }, [history.rows, query]);
+  const shown = useMemo(() => history.rows.filter((row) => matchesQuery(row, query)), [history.rows, query]);
+
+  // All of the filter's notifications, not only the pages read so far; the search applies to them too.
+  const exportAll = async () => {
+    const rows = (loadAll ? await loadAll() : history.rows).filter((row) => matchesQuery(row, query));
+    await exportSheet<HistoryRow>({
+      name: 'سجل الإشعارات', rows,
+      columns: [
+        { label: 'الإشعار', value: (r) => r.title, width: 30 },
+        { label: 'النص', value: (r) => r.body, width: 50 },
+        { label: 'عاجل', value: (r) => (r.priority === 'high' ? 'عاجل' : null), width: 8 },
+        ...(companyId ? [] : [{ label: 'الشركة', value: (r: HistoryRow) => r.company_name, width: 22 }]),
+        { label: 'إلى', value: (r) => r.audience, width: 30 },
+        { label: 'المرسل', value: (r) => senderShort(r, me), width: 20 },
+        { label: 'الموعد', value: (r) => excelMoment(at(r)), format: MOMENT_FORMAT, width: 18 },
+        { label: 'الحالة', value: (r) => STATE[r.status][0], width: 14 },
+        { label: 'وصل إلى (طالب)', value: (r) => (r.status === 'sent' ? r.students : null), width: 14 },
+        { label: 'قرأه', value: (r) => (r.status === 'sent' ? r.read : null), width: 10 },
+        { label: 'ملاحظة', value: (r) => r.status_note, width: 30 },
+      ],
+    });
+  };
 
   // The row changes at once; a refusal puts it back and says why.
   const guard = useGuard();
@@ -110,7 +137,10 @@ export const History: React.FC<Props> = ({ companyId, filter, onFilter, history,
   const toolbar = (
     <Toolbar search={<SearchBox value={query} onChange={setQuery} placeholder="ابحث في الإشعارات" />}
       filters={<div className="flex items-center gap-2"><Chips<StatusFilter> value={filter} onChange={onFilter} options={STATUS_FILTERS.map((f) => ({ value: f.key, label: f.label }))} />{filters}</div>}
-      actions={<IconButton icon="refresh" label="تحديث" sm className={`hidden shadow-ring sm:inline-flex ${history.refreshing ? 'animate-spin' : ''}`} onClick={history.reload} />} />
+      actions={<>
+        {history.rows.length > 0 && <ExportButton className="hidden sm:inline-flex" onExport={exportAll} />}
+        <IconButton icon="refresh" label="تحديث" sm className={`hidden shadow-ring sm:inline-flex ${history.refreshing ? 'animate-spin' : ''}`} onClick={history.reload} />
+      </>} />
   );
   const [eTitle, eText] = EMPTY[filter];
   const empty = history.loading ? undefined : history.error && history.rows.length === 0 ? (

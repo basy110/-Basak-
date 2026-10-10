@@ -5,9 +5,10 @@ import { keys } from '../lib/query';
 import { useGuard } from '../lib/guard';
 import { notifyError } from '../lib/toasts';
 import { adminsCount, colleaguesOf, createCompanyAdmin, deleteCompanyAdmin, useCompanyAdmins, type CompanyAdmin } from '../lib/team';
-import {
-  Badge, Button, DataTable, EmptyState, ErrorState, Ltr, Note, Page, PageHeader, PhoneBar, SkeletonTable, dayText, cairo, errorText, useOnline, type Column,
-} from '../ui';
+import { Badge, Button, DataTable, EmptyState, ErrorState, Ltr, Note, Page, PageHeader, PhoneBar, SkeletonTable, dayText, cairo, errorText, useOnline, type Column } from '../ui';
+import { ExportButton } from '../ui/Transfer';
+import { exportSheet } from '../lib/excel';
+import { DAY_FORMAT, excelDay, excelMoment, MOMENT_FORMAT } from '../lib/excelCells';
 import { PersonCell } from '../components/team/parts';
 import { AdminAddPanel, AdminAddedDialog, PLATFORM_ONLY, RemoveAdminDialog, type AdminDraft } from '../components/team/AdminParts';
 
@@ -82,7 +83,20 @@ export const TeamPage: React.FC = () => {
             <>
               <DataTable<CompanyAdmin> caption="مديرو الشركة" columns={columns} rows={admins} rowKey={(a) => a.id}
                 empty={admins.length === 0 ? <EmptyState icon="shield" title="لا مديرين لهذه الشركة بعد" text={platform ? 'أضف أول مدير ليدخل لوحة الشركة.' : 'تواصل مع إدارة المنصة لإضافة مدير.'} /> : undefined}
-                toolbar={<div className="flex items-center text-label text-ink-2 sm:min-h-[52px] sm:border-b sm:border-hair sm:px-4">{adminsCount(admins.length)} · يدخلون بالبريد الإلكتروني وكلمة المرور</div>}
+                toolbar={(
+                  <div className="flex items-center gap-3 text-label text-ink-2 sm:min-h-[52px] sm:border-b sm:border-hair sm:px-4">
+                    <span className="min-w-0 flex-1">{adminsCount(admins.length)} · يدخلون بالبريد الإلكتروني وكلمة المرور</span>
+                    <ExportButton count={admins.length} className="hidden sm:inline-flex" onExport={() => exportSheet<CompanyAdmin>({
+                      name: `مديرو ${company.name}`, rows: admins,
+                      columns: [
+                        { label: 'المدير', value: (a) => a.full_name, width: 28 },
+                        { label: 'البريد الإلكتروني', value: (a) => a.email, width: 32 },
+                        { label: 'أُضيف في', value: (a) => excelDay(cairo(a.created_at).day), format: DAY_FORMAT, width: 14 },
+                        { label: 'آخر دخول', value: (a) => excelMoment(a.last_sign_in_at), format: MOMENT_FORMAT, width: 18 },
+                      ],
+                    })} />
+                  </div>
+                )}
                 card={(a) => ({
                   title: <PersonCell name={a.full_name} />, end: you(a),
                   fields: [['البريد الإلكتروني', <Ltr key="e" className="break-all">{a.email}</Ltr>], ['أُضيف في', addedOn(a.created_at)]],

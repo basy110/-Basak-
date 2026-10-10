@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { Select } from '../../ui/Select';
 import { useQueryClient } from '@tanstack/react-query';
 import { keys } from '../../lib/query';
 import { usePlatformCompanies } from '../../lib/reference';
@@ -7,10 +8,10 @@ import { notifyDone, notifyError } from '../../lib/toasts';
 import {
   adminsCount, colleaguesOf, createCompanyAdmin, deleteCompanyAdmin, filterAdmins, usePlatformAdmins, type AdminSort, type CompanyAdmin,
 } from '../../lib/team';
-import {
-  Button, DataTable, EmptyState, ErrorState, Icon, Ltr, Note, Page, PageHeader, Pager, PhoneBar, Pill, SearchBox, SkeletonTable, SortSelect,
-  Toolbar, cairo, countText, dayText, errorText, useOnline, type Column,
-} from '../../ui';
+import { Button, DataTable, EmptyState, ErrorState, Icon, Ltr, Note, Page, PageHeader, Pager, PhoneBar, Pill, SearchBox, SkeletonTable, SortSelect, Toolbar, cairo, countText, dayText, errorText, useOnline, type Column } from '../../ui';
+import { ExportButton } from '../../ui/Transfer';
+import { exportSheet } from '../../lib/excel';
+import { DAY_FORMAT, excelDay, excelMoment, MOMENT_FORMAT } from '../../lib/excelCells';
 import { AdminAddPanel, RemoveAdminDialog, type AdminDraft } from '../../components/team/AdminParts';
 
 const PAGE = 25;
@@ -104,6 +105,18 @@ export const CompanyAdminsPage: React.FC = () => {
     { key: 'delete', label: <span className="sr-only">حذف</span>, w: 112, align: 'end', render: (a) => deleteButton(a) },
   ];
 
+  const exportRows = () => exportSheet<CompanyAdmin>({
+    name: 'مديرو الشركات', rows: shown,
+    columns: [
+      { label: 'المدير', value: (a) => a.full_name, width: 28 },
+      { label: 'البريد الإلكتروني', value: (a) => a.email, width: 32 },
+      { label: 'الشركة', value: (a) => nameOf(a.company_id) || null, width: 26 },
+      { label: 'حالة الشركة', value: (a) => { const st = a.company_id ? companyById.get(a.company_id)?.status : undefined; return st === 'suspended' ? 'موقوفة' : st === 'archived' ? 'مؤرشفة' : st ? 'تعمل' : null; }, width: 12 },
+      { label: 'أُضيف في', value: (a) => excelDay(cairo(a.created_at).day), format: DAY_FORMAT, width: 13 },
+      { label: 'آخر دخول', value: (a) => (a.last_sign_in_at === null ? 'لم يدخل بعد' : excelMoment(a.last_sign_in_at)), format: MOMENT_FORMAT, width: 18 },
+    ],
+  });
+
   const loading = adminsQ.loading || companiesQ.loading;
   const loadError = adminsQ.error || companiesQ.error;
   const noCompany = !loading && !loadError && working.length === 0;
@@ -135,17 +148,12 @@ export const CompanyAdminsPage: React.FC = () => {
                 count={`${adminsCount(admins.length)} في ${companiesWithAdmins === 1 ? 'شركة واحدة' : countText(companiesWithAdmins, ['شركة', 'شركتين', 'شركات', 'شركة'])}`}
                 sort={<SortSelect<AdminSort> value={sort} onChange={setSort} options={[
                   { value: 'newest', label: 'الأحدث أولاً' }, { value: 'oldest', label: 'الأقدم أولاً' }, { value: 'name', label: 'بالاسم' }]} />}
-                actions={
-                  <label className="relative hidden h-9 flex-none items-center gap-1.5 rounded-control px-2.5 text-label shadow-ring sm:inline-flex">
-                    <Icon name="building" size={14} stroke={2} />
-                    <select aria-label="الشركة" value={company} onChange={(e) => { setCompany(e.target.value); setPage(1); }}
-                      className="w-[132px] cursor-pointer appearance-none truncate bg-transparent pe-5 outline-none">
-                      <option value="">كل الشركات</option>
-                      {companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                    </select>
-                    <Icon name="down" size={14} stroke={2} className="pointer-events-none absolute end-2" />
-                  </label>
-                } />}
+                actions={<>
+                  <span className="hidden sm:inline-flex"><Select value={company} onChange={(v) => { setCompany(v); setPage(1); }} ariaLabel="الشركة" icon="building" minListWidth={240}
+                    options={[{ value: '', label: 'كل الشركات' }, ...companies.map((c) => ({ value: c.id, label: c.name }))]}
+                    className="inline-flex h-9 w-[180px] flex-none items-center gap-1.5 rounded-control px-2.5 text-label font-semibold shadow-ring hover:bg-ground" /></span>
+                  <ExportButton count={shown.length} className="hidden sm:inline-flex" onExport={exportRows} />
+                </>} />}
               empty={shown.length === 0 ? <EmptyState icon="search" title="لا مدير يطابق" text="جرّب اسماً آخر أو جزءاً من البريد، أو اعرض كل الشركات."
                 action={<Button kind="secondary" onClick={() => { setSearch(''); setCompany(''); }}>اعرض الكل</Button>} /> : undefined}
               pager={<Pager page={page} total={shown.length} onPage={setPage} />}

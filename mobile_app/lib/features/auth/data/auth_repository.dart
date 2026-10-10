@@ -121,6 +121,21 @@ class AuthRepository {
         .toList();
   }
 
+  /// The colleges shown for one university, by name. Empty when the platform
+  /// has not added any for it: the sign-up then offers the general list.
+  Future<List<String>> getCollegesOf(String universityId) async {
+    final rows = await _client
+        .from('colleges')
+        .select('name')
+        .eq('university_id', universityId)
+        .eq('is_active', true)
+        .order('name');
+    return (rows as List<dynamic>)
+        .map((row) => (row['name'] as String?)?.trim() ?? '')
+        .where((name) => name.isNotEmpty)
+        .toList();
+  }
+
   /// Whether [error] says the database has no `specialisation` column yet
   /// (the migration that adds it has not been applied).
   static bool isUnknownSpecialisationColumn(Object error) {

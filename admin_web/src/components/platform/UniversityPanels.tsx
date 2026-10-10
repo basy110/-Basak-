@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Badge, Button, Dialog, FieldRow, Note, SidePanel, StatePill, TextField, countText, num, NOUN } from '../../ui';
-import { collegeProblem, collegeStudents, universityProblem, type CollegeRow, type UniversityCounts, type UniversityRow } from '../../lib/platform';
+import { Badge, Button, Dialog, FieldRow, Icon, Note, SidePanel, StatePill, TextField, countText, num, NOUN } from '../../ui';
+import { collegeProblem, collegeStudents, sameName, universityProblem, type CollegeRow, type UniversityCounts, type UniversityRow } from '../../lib/platform';
+import { GENERAL_COLLEGES, isPlaceholderCollege } from '../../lib/colleges';
 
 export const studentsText = (n: number | null | undefined) => (n == null ? '—' : n === 0 ? 'لا طلاب' : `${num(n)} ${n === 1 ? 'طالب' : n === 2 ? 'طالبان' : 'طالباً'}`);
 export const UniState: React.FC<{ on: boolean }> = ({ on }) => <StatePill state={on ? 'on' : 'off'} label={on ? 'تظهر' : 'مخفية'} />;
@@ -26,7 +27,7 @@ export const UniversityAddPanel: React.FC<{
         <TextField label="المدينة" value={city} onChange={(e) => setCity(e.target.value)} maxLength={60} error={tried ? problem.city : undefined} />
         <button type="submit" hidden aria-hidden="true" tabIndex={-1} />
       </form>
-      <Note tone="teal" title="بعد الإضافة">أضف كلياتها من صفحتها: الطالب لا يستطيع اختيار جامعة بلا كليات. تظهر فوراً للشركات في إنشاء الخطوط.</Note>
+      <Note tone="teal" title="بعد الإضافة">تظهر فوراً للطلاب عند التسجيل وللشركات في إنشاء الخطوط. إلى أن تضيف كلياتها يختار طلابها من القائمة العامة للكليات.</Note>
     </SidePanel>
   );
 };
@@ -38,9 +39,9 @@ export const UniversityAddPanel: React.FC<{
  */
 export const UniversityPanel: React.FC<{
   u: UniversityRow | null; all: UniversityRow[]; colleges: CollegeRow[]; counts: UniversityCounts | null | undefined; online: boolean; busy: string | null;
-  onClose: () => void; onSave: (name: string, city: string) => void; onAddCollege: (name: string) => Promise<boolean>;
+  onClose: () => void; onSave: (name: string, city: string) => void; onAddCollege: (name: string) => Promise<boolean>; onAddColleges: (names: string[]) => void;
   onCollege: (c: CollegeRow, show: boolean) => void; onUniversity: (show: boolean) => void; saveError?: string;
-}> = ({ u, all, colleges, counts, online, busy, onClose, onSave, onAddCollege, onCollege, onUniversity, saveError }) => {
+}> = ({ u, all, colleges, counts, online, busy, onClose, onSave, onAddCollege, onAddColleges, onCollege, onUniversity, saveError }) => {
   const [name, setName] = useState(u?.name ?? '');
   const [city, setCity] = useState(u?.city ?? '');
   const [college, setCollege] = useState('');
@@ -49,6 +50,10 @@ export const UniversityPanel: React.FC<{
   if (!u) return null;
   const mine = colleges.filter((c) => c.university_id === u.id).sort((a, b) => Number(b.is_active) - Number(a.is_active) || (collegeStudents(counts ?? undefined, u.id, b.name) ?? 0) - (collegeStudents(counts ?? undefined, u.id, a.name) ?? 0) || a.name.localeCompare(b.name, 'ar'));
   const shownCount = mine.filter((c) => c.is_active).length;
+  // What its students actually wrote at sign-up, and is not one of its colleges yet.
+  const typed = (counts?.colleges ?? [])
+    .filter((c) => c.university_id === u.id && !isPlaceholderCollege(c.college) && !mine.some((m) => sameName(m.name, c.college)))
+    .sort((a, b) => b.students - a.students);
   const n = counts?.universities.find((x) => x.id === u.id);
   const changed = name.trim() !== u.name || city.trim() !== u.city;
   const problem = changed ? universityProblem(name, city, all, u.id) : {};
@@ -90,7 +95,23 @@ export const UniversityPanel: React.FC<{
           <Button type="submit" kind="secondary" icon="plus" loading={busy === 'college'} disabled={!online}>أضف كلية</Button>
         </form>
         {mine.length === 0 ? (
-          <Note tone="warning" title="لا كليات بعد">لا يستطيع طالب أن يختار هذه الجامعة عند التسجيل حتى تضيف كلية واحدة على الأقل.</Note>
+          <div className="flex flex-col gap-3 rounded-inner bg-teal-tint/60 p-4">
+            <div className="flex items-start gap-3">
+              <span className="flex h-9 w-9 flex-none items-center justify-center rounded-lg bg-teal text-white"><Icon name="school" size={18} /></span>
+              <div className="min-w-0 flex-1">
+                <div className="text-small font-bold">يرى طلابها الآن القائمة العامة</div>
+                <div className="text-label text-ink-2">لم تُضف كليات خاصة بهذه الجامعة، فيختار الطالب من {num(GENERAL_COLLEGES.length)} كلية عامة أو يكتب كليته. أضف كلياتها لتظهر هي وحدها.</div>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {GENERAL_COLLEGES.map((c) => <span key={c} className="inline-flex h-7 items-center rounded-control bg-surface px-2.5 text-cap font-semibold text-ink-2 ring-1 ring-hair">{c}</span>)}
+            </div>
+            <div className="flex">
+              <Button kind="primary" sm icon="plus" className="w-full !h-12 sm:w-auto sm:!h-9" loading={busy === 'colleges'} disabled={!online}
+                onClick={() => onAddColleges([...GENERAL_COLLEGES])}>انسخ القائمة العامة إليها ({num(GENERAL_COLLEGES.length)})</Button>
+            </div>
+            <p className="m-0 text-cap text-ink-3">بعد النسخ أخفِ ما لا يوجد فيها من كليات بزر «أخفِ» بجانب كل كلية.</p>
+          </div>
         ) : (
           <ul className="m-0 flex list-none flex-col p-0">
             {mine.map((c, i) => {
@@ -110,6 +131,23 @@ export const UniversityPanel: React.FC<{
           </ul>
         )}
       </section>
+
+      {typed.length > 0 && (
+        <section className="flex flex-col gap-3">
+          <div className="flex items-center gap-2"><h3 className="m-0 flex-1 text-card">كليات كتبها طلابها</h3><Badge>{num(typed.length)}</Badge></div>
+          <p className="m-0 text-label text-ink-2">كتبها طلاب مسجّلون ولا توجد في كليات الجامعة. أضف الصحيح منها ليختاره من يأتي بعدهم.</p>
+          <ul className="m-0 flex list-none flex-col p-0">
+            {typed.map((c, i) => (
+              <li key={c.college} className={`flex min-h-12 items-center gap-3 py-1.5 ${i ? 'border-t border-hair' : ''}`}>
+                <span className="min-w-0 flex-1 truncate text-small font-medium">{c.college}</span>
+                <span className="text-label text-ink-3">{studentsText(c.students)}</span>
+                <Button sm kind="tonal" icon="plus" className="!h-11 sm:!h-9" disabled={!online || busy === 'colleges'} onClick={() => onAddColleges([c.college])}
+                  aria-label={`أضف كلية ${c.college}`}>أضف</Button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <section className="flex flex-col gap-3">
         <div className="flex items-center gap-2"><h3 className="m-0 flex-1 text-card">شركات لها خطوط إليها</h3>{n && <Badge>{num(n.companies.length)}</Badge>}</div>

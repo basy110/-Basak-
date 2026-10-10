@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import {
-  Badge, Button, Cell2, Chips, DataTable, EmptyState, ErrorState, IconButton, Ltr, Menu, Note, Page, PageHeader, Pager, Pill, SearchBox,
-  SkeletonTable, SortSelect, Toolbar, countText, NOUN, phoneText, useOnline, agoText, cairo, type Column,
-} from '../ui';
+import { Badge, Button, Cell2, Chips, DataTable, EmptyState, ErrorState, IconButton, Ltr, Menu, Note, Page, PageHeader, Pager, Pill, SearchBox, SkeletonTable, SortSelect, Toolbar, countText, NOUN, num, phoneText, useOnline, agoText, cairo, type Column } from '../ui';
+import { ExportButton } from '../ui/Transfer';
+import { exportSheet } from '../lib/excel';
+import { excelMoment, MOMENT_FORMAT } from '../lib/excelCells';
+import { BulkDialog, BulkExportButton } from '../components/BulkDialog';
 import { useCompany } from '../lib/adminScope';
 import { cairoToday } from '../lib/time';
 import { useGuard } from '../lib/guard';
@@ -13,6 +14,10 @@ import { CancelDialog, CodeDialog, VerifyDialog } from '../components/receipts/P
 type View = 'company' | 'platform';
 const isToday = (iso: string, now: Date) => cairo(iso).day === cairoToday(now);
 const PAGE = 25;
+/** «طلبين مفتوحين», «5 طلبات مفتوحة», «15 طلباً مفتوحاً». */
+const openRequests = (n: number) => (n === 1 ? 'طلباً مفتوحاً واحداً' : n === 2 ? 'طلبين مفتوحين' : n <= 10 ? `${n} طلبات مفتوحة` : `${num(n)} طلباً مفتوحاً`);
+/** «طلبين», «5 طلبات», «15 طلباً» (after a verb). */
+const requestsObj = (n: number) => (n === 2 ? 'طلبين' : countText(n, NOUN.request));
 const SUB = 'طالب نسي كلمة المرور وطلب المساعدة من التطبيق. اتصل به لتتأكد أنه هو، ثم أعطه رمزاً يكتبه في التطبيق مع كلمة مرور جديدة.';
 const SUB_PHONE = 'اتصل بالطالب لتتأكد أنه هو، ثم أعطه رمزاً يكتبه في التطبيق مع كلمة مرور جديدة.';
 const PLATFORM_SUB = 'طلاب كل الشركات، ومعهم من لا شركة له. اتصل بالطالب لتتأكد أنه هو، ثم أعطه رمزاً يدخل به مرة واحدة ويختار كلمة مرور جديدة.';
@@ -46,6 +51,8 @@ const RequestsView: React.FC<{ companyId: string | null; view: View }> = ({ comp
   const [cancelling, setCancelling] = useState<ResetRequest | null>(null);
   const [issued, setIssued] = useState<{ request: ResetRequest; code: IssuedCode } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkCancel, setBulkCancel] = useState(false);
 
   const all = data.requests;
   const open = useMemo(() => all.filter((r) => canAct(r, now)), [all, now]);
@@ -85,6 +92,38 @@ const RequestsView: React.FC<{ companyId: string | null; view: View }> = ({ comp
       notify({ title: 'تعذّر إلغاء الطلب. لم يتغيّر شيء؛ ما تراه الآن هو حالته الحالية.', tone: 'error' }, 12_000);
     } finally { setBusy(false); }
   });
+
+  // ── Chosen rows: export them, or cancel the open ones together ────
+  const chosen = all.filter((r) => selected.has(r.id));
+  const cancellable = chosen.filter((r) => canAct(r, now));
+  const [cancelList, setCancelList] = useState<ResetRequest[]>([]);
+  const askBulkCancel = () => { setCancelList(cancellable); setBulkCancel(true); };
+  const exportRows = (list: ResetRequest[]) => exportSheet<ResetRequest>({
+    name: 'طلبات كلمة المرور', rows: list,
+    columns: [
+      { label: 'الطالب', value: (r) => r.student_name, width: 28 },
+      { label: 'رقم الهاتف', value: (r) => r.student_phone, width: 15 },
+      ...(view === 'platform' ? [{ label: 'شركته', value: (r: ResetRequest) => (r.companies == null ? null : r.companies.length ? r.companies.join('، ') : 'بلا شركة'), width: 26 }] : []),
+      { label: 'وقت الطلب', value: (r) => excelMoment(r.requested_at), format: MOMENT_FORMAT, width: 18 },
+      { label: 'الحالة', value: (r) => resetState(r, view, now).text, width: 26 },
+      { label: 'أُصدر الرمز', value: (r) => excelMoment(r.code_issued_at), format: MOMENT_FORMAT, width: 18 },
+      { label: 'ينتهي الرمز', value: (r) => excelMoment(r.code_expires_at), format: MOMENT_FORMAT, width: 18 },
+      { label: 'محاولات خاطئة', value: (r) => r.failed_attempts, width: 13 },
+      { label: 'أُغلق في', value: (r) => excelMoment(r.closed_at), format: MOMENT_FORMAT, width: 18 },
+    ],
+  });
+  const exportButton = <ExportButton count={rows.length} className="hidden sm:inline-flex" onExport={() => exportRows(rows)} />;
+  const bulk = {
+    count: chosen.length, onClear: () => setSelected(new Set()), total: rows.length, onAll: () => setSelected(new Set(rows.map((r) => r.id))),
+    actions: (
+      <>
+        <BulkExportButton count={chosen.length} onExport={() => exportRows(chosen)} />
+        <Button sm kind="secondary" icon="x" disabled={!online || cancellable.length === 0} onClick={askBulkCancel}>
+          {cancellable.length ? `ألغِ ${cancellable.length === 1 ? 'الطلب المفتوح' : openRequests(cancellable.length)}` : 'لا طلب مفتوح بينها'}
+        </Button>
+      </>
+    ),
+  };
 
   const firstName = (r: ResetRequest) => r.student_name;
   const state = (r: ResetRequest) => {
@@ -197,17 +236,19 @@ const RequestsView: React.FC<{ companyId: string | null; view: View }> = ({ comp
         caption="طلبات كلمة المرور"
         columns={view === 'company' ? companyColumns : platformColumns}
         rows={shown} rowKey={(r) => r.id} card={card} empty={empty} rowH={view === 'company' ? 58 : 57}
+        selectable selected={selected} onSelect={setSelected}
         toolbar={view === 'company' ? (
-          <Toolbar filters={chips}
+          <Toolbar filters={chips} bulk={bulk}
             count={rows.length ? <span>{countLine}</span> : null}
-            actions={<IconButton icon="refresh" label="تحديث القائمة" onClick={() => void data.reload()} className="hidden sm:inline-flex" />} />
+            actions={<>{rows.length > 0 && exportButton}<IconButton icon="refresh" label="تحديث القائمة" onClick={() => void data.reload()} className="hidden sm:inline-flex" /></>} />
         ) : (
           <Toolbar search={<SearchBox value={search} onChange={setSearch} placeholder="ابحث بالاسم أو رقم الهاتف" className="!bg-ground" />}
-            filters={chips}
+            filters={chips} bulk={bulk}
             actions={rows.length ? (
               <div className="hidden items-center gap-3 sm:flex">
                 <span className="whitespace-nowrap text-label text-ink-2">{countLine}</span>
                 <SortSelect value={sort} onChange={setSort} options={[{ value: 'new', label: 'الأحدث أولاً' }, { value: 'old', label: 'الأقدم أولاً' }]} />
+                {exportButton}
               </div>
             ) : null} />
         )}
@@ -215,6 +256,21 @@ const RequestsView: React.FC<{ companyId: string | null; view: View }> = ({ comp
 
       <VerifyDialog request={verifying} view={view} busy={busy} disabled={!online} onClose={() => setVerifying(null)} onIssue={() => verifying && void issue(verifying)} />
       <CodeDialog issued={issued} view={view} onClose={() => setIssued(null)} />
+      <BulkDialog<ResetRequest> open={bulkCancel} onClose={() => setBulkCancel(false)} items={cancelList} labelOf={(r) => r.student_name}
+        run={async (r) => { await guard(`cancel:${r.id}`, () => data.cancel(r)); }} disabled={!online} danger icon="x" tone="danger"
+        title={cancelList.length === 1 ? `إلغاء طلب ${cancelList[0].student_name}؟` : `إلغاء ${openRequests(cancelList.length)}؟`}
+        confirmLabel={cancelList.length === 1 ? 'ألغِ الطلب' : `ألغِ ${requestsObj(cancelList.length)}`}
+        doneText={(n) => (n === 0 ? 'لم يُلغَ أي طلب.' : n === 1 ? 'أُلغي طلب واحد.' : `أُلغي ${countText(n, NOUN.request)}.`)}
+        onFinished={(done) => setSelected((s) => { const next = new Set(s); done.forEach((r) => next.delete(r.id)); return next; })}>
+        <p className="m-0">
+          يُغلق كل طلب منها{cancelList.some((r) => r.status === 'code_issued') ? '، ويتوقف أي رمز أُعطي فيها عن العمل' : ' ولا يصدر فيه رمز'}.
+          تبقى كلمات مرور الطلاب كما هي، ويستطيع كل طالب أن يطلب المساعدة من التطبيق مرة أخرى.
+        </p>
+        {chosen.length > cancelList.length && (
+          <p className="m-0">من {num(chosen.length)} محددة، {num(chosen.length - cancelList.length)} مغلقة من قبل ولن يتغيّر فيها شيء.</p>
+        )}
+        <p className="m-0 text-ink">{cancelList.slice(0, 6).map((r) => r.student_name).join('، ')}{cancelList.length > 6 ? ` و${num(cancelList.length - 6)} غيرهم` : ''}.</p>
+      </BulkDialog>
       <CancelDialog request={cancelling} view={view} busy={busy} disabled={!online} onClose={() => setCancelling(null)} onCancel={() => cancelling && void cancel(cancelling)} />
     </Page>
   );

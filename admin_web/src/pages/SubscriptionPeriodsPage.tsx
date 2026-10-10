@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Select } from '../ui/Select';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
@@ -69,12 +70,10 @@ const EdgeField: React.FC<{
         aria-invalid={error ? true : undefined}
         onChange={(e) => { const d = e.target.value.replace(/[٠-٩]/g, (x) => String(x.charCodeAt(0) - 0x0660)).replace(/\D/g, ''); onDay(d ? Number(d) : 0); }}
         className={`${FIELD} w-[52px] flex-none text-center tabular ${ring(!!error, changed)} disabled:bg-ground disabled:text-disabled`} />
-      <div className={`relative min-w-0 flex-1 ${FIELD} ${ring(!!error, changed)} ${disabled ? '!bg-ground' : ''}`}>
-        <select aria-label={`${label}: الشهر`} value={month} disabled={disabled} onChange={(e) => onMonth(Number(e.target.value))}
-          className="h-full w-full cursor-pointer appearance-none rounded-control bg-transparent pe-9 ps-3 outline-none disabled:cursor-default disabled:text-disabled">
-          {MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
-        </select>
-        <Icon name="down" size={18} className="pointer-events-none absolute end-3 top-1/2 -translate-y-1/2 text-ink-3" />
+      <div className="min-w-0 flex-1">
+        <Select value={String(month)} disabled={disabled} onChange={(v) => onMonth(Number(v))} ariaLabel={`${label}: الشهر`}
+          options={MONTHS.map((m, i) => ({ value: String(i + 1), label: m }))}
+          className={`flex w-full items-center gap-2 px-3 text-start ${FIELD} ${ring(!!error, changed)} disabled:cursor-default disabled:!bg-ground disabled:text-disabled`} />
       </div>
     </div>
     <div className={`min-h-[18px] text-cap ${error ? 'font-medium text-bad' : changed ? 'font-medium text-warn' : 'text-ink-3'}`} role={error ? 'alert' : undefined}>

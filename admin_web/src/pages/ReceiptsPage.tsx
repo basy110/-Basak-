@@ -7,7 +7,7 @@ import {
 import { useCompany } from '../lib/adminScope';
 import { useCompanyOverview } from '../lib/overview';
 import {
-  APPROVAL_HOLD_MS, RECEIPTS_BUCKET, filterReceipts, firstName, isAlreadyDecided, lineCounts, listName, shortName, usePendingReceipts, type PendingReceiptRow,
+  APPROVAL_HOLD_MS, RECEIPTS_BUCKET, fetchPendingReceipts, filterReceipts, firstName, isAlreadyDecided, lineCounts, listName, shortName, usePendingReceipts, type PendingReceiptRow,
 } from '../lib/pendingReceipts';
 import { useSignedUrls } from '../lib/signedUrls';
 import { useGuard } from '../lib/guard';
@@ -15,6 +15,10 @@ import { notify, notifyDone, notifyError, notifyUndoable } from '../lib/toasts';
 import { ReceiptImage, type ImageState } from '../components/receipts/ReceiptImage';
 import { RejectDialog } from '../components/receipts/RejectDialog';
 import { AmountCard, LastAttemptNote, QueueRow, ReceiptFacts, receiptCard, waitedText } from '../components/receipts/ReceiptParts';
+import { BulkDialog, type BulkMode } from '../components/receipts/BulkDialogs';
+import { PendingTable } from '../components/receipts/PendingTable';
+import { HistoryView } from '../components/receipts/HistoryView';
+import { Tabs } from '../components/students/parts';
 
 /** Desktop from 1024: the queue and the open receipt side by side. Below: the queue, and a receipt as its own page. */
 function useWide(query = '(min-width: 1024px)') {
@@ -36,12 +40,19 @@ function useMinute() {
 const waitingText = (n: number) => (n === 1 ? 'إيصال واحد ينتظر' : n === 2 ? 'إيصالان ينتظران' : `${countText(n, NOUN.receipt)} تنتظر`);
 const SUB_PHONE = 'الأقدم أولاً. افتح الإيصال لترى الصورة وتقرر.';
 const SUB = 'الأقدم أولاً. قارن المبلغ في صورة التحويل بالمبلغ المطلوب، ثم اقبل أو ارفض.';
+const SUB_TABLE = 'حدّد عدة إيصالات لتقبلها أو ترفضها معاً، أو صدّرها إلى ملف Excel.';
+const SUB_HISTORY = 'كل إيصال قبلته أو رفضته، الأحدث أولاً، مع من راجعه ومتى وسبب الرفض.';
+type Tab = 'pending' | 'history';
 
 /**
  * «الإيصالات»: the receipts waiting for a decision, oldest first. The picture opens large with
  * the amount beside it and the two decisions under it. Accepting has no question: the receipt
  * leaves at once, and «تراجع» on the toast takes it back for a few seconds before anything is
  * saved. Rejecting asks for the reason the student will read.
+ *
+ * «جدول» (?view=table) shows the same queue as a table to tick many receipts and
+ * accept or reject them together (one after the other, through the same path).
+ * «السجل» (?tab=history) lists the receipts already decided.
  */
 export const ReceiptsPage: React.FC = () => {
   const company = useCompany();
@@ -61,6 +72,17 @@ export const ReceiptsPage: React.FC = () => {
   const open = useCallback((id: string | null, replace = false) => {
     setParams((p) => { const n = new URLSearchParams(p); if (id) n.set('r', id); else n.delete('r'); return n; }, { replace });
   }, [setParams]);
+  const tab: Tab = params.get('tab') === 'history' ? 'history' : 'pending';
+  const table = tab === 'pending' && params.get('view') === 'table';
+  const setParam = useCallback((patch: Record<string, string | null>, replace = false) => {
+    setParams((p) => {
+      const n = new URLSearchParams(p);
+      Object.entries(patch).forEach(([k, v]) => (v ? n.set(k, v) : n.delete(k)));
+      return n;
+    }, { replace });
+  }, [setParams]);
+  const [checked, setChecked] = useState<Set<string>>(() => new Set());
+  const [bulk, setBulk] = useState<{ mode: BulkMode; rows: PendingReceiptRow[] } | null>(null);
 
   const [search, setSearch] = useState('');
   const [line, setLine] = useState<string | null>(null);
@@ -161,8 +183,9 @@ export const ReceiptsPage: React.FC = () => {
   };
 
   // A, R, ↑ ↓ and Z on a desktop, while nothing else has the keyboard.
-  const keys = useRef({ approve, step, canDecide, selected, setRejecting });
-  keys.current = { approve, step, canDecide, selected, setRejecting };
+  const reviewing = tab === 'pending' && !table;
+  const keys = useRef({ approve, step, canDecide, selected, setRejecting, reviewing });
+  keys.current = { approve, step, canDecide, selected, setRejecting, reviewing };
   useEffect(() => {
     if (!wide) return undefined;
     const onKey = (e: KeyboardEvent) => {
@@ -170,6 +193,7 @@ export const ReceiptsPage: React.FC = () => {
       if (e.altKey || e.ctrlKey || e.metaKey || e.defaultPrevented) return;
       if (t && (t.closest('input, textarea, select, [contenteditable="true"]') || document.querySelector('[aria-modal="true"]'))) return;
       const k = keys.current;
+      if (!k.reviewing) return;
       if (e.code === 'ArrowDown' || e.code === 'ArrowUp') { e.preventDefault(); k.step(e.code === 'ArrowDown' ? 1 : -1); }
       else if (e.code === 'KeyA' && k.canDecide && k.selected) { e.preventDefault(); k.approve(k.selected); }
       else if (e.code === 'KeyR' && k.canDecide && k.selected) { e.preventDefault(); k.setRejecting(k.selected); }
@@ -181,11 +205,49 @@ export const ReceiptsPage: React.FC = () => {
 
   useEffect(() => { setImage('loading'); }, [selected?.id]);
 
-  const header = (
-    <PageHeader title="الإيصالات"
-      meta={queue.loaded ? <span className="hidden sm:inline-flex"><Badge tone={total ? 'warning' : 'success'}>{total} تنتظر</Badge></span> : undefined}
-      sub={<><span className="sm:hidden">{SUB_PHONE}</span><span className="hidden sm:inline">{SUB}</span></>} />
+  const switchView = tab === 'pending' && queue.receipts.length > 0 && (
+    table
+      ? <Button kind="outline" sm icon="eye" onClick={() => setParam({ view: null, r: null })}>المراجعة واحداً واحداً</Button>
+      : <Button kind="outline" sm icon="check" onClick={() => setParam({ view: 'table', r: null })}>تحديد عدة إيصالات</Button>
   );
+  const header = (
+    <>
+      <PageHeader title="الإيصالات"
+        meta={queue.loaded ? <span className="hidden sm:inline-flex"><Badge tone={total ? 'warning' : 'success'}>{total} تنتظر</Badge></span> : undefined}
+        sub={tab === 'history' ? SUB_HISTORY : table ? SUB_TABLE : <><span className="sm:hidden">{SUB_PHONE}</span><span className="hidden sm:inline">{SUB}</span></>}
+        actions={switchView || undefined} />
+      <Tabs<Tab> label="الإيصالات" value={tab}
+        onChange={(t) => setParam({ tab: t === 'history' ? 'history' : null, r: null, h: null, view: null })}
+        tabs={[
+          { value: 'pending', label: 'بانتظار المراجعة', short: 'المنتظرة', count: queue.loaded ? total : null },
+          { value: 'history', label: 'السجل' },
+        ]} />
+    </>
+  );
+
+  // Many at once: each through the same review path as one receipt, one after the other.
+  const decideOne = async (row: PendingReceiptRow, reason?: string) => {
+    await guard(row.id, () => queue.review(row.id, reason ? 'rejected' : 'approved', reason));
+  };
+  // Rendered by every branch of the pending tab: the queue may empty while it runs.
+  const bulkDialog = (
+    <BulkDialog mode={bulk?.mode ?? null} rows={bulk?.rows ?? []} onClose={() => setBulk(null)} act={decideOne} disabled={!online}
+      onFinished={(result) => setChecked((current) => {
+        const next = new Set(current);
+        result.done.forEach((row) => next.delete(row.id));
+        return next;
+      })} />
+  );
+
+  // ── «السجل»: the receipts already decided ──
+  if (tab === 'history') {
+    return (
+      <Page>
+        {header}
+        <HistoryView companyId={company.id} openId={params.get('h')} onOpen={(id) => setParam({ h: id })} onShowQueue={() => setParam({ tab: null, h: null })} />
+      </Page>
+    );
+  }
 
   // ── Loading, failure, nothing waiting ──
   if (queue.loading) {
@@ -217,7 +279,24 @@ export const ReceiptsPage: React.FC = () => {
               text="يحوّل الطالب ثمن الاشتراك إلى حسابك ثم يرسل صورة التحويل من التطبيق. تفتحها هنا، تقارن المبلغ، وتقبل أو ترفض. لم يصل أي إيصال بعد."
               action={<Button kind="secondary" iconEnd="fwd" to={`/c/${company.id}/payment-methods`}>تأكد من وسائل الدفع</Button>} />
           : <EmptyState card icon="check" title="لا إيصالات تنتظرك"
-              text="راجعت كل ما وصل. عندما يدفع طالب ويرسل صورة التحويل من التطبيق تظهر هنا فوراً، ويظهر عددها بجانب «الإيصالات» في القائمة." />}
+              text="راجعت كل ما وصل. عندما يدفع طالب ويرسل صورة التحويل من التطبيق تظهر هنا فوراً، ويظهر عددها بجانب «الإيصالات» في القائمة."
+              action={<Button kind="secondary" iconEnd="fwd" onClick={() => setParam({ tab: 'history', view: null })}>افتح سجل الإيصالات</Button>} />}
+        {bulkDialog}
+      </Page>
+    );
+  }
+
+  // ── «تحديد عدة إيصالات»: the queue as a table, to decide many at once ──
+  if (table) {
+    return (
+      <Page>
+        {header}
+        <PendingTable receipts={queue.receipts} total={total} hasMore={queue.hasMore} loadingMore={queue.loadingMore} onLoadMore={queue.loadMore}
+          lines={lines} now={now} online={online} selected={checked} onSelect={setChecked}
+          onOpen={(row) => setParam({ view: null, r: row.id })}
+          onBulk={(mode, rows) => setBulk({ mode, rows })}
+          loadAll={async () => (await fetchPendingReceipts(company.id, 200)).rows} />
+        {bulkDialog}
       </Page>
     );
   }

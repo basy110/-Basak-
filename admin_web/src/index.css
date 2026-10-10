@@ -2,16 +2,17 @@
 @tailwind components;
 @tailwind utilities;
 
-/* The dashboard in the mobile app's brand. Tokens live in tailwind.config.js. */
+/* The dashboard in the mobile app's colours, with its own Cairo / Inter type. Tokens live in tailwind.config.js. */
 @layer base {
   html { -webkit-text-size-adjust: 100%; }
   body {
     margin: 0;
     background: #F0F5F8;
     color: #17384A;
-    font-family: 'Readex Pro', 'Segoe UI', Tahoma, sans-serif;
-    font-size: 14px;
-    line-height: 22px;
+    font-family: 'Inter', 'Cairo', 'Segoe UI', Tahoma, sans-serif;
+    font-size: 15px;
+    line-height: 24px;
+    font-weight: 500;
     min-height: 100vh;
   }
   button { cursor: pointer; }

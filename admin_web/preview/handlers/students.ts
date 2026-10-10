@@ -300,7 +300,7 @@ registerFunctions({
     const period = body.periodCode === 'second' ? { ...NEXT, period_label: 'الفصل الثاني 2026/2027', period_phase: 'upcoming' } : { ...CURRENT, period_label: 'الفصل الأول 2026/2027', period_phase: 'current' };
     const station = line.stations.find((s: Row) => s.id === body.stationId);
     ROWS.unshift({
-      id, phone, full_name: body.fullName, university: body.university, university_id: universityId(body.university), college: 'غير محدد', specialisation: null,
+      id, phone, full_name: body.fullName, university: body.university, university_id: universityId(body.university), college: body.college || 'غير محدد', specialisation: null,
       profile_image_url: null, created_at: new Date().toISOString(), joined_at: new Date().toISOString(),
       subscriptions: [{ id: uuid(), status: 'pending_payment', type: body.subscriptionType, price: body.subscriptionType === 'daily' ? line.price_daily : 4200, created_at: new Date().toISOString(),
         ...(body.subscriptionType === 'daily' ? { start_date: null, end_date: null, period_label: 'اشتراك يومي', period_phase: 'current' } : period),

@@ -4,7 +4,7 @@ import { SkeletonStat, SkeletonTable as Table } from '../ui/Feedback';
 
 /** A page's shape while its code or first data arrives: header, three numbers, a table. */
 export const SkeletonPage: React.FC = () => (
-  <div aria-busy="true" className="mx-auto flex w-full max-w-[1200px] flex-col gap-6">
+  <div aria-busy="true" className="mx-auto flex w-full max-w-[1920px] flex-col gap-6">
     <div className="flex flex-col gap-2"><span className="skeleton block h-8 w-48 rounded-lg" /><span className="skeleton block h-3 w-72 rounded" /></div>
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-3"><SkeletonStat /><SkeletonStat /><SkeletonStat /></div>
     <Table rows={6} />

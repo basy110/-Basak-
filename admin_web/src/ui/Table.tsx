@@ -2,6 +2,7 @@ import React from 'react';
 import { Icon } from './Icon';
 import { Checkbox } from './Field';
 import { Button } from './Button';
+import { Select } from './Select';
 
 /* ── Toolbar parts ───────────────────────────────────────────────────── */
 export const SearchBox: React.FC<{ value: string; onChange: (v: string) => void; placeholder: string; className?: string; inputRef?: React.Ref<HTMLInputElement>; onFocus?: () => void; onKeyDown?: React.KeyboardEventHandler<HTMLInputElement>; kbd?: boolean; label?: string }> = ({ value, onChange, placeholder, className = '', inputRef, onFocus, onKeyDown, kbd, label }) => (
@@ -29,30 +30,35 @@ export function Chips<V extends string>({ value, onChange, options }: { value: V
 }
 export function SortSelect<V extends string>({ value, onChange, options }: { value: V; onChange: (v: V) => void; options: { value: V; label: string }[] }) {
   return (
-    <label className="relative inline-flex h-10 flex-none items-center gap-1.5 rounded-control px-2.5 text-label text-teal sm:h-9 sm:text-ink sm:shadow-ring">
-      <Icon name="sort" size={14} stroke={2} />
-      <select aria-label="الترتيب" value={value} onChange={(e) => onChange(e.target.value as V)} className="cursor-pointer appearance-none bg-transparent pe-5 font-medium outline-none sm:font-normal">
-        {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-      </select>
-      <Icon name="down" size={14} stroke={2} className="pointer-events-none absolute end-2" />
-    </label>
+    <Select value={value} onChange={onChange} options={options} ariaLabel="الترتيب" icon="sort" minListWidth={220}
+      className="inline-flex h-10 flex-none items-center gap-1.5 rounded-control px-2.5 text-label font-semibold text-teal hover:bg-ground sm:h-9 sm:text-ink sm:shadow-ring" />
   );
 }
 
 /** Search → filter chips → count → sort → actions. On a phone: search on its own row, chips scroll sideways. */
-export const Toolbar: React.FC<{ search?: React.ReactNode; filters?: React.ReactNode; count?: React.ReactNode; sort?: React.ReactNode; actions?: React.ReactNode; bulk?: { count: number; onClear: () => void; actions: React.ReactNode } | null }> = ({ search, filters, count, sort, actions, bulk }) => bulk && bulk.count > 0 ? (
-  <div className="flex min-h-[60px] flex-wrap items-center gap-3 border-b border-hair bg-teal-tint px-4 py-2">
-    <span className="text-small font-semibold text-teal">تم تحديد {bulk.count}</span>
-    <Button kind="link" sm onClick={bulk.onClear}>إلغاء التحديد</Button>
-    <span className="flex-1" />{bulk.actions}
+export interface BulkBar {
+  count: number; onClear: () => void; actions: React.ReactNode;
+  /** «حدّد كل الـ 442»: offered when every row on the page is chosen and more rows match. */
+  total?: number; onAll?: () => void;
+}
+export const Toolbar: React.FC<{ search?: React.ReactNode; filters?: React.ReactNode; count?: React.ReactNode; sort?: React.ReactNode; actions?: React.ReactNode; bulk?: BulkBar | null }> = ({ search, filters, count, sort, actions, bulk }) => bulk && bulk.count > 0 ? (
+  <div className="flex min-h-[60px] flex-wrap items-center gap-x-3 gap-y-2 rounded-inner bg-teal px-4 py-2 text-white sm:rounded-none">
+    <span className="flex h-7 min-w-7 items-center justify-center rounded-full bg-white px-2 text-label font-extrabold tabular text-teal">{bulk.count.toLocaleString('en-US')}</span>
+    <span className="text-small font-bold">{bulk.total != null && bulk.count >= bulk.total ? 'كل الصفوف محددة' : 'محدد'}</span>
+    {bulk.onAll && bulk.total != null && bulk.count < bulk.total && (
+      <button type="button" onClick={bulk.onAll} className="rounded-control px-2 py-1 text-label font-bold underline underline-offset-4 hover:bg-white/15">حدّد كل الـ {bulk.total.toLocaleString('en-US')}</button>
+    )}
+    <button type="button" onClick={bulk.onClear} className="rounded-control px-2 py-1 text-label font-semibold text-white/85 hover:bg-white/15">إلغاء التحديد</button>
+    <span className="flex-1" />
+    <div className="flex flex-wrap items-center gap-2 [&_button]:shadow-none">{bulk.actions}</div>
   </div>
 ) : (
   <div className="flex flex-col gap-3 sm:min-h-[60px] sm:flex-row sm:flex-wrap sm:items-center sm:border-b sm:border-hair sm:px-4 sm:py-2">
-    {search && <div className="sm:w-[280px]">{search}</div>}
+    {search && <div className="sm:w-[300px]">{search}</div>}
     {filters}
     <span className="hidden flex-1 sm:block" />
-    {(count || sort) && <div className="flex min-h-6 items-center gap-2 sm:contents"><span className="flex-1 whitespace-nowrap text-label text-ink-2 sm:flex-none">{count}</span>{sort}</div>}
-    {actions}
+    {(count || sort) && <div className="flex min-h-6 items-center gap-2 sm:contents"><span className="flex-1 whitespace-nowrap text-label font-semibold text-ink-2 sm:flex-none">{count}</span>{sort}</div>}
+    {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
   </div>
 );
 
@@ -119,11 +125,11 @@ export function DataTable<T>({ columns, rows, rowKey, onOpen, openKey, selectabl
             <table className="w-full table-fixed border-collapse">
               {caption && <caption className="sr-only">{caption}</caption>}
               <thead>
-                <tr className="h-11 bg-ground">
-                  {sel && <th className="w-12 text-center"><Checkbox hideLabel label="تحديد كل الصفوف" checked={allOn ? true : someOn ? 'mixed' : false} onChange={(on) => onSelect!(on ? new Set(rows.map(rowKey)) : new Set())} /></th>}
+                <tr className="h-12 bg-teal-tint/70">
+                  {sel && <th className="w-12 text-center"><Checkbox hideLabel label="تحديد كل الصفوف" checked={allOn ? true : someOn ? 'mixed' : false} onChange={(on) => { const next = new Set(selected); rows.forEach((r) => (on ? next.add(rowKey(r)) : next.delete(rowKey(r)))); onSelect!(next); }} /></th>}
                   {columns.map((c, i) => (
                     <th key={c.key} scope="col" style={c.w ? { width: c.w } : undefined}
-                      className={`whitespace-nowrap px-3 text-label font-medium text-ink-2 ${al(c)} ${tab(c)} ${i === 0 && !sel ? 'ps-4' : ''} ${i === columns.length - 1 ? 'pe-4' : ''}`}>{c.label}</th>
+                      className={`whitespace-nowrap px-3 text-label font-bold text-ink ${al(c)} ${tab(c)} ${i === 0 && !sel ? 'ps-4' : ''} ${i === columns.length - 1 ? 'pe-4' : ''}`}>{c.label}</th>
                   ))}
                 </tr>
               </thead>
@@ -157,6 +163,11 @@ export function DataTable<T>({ columns, rows, rowKey, onOpen, openKey, selectabl
       {/* Phone */}
       <div className="flex flex-col gap-3 sm:hidden">
         {toolbar}
+        {sel && !empty && rows.length > 0 && (
+          <div className="flex items-center gap-2 px-1">
+            <Checkbox label={allOn ? 'إلغاء تحديد الكل' : 'تحديد كل ما في الصفحة'} checked={allOn ? true : someOn ? 'mixed' : false} onChange={(on) => onSelect!(on ? new Set([...selected!, ...rows.map(rowKey)]) : new Set())} />
+          </div>
+        )}
         {empty ?? rows.map((r) => {
           const k = rowKey(r);
           return <RecordCard key={k} spec={card(r)} onOpen={onOpen ? () => onOpen(r) : undefined}

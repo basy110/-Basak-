@@ -1,5 +1,6 @@
 import React from 'react';
 import { Icon, type IconName } from '../../ui/Icon';
+import { Select } from '../../ui/Select';
 import { Badge, StatusPill } from '../../ui/Status';
 import { cairo, dayText } from '../../ui/format';
 import { initialOf, type Shown } from '../../lib/students';
@@ -32,20 +33,11 @@ export function FilterSelect<V extends string>({ label, value, onChange, options
   label: string; value: V | ''; onChange: (v: V | '') => void; options: { value: V; label: string }[]; allLabel: string; className?: string;
   icon?: IconName; hideLabel?: boolean;
 }) {
-  const chosen = options.find((o) => o.value === value)?.label;
-  const current = chosen ?? <><span className="sm:hidden">الكل</span><span className="hidden sm:inline">{allLabel}</span></>;
+  const all = [{ value: '' as V | '', label: allLabel }, ...options];
   return (
-    <label className={`relative inline-flex h-11 sm:h-10 min-w-0 flex-none items-center gap-1 rounded-control bg-surface ps-2 pe-7 sm:gap-1.5 sm:ps-3 sm:pe-8 text-label shadow-ring hover:bg-ground focus-within:!shadow-field-focus sm:h-9 ${value ? '!shadow-[inset_0_0_0_1.5px_#00658D]' : ''} ${className}`}>
-      {icon && <Icon name={icon} size={16} className="text-ink-2" />}
-      {!hideLabel && <span className="text-ink-2">{label}</span>}
-      <span className="min-w-0 truncate font-semibold text-ink">{current}</span>
-      <Icon name="down" size={14} stroke={2} className="pointer-events-none absolute end-2 text-ink-2 sm:end-2.5" />
-      <select aria-label={label} value={value} onChange={(e) => onChange(e.target.value as V | '')}
-        className="absolute inset-0 h-full w-full cursor-pointer appearance-none opacity-0">
-        <option value="">{allLabel}</option>
-        {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-      </select>
-    </label>
+    <Select<V | ''> value={value} onChange={onChange} options={all as { value: V | ''; label: string }[]} ariaLabel={label} icon={icon} minListWidth={220}
+      renderValue={(o) => <>{!hideLabel && <span className="font-normal text-ink-2">{label} </span>}<span className="font-bold text-ink">{o && o.value ? o.label : <><span className="sm:hidden">الكل</span><span className="hidden sm:inline">{allLabel}</span></>}</span></>}
+      className={`inline-flex h-11 min-w-0 flex-none items-center gap-1.5 rounded-control bg-surface px-3 text-label shadow-ring hover:bg-ground focus-visible:!shadow-field-focus sm:h-9 ${value ? '!shadow-[inset_0_0_0_1.5px_#00658D]' : ''} ${className}`} />
   );
 }
 
@@ -85,12 +77,7 @@ export const PanelHead: React.FC<{ children: React.ReactNode; end?: React.ReactN
 /** A phone toolbar's quiet choice: teal words and an icon, the native list on tap («⇅ كل الشركات»). */
 export function LinkSelect<V extends string>({ label, value, onChange, options, icon = 'sort' }: { label: string; value: V; onChange: (v: V) => void; options: { value: V; label: string }[]; icon?: IconName }) {
   return (
-    <label className="relative inline-flex h-10 max-w-[60vw] flex-none items-center gap-1.5 px-1 text-label font-medium text-teal">
-      <Icon name={icon} size={14} stroke={2} />
-      <span className="truncate">{options.find((o) => o.value === value)?.label}</span>
-      <select aria-label={label} value={value} onChange={(e) => onChange(e.target.value as V)} className="absolute inset-0 h-full w-full cursor-pointer appearance-none opacity-0">
-        {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-      </select>
-    </label>
+    <Select value={value} onChange={onChange} options={options} ariaLabel={label} icon={icon} minListWidth={220}
+      className="inline-flex h-10 max-w-[60vw] flex-none items-center gap-1.5 px-1 text-label font-semibold text-teal" />
   );
 }

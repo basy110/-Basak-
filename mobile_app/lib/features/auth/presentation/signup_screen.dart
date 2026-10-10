@@ -11,6 +11,7 @@ import '../../../core/widgets/photo_adjust_screen.dart';
 import '../biometrics/biometric_sign_in.dart';
 import '../biometrics/presentation/biometric_quick_sign_in.dart';
 import '../data/auth_repository.dart';
+import '../data/colleges.dart';
 import '../providers/auth_provider.dart';
 import 'college_picker_sheet.dart';
 import 'password_strength.dart';
@@ -203,7 +204,18 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
 
   Future<void> _pickCollege() async {
     FocusScope.of(context).unfocus();
-    final college = await CollegePickerSheet.show(context, selected: _college);
+    // The university's own colleges when the platform listed them; otherwise
+    // (or offline) the general list the app ships.
+    var colleges = kColleges;
+    final universityId = _universityId;
+    if (universityId != null) {
+      try {
+        final own = await ref.read(universityCollegesProvider(universityId).future);
+        if (own.isNotEmpty) colleges = own;
+      } catch (_) {}
+      if (!mounted) return;
+    }
+    final college = await CollegePickerSheet.show(context, selected: _college, colleges: colleges);
     if (!mounted || college == null) return;
     setState(() {
       _college = college;

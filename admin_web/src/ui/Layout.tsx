@@ -47,16 +47,16 @@ export const PageHeader: React.FC<{
         <div className="hidden flex-wrap items-center gap-3 sm:flex"><h1 className="m-0 text-page">{title}</h1>{meta}</div>
         {meta && <div className="flex flex-wrap items-center gap-2 sm:hidden">{meta}</div>}
         <h1 className="sr-only sm:hidden">{title}</h1>
-        {sub && <p className="m-0 max-w-[720px] text-small text-ink-2">{sub}</p>}
+        {sub && <p className="m-0 max-w-[900px] text-small text-ink-2">{sub}</p>}
       </div>
       {actions && <div className={`${phoneActions ? 'flex' : 'hidden sm:flex'} flex-col gap-2 sm:flex-none sm:flex-row sm:items-center`}>{actions}</div>}
     </div>
   );
 };
 
-/** Sections of a page, 24 apart; content never wider than 1200. */
+/** Sections of a page, 24 apart; the page uses the whole width the screen gives it. */
 export const Page: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = '' }) => (
-  <div className={`mx-auto flex w-full max-w-[1200px] flex-col gap-5 sm:gap-6 ${className}`}>{children}</div>
+  <div className={`mx-auto flex w-full max-w-[1920px] flex-col gap-5 sm:gap-6 ${className}`}>{children}</div>
 );
 
 /** A section title inside a page: 12 above its card. */
@@ -101,23 +101,45 @@ export const InfoRows: React.FC<{ rows: [React.ReactNode, React.ReactNode][]; la
 
 /* ── Numbers ─────────────────────────────────────────────────────────── */
 /** One number, one sentence. `bar` (0–100) draws a meter. A card with `to` is a link. */
+type Accent = 'teal' | 'violet' | 'amber' | 'green' | 'pink' | 'blue' | 'orange';
+const ACCENT: Record<Accent, { tile: string; bar: string; edge: string }> = {
+  teal: { tile: 'bg-teal-tint text-teal', bar: 'bg-teal', edge: 'before:bg-teal' },
+  violet: { tile: 'bg-violet-bg text-violet', bar: 'bg-violet', edge: 'before:bg-violet' },
+  amber: { tile: 'bg-amber-bg text-amber', bar: 'bg-amber', edge: 'before:bg-amber' },
+  green: { tile: 'bg-green-bg text-green', bar: 'bg-green', edge: 'before:bg-green' },
+  pink: { tile: 'bg-pink-bg text-pink', bar: 'bg-pink', edge: 'before:bg-pink' },
+  blue: { tile: 'bg-blue-bg text-blue', bar: 'bg-blue', edge: 'before:bg-blue' },
+  orange: { tile: 'bg-orange-bg text-orange', bar: 'bg-orange', edge: 'before:bg-orange' },
+};
+/** Each kind of number keeps one colour across the dashboard, read from its icon. */
+const ICON_ACCENT: Partial<Record<IconName, Accent>> = {
+  building: 'blue', users: 'violet', user: 'violet', check: 'green', receipt: 'amber', bus: 'teal', aup: 'blue', adown: 'violet',
+  chart: 'green', card: 'green', clock: 'amber', calendar: 'pink', smartphone: 'blue', school: 'violet', route: 'blue', key: 'orange',
+  megaphone: 'pink', scan: 'teal', idcard: 'violet', send: 'blue',
+};
+
 export const StatCard: React.FC<{
   label: React.ReactNode; value: React.ReactNode; unit?: React.ReactNode; hint?: React.ReactNode;
-  icon?: IconName; tone?: Tone; to?: string; bar?: number; className?: string;
-}> = ({ label, value, unit, hint, icon, tone, to, bar, className = '' }) => {
+  icon?: IconName; tone?: Tone; accent?: Accent; to?: string; bar?: number; className?: string;
+}> = ({ label, value, unit, hint, icon, tone, accent, to, bar, className = '' }) => {
+  const a = ACCENT[accent ?? (icon && ICON_ACCENT[icon]) ?? 'teal'];
+  const toned = tone && tone !== 'teal' && tone !== 'neutral';
+  const tile = toned ? TONE[tone] : a.tile;
+  const edge = toned ? { success: 'before:bg-ok', warning: 'before:bg-warn', danger: 'before:bg-bad' }[tone as 'success' | 'warning' | 'danger'] : a.edge;
   const body = (
     <>
-      <div className="flex items-center gap-2 text-label font-medium text-ink-2">
-        {icon && <span className={`flex ${tone ? TONE[tone].split(' ')[1] : 'text-ink-3'}`}><Icon name={icon} size={16} stroke={2} /></span>}
+      <div className="flex items-center gap-2.5 text-label font-bold text-ink-2">
+        {icon && <span className={`flex h-9 w-9 flex-none items-center justify-center rounded-lg ${tile}`}><Icon name={icon} size={18} stroke={2} /></span>}
         <span className="min-w-0 flex-1 truncate">{label}</span>
         {to && <Icon name="fwd" size={16} stroke={2} className="text-ink-3" />}
       </div>
-      <div className="mt-1 flex items-baseline gap-1.5 sm:mt-2"><span className="text-num-phone tabular sm:text-num">{value}</span>{unit && <span className="text-label text-ink-3">{unit}</span>}</div>
-      {bar != null && <div aria-hidden="true" className="mt-2 h-1.5 overflow-hidden rounded bg-sunken"><div className="h-1.5 rounded bg-teal" style={{ width: `${Math.max(0, Math.min(100, bar))}%` }} /></div>}
+      <div className="mt-1 flex items-baseline gap-1.5 sm:mt-2"><span className="text-num-phone tabular sm:text-num">{value}</span>{unit && <span className="text-label font-semibold text-ink-3">{unit}</span>}</div>
+      {bar != null && <div aria-hidden="true" className="mt-2 h-2 overflow-hidden rounded-full bg-sunken"><div className={`h-2 rounded-full ${a.bar}`} style={{ width: `${Math.max(0, Math.min(100, bar))}%` }} /></div>}
       {hint && <div className={`text-label text-ink-3 ${bar != null ? 'mt-2' : 'mt-0.5'}`}>{hint}</div>}
     </>
   );
-  const cls = `flex min-w-0 flex-col rounded-card bg-surface px-4 py-3.5 text-ink shadow-card sm:px-5 sm:py-[18px] ${className}`;
+  // A coloured strip along the card's start edge.
+  const cls = `relative flex min-w-0 flex-col overflow-hidden rounded-card bg-surface px-4 py-3.5 text-ink shadow-card before:absolute before:inset-y-0 before:start-0 before:w-1 sm:px-5 sm:py-[18px] ${edge} ${className}`;
   return to ? <Link to={to} className={`${cls} hover:shadow-[0_1px_2px_rgba(23,56,74,.05),inset_0_0_0_1px_#9DB0BB]`}>{body}</Link> : <div className={cls}>{body}</div>;
 };
 
