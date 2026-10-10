@@ -4,7 +4,6 @@ import { SearchBox } from '../ui/Table';
 import { Icon } from '../ui/Icon';
 import { phoneText } from '../ui/format';
 import { supabase } from '../lib/supabase';
-import { fetchStudentsPage } from '../lib/students';
 import type { ShellRole } from './AppShell';
 
 interface Hit { id: string; name: string; phone: string; sub: string }
@@ -32,6 +31,8 @@ export const StudentSearch: React.FC<{ role: ShellRole; base: string; companyId?
       try {
         let found: Hit[];
         if (role !== 'platform' && companyId) {
+          // Loaded when the admin first types: the students code is not on every page's first paint.
+          const { fetchStudentsPage } = await import('../lib/students');
           const page = await fetchStudentsPage({ companyId, search: term, limit: 6, offset: 0, withTotal: false });
           found = page.rows.map((s) => ({ id: s.id, name: s.full_name, phone: s.phone, sub: s.university }));
         } else {
