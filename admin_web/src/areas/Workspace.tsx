@@ -1,8 +1,7 @@
-import React, { Suspense, useEffect } from 'react';
+import React, { Suspense, lazy, useEffect } from 'react';
 import { Navigate, Route, Routes, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { AppShell, type Who } from '../shell/AppShell';
-import { WorkspaceBar } from '../shell/WorkspaceBar';
 import { CompanyMark } from '../components/CompanyMark';
 import { SkeletonPage, SkeletonShell } from '../components/Skeleton';
 import { Button } from '../ui/Button';
@@ -20,6 +19,9 @@ import {
   ReceiptsPage, ReportsPage, RideConfirmationPage, StudentsPage, SubscriptionPeriodsPage, SupervisorsPage, TeamPage,
   TodayPage, WalletCardPage,
 } from '../lib/routes';
+
+/** Only the platform admin ever sees the return bar: company admins never download it. */
+const WorkspaceBar = lazy(() => import('../shell/WorkspaceBar').then((m) => ({ default: m.WorkspaceBar })));
 
 type Loaded = { state: 'loading' } | { state: 'missing' } | { state: 'ready'; company: CompanyScope };
 
@@ -136,7 +138,7 @@ const WorkspaceShell: React.FC<{ admin: AdminProfile; company: CompanyScope; onL
     <AppShell role={isPlatform ? 'workspace' : 'company'} groups={COMPANY_NAV} base={`/c/${company.id}`} scope="لوحة الشركة"
       companyName={company.name} companyId={company.id} who={whoOf(admin)} onLogout={onLogout}
       mark={overview?.company && (overview.company.emblem_path || overview.company.logo_path) ? <CompanyMark name={company.name} brand={overview.company} size="md" className="!h-9 !w-9 !rounded-control" /> : undefined}
-      badges={{ receipts, requests }} workspaceBar={isPlatform ? <WorkspaceBar company={company} /> : undefined}>
+      badges={{ receipts, requests }} workspaceBar={isPlatform ? <Suspense fallback={<div className="h-12 flex-none bg-ink" />}><WorkspaceBar company={company} /></Suspense> : undefined}>
       {children}
     </AppShell>
   );
