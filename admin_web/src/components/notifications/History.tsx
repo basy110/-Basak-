@@ -88,7 +88,7 @@ export const History: React.FC<Props> = ({ companyId, filter, onFilter, history,
     { key: 'at', label: 'الموعد', w: 170, render: (r) => <span className={`whitespace-nowrap ${r.status === 'cancelled' ? 'text-ink-3' : ''}`}>{whenLabel(at(r))}</span> },
     { key: 'read', label: 'قرأه', w: 120, render: (r) => <ReadCell r={r} /> },
     { key: 'state', label: 'الحالة', w: 120, render: statePill },
-    { key: 'act', label: <span className="sr-only">إجراءات</span>, w: 112, align: 'end', render: (r) => (
+    { key: 'act', label: <span className="sr-only">إجراءات</span>, w: 128, align: 'end', render: (r) => (
       <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
         {canEdit(r) && <Button sm kind="outline" onClick={() => setOpen({ kind: 'edit', row: r })}>تعديل</Button>}
         <Menu label={`إجراءات «${r.title}»`} items={[
