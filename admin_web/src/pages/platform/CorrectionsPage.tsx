@@ -14,6 +14,7 @@ import { useGuard } from '../../lib/guard';
 import { notify, notifyDone } from '../../lib/toasts';
 import { decideCorrection, FIELD_LABEL, loadPlatformCorrections, matchCorrection, type PlatformCorrection } from '../../lib/corrections';
 import { atCompanies, CorrectionPanel, toastName } from '../../components/students/CorrectionPanel';
+import { LinkSelect } from '../../components/students/parts';
 
 type Order = 'oldest' | 'newest';
 /** «9 طلبات تنتظر قرارك», «طلب واحد ينتظر قرارك». */
@@ -83,7 +84,8 @@ export const CorrectionsPage: React.FC = () => {
       <span className="hidden flex-1 sm:block" />
       <div className="flex min-h-6 items-center gap-2 sm:contents">
         <span aria-live="polite" className="flex-1 whitespace-nowrap text-label text-ink-2 sm:flex-none">{queue.data ? (search ? `${countText(rows.length, NOUN.request)} من ${all.length}` : waitingText(all.length)) : ''}</span>
-        <SortSelect<Order> value={order} onChange={setOrder} options={[{ value: 'oldest', label: 'الأقدم أولاً' }, { value: 'newest', label: 'الأحدث أولاً' }]} />
+        <span className="sm:hidden"><LinkSelect<Order> label="الترتيب" value={order} onChange={setOrder} options={[{ value: 'oldest', label: 'الأقدم أولاً' }, { value: 'newest', label: 'الأحدث أولاً' }]} /></span>
+        <span className="hidden sm:inline-flex"><SortSelect<Order> value={order} onChange={setOrder} options={[{ value: 'oldest', label: 'الأقدم أولاً' }, { value: 'newest', label: 'الأحدث أولاً' }]} /></span>
       </div>
     </div>
   );

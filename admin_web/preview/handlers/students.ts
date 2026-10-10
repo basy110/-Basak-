@@ -288,9 +288,9 @@ const EXISTING_ELSEWHERE = new Set(['01112345679', '01071845568']);
 registerFunctions({
   'admin-create-student': (body) => {
     const phone = digits(body.phone);
-    if (ROWS.some((r) => r.phone === phone) || tables.company_invites.some((i) => i.phone === phone && i.status === 'pending')) {
-      throw Object.assign(new Error('هذا الرقم لطالب في شركتك بالفعل، أو أُرسلت له دعوة. ابحث عنه في قائمة الطلاب أو في «الدعوات».'), { context: null });
-    }
+    // The edge function's own sentences (supabase/functions/_shared/create-student.ts).
+    if (ROWS.some((r) => r.phone === phone)) throw new Error('هذا الطالب مسجل في شركتك بالفعل. أضف له اشتراكاً من قائمة الطلاب.');
+    if (tables.company_invites.some((i) => i.phone === phone && i.status === 'pending')) throw new Error('توجد دعوة معلقة لهذا الرقم بالفعل. تظهر للطالب في التطبيق.');
     const line = LINES.find((l) => l.id === body.lineId)!;
     if (EXISTING_ELSEWHERE.has(phone) || OTHERS.some((o) => o.phone === phone)) {
       tables.company_invites.unshift({ id: uuid(), company_id: COMPANY_ID, phone, status: 'pending', created_at: new Date().toISOString(), expires_at: daysAgo(-14), responded_at: null, lines: { name: line.name } });

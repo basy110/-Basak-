@@ -17,7 +17,7 @@ import {
 import { BlockedPhonesPanel } from '../../components/BlockedPhonesPanel';
 import { BlockedBadge } from '../../components/BlockStudentButton';
 import { PlatformStudentPanel } from '../../components/students/PlatformStudentPanel';
-import { FilterSelect, fullDay } from '../../components/students/parts';
+import { FilterSelect, fullDay, LinkSelect } from '../../components/students/parts';
 
 const PAGE_SIZE = 25;
 const accountsCount = (n: number) => (n === 1 ? 'حساب واحد' : n === 2 ? 'حسابان' : countText(n, ['حساب', 'حسابان', 'حسابات', 'حساباً']));
@@ -101,15 +101,16 @@ export const AllStudentsPage: React.FC = () => {
     { key: 'date', label: 'سُجّل في', w: 130, hideTablet: true, render: (r) => <span className="whitespace-nowrap">{fullDay(r.created_at)}</span> },
   ];
 
+  const nothing = !filtered && !list.loading && !!list.data && total === 0;
   const toolbar = (
-    <div className="flex flex-col gap-3 sm:min-h-[60px] sm:flex-row sm:flex-wrap sm:items-center sm:border-b sm:border-hair sm:px-4 sm:py-2">
+    <div className={`${nothing ? 'max-sm:hidden ' : ''}flex flex-col gap-3 sm:min-h-[60px] sm:flex-row sm:flex-wrap sm:items-center sm:border-b sm:border-hair sm:px-4 sm:py-2`}>
       <SearchBox value={typed} onChange={setTyped} placeholder="ابحث بالاسم أو الهاتف أو الجامعة" className="sm:w-[280px]" />
       <Chips<Membership> value={membership} onChange={(m) => { setMembership(m); setPage(1); }} options={chips} />
       <span className="hidden flex-1 sm:block" />
       <div className="flex min-h-6 items-center gap-2 sm:contents">
         <span aria-live="polite" className="flex-1 whitespace-nowrap text-label text-ink-2 sm:hidden">{list.data ? accountsCount(total) : ''}</span>
         <span className="hidden sm:inline-flex"><SortSelect value="newest" onChange={() => undefined} options={[{ value: 'newest', label: 'الأحدث تسجيلاً' }]} /></span>
-        <span className="sm:hidden"><SortSelect<string> value={companyId} onChange={(v) => { setCompanyId(v); setPage(1); }} options={[{ value: '', label: 'كل الشركات' }, ...companyOptions]} /></span>
+        <span className="sm:hidden"><LinkSelect<string> label="الشركة" value={companyId} onChange={(v) => { setCompanyId(v); setPage(1); }} options={[{ value: '', label: 'كل الشركات' }, ...companyOptions]} /></span>
         <FilterSelect label="الشركة" hideLabel icon="building" value={companyId} allLabel="كل الشركات" options={companyOptions} className="max-sm:hidden"
           onChange={(v) => { setCompanyId(v); setPage(1); }} />
       </div>
