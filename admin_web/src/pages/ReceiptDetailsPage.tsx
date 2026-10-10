@@ -1,7 +1,10 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useMemo, useState } from 'react';
+
+/** The logo and emblem editor, downloaded when it is opened. */
+const CompanyIdentityCard = lazy(() => import('../components/CompanyIdentityCard').then((m) => ({ default: m.CompanyIdentityCard })));
 import { useQueryClient } from '@tanstack/react-query';
 import {
-  Button, Card, ErrorState, Icon, Ltr, Money, Note, Page, PageHeader, PhoneBar, SkeletonForm, SkeletonText, TextField, dayText, useOnline,
+  Button, Card, ErrorState, Sheet, Icon, Ltr, Money, Note, Page, PageHeader, PhoneBar, SkeletonForm, SkeletonText, TextField, dayText, useOnline,
 } from '../ui';
 import { supabase } from '../lib/supabase';
 import { useCompany } from '../lib/adminScope';
@@ -44,6 +47,7 @@ export const ReceiptDetailsPage: React.FC = () => {
   const [draft, setDraft] = useState<Draft>(saved);
   const [touched, setTouched] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [identityOpen, setIdentityOpen] = useState(false);
   // What is saved shows until the admin starts typing; a background refresh never overwrites typing.
   useEffect(() => { if (!touched) setDraft(saved); }, [saved, touched]);
 
@@ -107,9 +111,9 @@ export const ReceiptDetailsPage: React.FC = () => {
                 : <span aria-hidden="true" className="flex h-10 w-10 flex-none items-center justify-center rounded-control bg-sunken text-ink-2"><Icon name="image" size={20} /></span>}
               <div className="min-w-0 flex-1">
                 <div className="text-small font-semibold">الشعار</div>
-                <div className="text-label text-ink-2">{hasLogo ? 'هو شعار «بطاقة الطالب» نفسه، ويُغيَّر من هناك.' : 'لا شعار بعد. يُضاف من صفحة «بطاقة الطالب».'}</div>
+                <div className="text-label text-ink-2">{hasLogo ? 'يُطبع أعلى الإيصال، ويظهر للطلاب في التطبيق.' : 'لا شعار بعد. بلا شعار يُطبع اسم الشركة وحده.'}</div>
               </div>
-              <Button kind="link" sm iconEnd="fwd" to={`/c/${company.id}/wallet-card`}>بطاقة الطالب</Button>
+              <Button kind="link" sm iconEnd="fwd" onClick={() => setIdentityOpen(true)}>{hasLogo ? 'تغيير الشعار' : 'أضف الشعار'}</Button>
             </div>
             <TextField label="هاتف الشركة" optional ltr inputMode="tel" autoComplete="tel" maxLength={LIMITS.phone} value={draft.phone} onChange={set('phone')} error={phoneError} />
             <div className="relative">
@@ -140,6 +144,10 @@ export const ReceiptDetailsPage: React.FC = () => {
         </Card>
       </div>
       <PhoneBar><Button full loading={saving} disabled={!canSave} onClick={() => void save()}>حفظ بيانات الإيصال</Button></PhoneBar>
+      {/* The company's logo and emblem (receipts, the app, the dashboard) — saved on their own, as before. */}
+      <Sheet open={identityOpen} onClose={() => setIdentityOpen(false)} title="شعار الشركة" w={720}>
+        <Suspense fallback={<SkeletonForm />}><CompanyIdentityCard companyId={company.id} companyName={company.name} /></Suspense>
+      </Sheet>
     </Page>
   );
 };

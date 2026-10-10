@@ -1,12 +1,6 @@
 import React from 'react';
-import { SkeletonCards as Cards, SkeletonForm as Form, SkeletonList, SkeletonStat, SkeletonTable as Table, SkeletonText } from '../ui/Feedback';
+import { SkeletonStat, SkeletonTable as Table } from '../ui/Feedback';
 
-/** Kept for the pages that still import the older names; new code imports from ui/. */
-export const Skeleton: React.FC<{ className?: string }> = ({ className = '' }) => <span aria-hidden="true" className={`skeleton block rounded-md ${className}`} />;
-export const SkeletonTable: React.FC<{ rows?: number; cols?: number; columns?: number }> = ({ rows, cols, columns }) => <Table rows={rows} cols={cols ?? columns} />;
-export const SkeletonRows: React.FC<{ rows?: number }> = (p) => <SkeletonList {...p} />;
-export const SkeletonCards: React.FC<{ count?: number; rows?: number; columns?: number }> = ({ count, rows }) => <Cards rows={rows ?? count} />;
-export const SkeletonForm: React.FC<{ rows?: number; fields?: number }> = ({ rows, fields }) => <Form rows={rows ?? fields} />;
 
 /** A page's shape while its code or first data arrives: header, three numbers, a table. */
 export const SkeletonPage: React.FC = () => (
@@ -14,7 +8,6 @@ export const SkeletonPage: React.FC = () => (
     <div className="flex flex-col gap-2"><span className="skeleton block h-8 w-48 rounded-lg" /><span className="skeleton block h-3 w-72 rounded" /></div>
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-3"><SkeletonStat /><SkeletonStat /><SkeletonStat /></div>
     <Table rows={6} />
-    <SkeletonText rows={0} />
   </div>
 );
 
@@ -32,7 +25,3 @@ export const SkeletonShell: React.FC = () => (
   </div>
 );
 
-/** A quiet «refreshing» note beside a list that is being re-read behind what it shows. */
-export const Refreshing: React.FC<{ active: boolean }> = ({ active }) => (
-  active ? <span className="text-cap text-ink-3" role="status">جارٍ التحديث…</span> : null
-);

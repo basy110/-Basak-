@@ -296,7 +296,7 @@ export function rideDayLabel(day: string, today: string): string {
   if (day === today) return 'اليوم';
   if (day === addDays(today, 1)) return 'غداً';
   const [y, m, d] = day.split('-').map(Number);
-  return new Date(Date.UTC(y, m - 1, d, 12)).toLocaleDateString('ar-EG', { timeZone: 'UTC', weekday: 'long', day: 'numeric', month: 'long' });
+  return new Date(Date.UTC(y, m - 1, d, 12)).toLocaleDateString('ar-EG-u-nu-latn', { timeZone: 'UTC', weekday: 'long', day: 'numeric', month: 'long' });
 }
 
 // ------------------------------------------------------- optimistic edits ----

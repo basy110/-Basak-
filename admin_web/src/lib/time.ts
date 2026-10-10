@@ -74,7 +74,7 @@ export function formatCairo(iso: string | null | undefined, withYear = false): s
   if (!iso) return '';
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return '';
-  return date.toLocaleString('ar-EG', {
+  return date.toLocaleString('ar-EG-u-nu-latn', {
     timeZone: CAIRO_ZONE, day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit',
     ...(withYear ? { year: 'numeric' as const } : {}),
   });
