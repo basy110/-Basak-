@@ -1,8 +1,12 @@
-import React from 'react';
-import { Ban } from 'lucide-react';
+import React, { useState } from 'react';
+import { Button } from '../ui/Button';
+import { Card, Section } from '../ui/Layout';
+import { Badge, CountBadge, Ltr } from '../ui/Status';
+import { phoneText } from '../ui/format';
 import { blockedBy, useBlockActions, type BlockedPhone } from '../lib/blockedPhones';
-import { useGuard } from '../lib/guard';
-import { notifyDone, notifyError } from '../lib/toasts';
+import { notifyDone } from '../lib/toasts';
+import { ConfirmDialog } from './students/StudentDialogs';
+import { fullDay } from './students/parts';
 
 /**
  * Every blocked number, with who it belonged to and why, and a way to unblock
@@ -10,47 +14,31 @@ import { notifyDone, notifyError } from '../lib/toasts';
  * Not shown while nothing is blocked.
  */
 export const BlockedPhonesPanel: React.FC<{ list: BlockedPhone[] }> = ({ list }) => {
-  const guard = useGuard();
   const { unblock } = useBlockActions(null);
+  const [target, setTarget] = useState<BlockedPhone | null>(null);
   if (list.length === 0) return null;
-
-  const onUnblock = (entry: BlockedPhone) => guard(`unblock:${entry.phone}`, async () => {
-    if (!confirm(`إلغاء حظر الرقم ${entry.phone}؟\nيصبح متاحاً للتسجيل${entry.has_account ? '، ويستطيع صاحب الحساب الدخول مرة أخرى' : ''}.`)) return;
-    try {
-      await unblock(entry.phone);
-      notifyDone(`تم إلغاء حظر ${entry.phone}`);
-    } catch (error) {
-      notifyError('تعذر إلغاء الحظر', (error as Error).message);
-    }
-  });
-
   return (
-    <div className="glass-panel overflow-hidden">
-      <div className="border-b border-slate-100 p-4">
-        <h2 className="flex items-center gap-2 text-[15px] font-bold text-[#1F2937]">
-          <Ban className="h-4 w-4 text-rose-500" /> الأرقام المحظورة ({list.length.toLocaleString('ar-EG')})
-        </h2>
-        <p className="text-[12px] text-[#5B6B7A]">لا يمكن التسجيل بها، ولا يستطيع أصحابها الدخول إلى التطبيق. يبقى الرقم محظوراً حتى لو حُذف حسابه.</p>
-      </div>
-      <ul className="divide-y divide-slate-100">
-        {list.map((entry) => (
-          <li key={entry.phone} className="flex flex-wrap items-center justify-between gap-3 p-4 text-sm">
-            <div>
-              <p className="font-bold text-slate-800">
-                {entry.full_name ?? '—'} <span className="font-mono text-xs font-normal text-slate-500" dir="ltr">{entry.phone}</span>
-                {!entry.has_account && <span className="mr-2 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">الحساب محذوف</span>}
-              </p>
-              <p className="text-xs text-slate-500">
-                حظره {blockedBy(entry)} في {new Date(entry.blocked_at).toLocaleDateString('ar-EG')}{entry.reason ? ` • ${entry.reason}` : ''}
-              </p>
+    <Section title="الأرقام المحظورة" meta={<CountBadge n={list.length} className="!bg-sunken !text-ink-2" />}>
+      <p className="-mt-1 m-0 text-small text-ink-2">لا يمكن التسجيل بها، ولا يستطيع أصحابها الدخول إلى التطبيق. يبقى الرقم محظوراً حتى لو حُذف حسابه.</p>
+      <Card className="overflow-hidden">
+        {list.map((entry, i) => (
+          <div key={entry.phone} className={`flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:gap-4 ${i ? 'border-t border-hair' : ''}`}>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2 text-small font-semibold">
+                <span>{entry.full_name ?? '—'}</span><Ltr className="font-normal text-ink-2">{phoneText(entry.phone)}</Ltr>
+                {!entry.has_account && <Badge>الحساب محذوف</Badge>}
+              </div>
+              <div className="text-label text-ink-2">حظره {blockedBy(entry)} في {fullDay(entry.blocked_at)}{entry.reason ? ` · ${entry.reason}` : ''}</div>
             </div>
-            <button onClick={() => void onUnblock(entry)}
-              className="rounded-lg border border-emerald-200 px-3 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-50">
-              إلغاء الحظر
-            </button>
-          </li>
+            <Button sm kind="outline" icon="shield" className="max-sm:!h-12" onClick={() => setTarget(entry)}>إلغاء الحظر</Button>
+          </div>
         ))}
-      </ul>
-    </div>
+      </Card>
+      <ConfirmDialog open={!!target} onClose={() => setTarget(null)} icon="shield" tone="teal" kind="primary" confirm="إلغاء الحظر"
+        title={<>إلغاء حظر الرقم <Ltr>{phoneText(target?.phone)}</Ltr>؟</>}
+        onConfirm={async () => { if (!target) return; await unblock(target.phone); notifyDone(`تم إلغاء حظر ${phoneText(target.phone)}`); }}>
+        <p className="m-0">يصبح متاحاً للتسجيل{target?.has_account ? '، ويستطيع صاحب الحساب الدخول مرة أخرى' : ''}.</p>
+      </ConfirmDialog>
+    </Section>
   );
 };

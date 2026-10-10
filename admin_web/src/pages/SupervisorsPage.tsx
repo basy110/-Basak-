@@ -1,372 +1,366 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { useCompany } from '../lib/adminScope';
-import { useQueryClient } from '@tanstack/react-query';
 import { keys, refreshIfNotUpdated } from '../lib/query';
-import { SUPERVISOR_COLUMNS as COLUMNS, useLineNames, useSupervisorLines, useSupervisors, type LineName, type SupervisorLine, type SupervisorRow } from '../lib/reference';
+import {
+  SUPERVISOR_COLUMNS, useLineNames, useLines, useSupervisorLines, useSupervisors, type SupervisorLine, type SupervisorRow,
+} from '../lib/reference';
+import { useCompanyOverview } from '../lib/overview';
 import { rememberApplied } from '../lib/recentChanges';
 import { useGuard } from '../lib/guard';
 import { notifyDone, notifyError } from '../lib/toasts';
 import { useSignedUrls } from '../lib/signedUrls';
-import { SkeletonRows } from '../components/Skeleton';
-import { invokeEdgeFunction } from '../lib/edgeFunctions';
 import { squareJpeg } from '../lib/images';
-import { UserCheck, Plus, CheckCircle, XCircle, Trash2, Bus, Pencil, Save, X, Camera } from 'lucide-react';
+import {
+  assignmentMaps, filterSupervisors, impactOn, linesPhrase, linesWithoutSupervisor, listText, supervisorCounts, supervisorsCount,
+  createSupervisor, deleteSupervisor, normalizePhone, resetSupervisorPassword, setSupervisorActive, setSupervisorLines, updateSupervisor,
+  useSupervisorRecords, type SupervisorFilter, type SupervisorSort,
+} from '../lib/team';
+import {
+  Badge, Button, Chips, DataTable, EmptyState, ErrorState, Note, Page, PageHeader, Pager, PhoneBar, SearchBox, SkeletonTable,
+  Icon, SortSelect, StatePill, Toolbar, countText, errorText, useOnline, type Column,
+} from '../ui';
+import { LineTag, PersonCell, PhoneLtr } from '../components/team/parts';
+import { RowMenu } from '../components/team/RowMenu';
+import { SupervisorAddPanel, SupervisorEditPanel, SupervisorLinesPanel, SupervisorPanel, type AddDraft, type LineFacts } from '../components/team/SupervisorPanels';
+import {
+  AssignLineDialog, CredentialsDialog, DeleteDialog, RemovePhotoDialog, ResetPasswordDialog, StartDialog, StopDialog,
+} from '../components/team/SupervisorDialogs';
 
 const PHOTO_BUCKET = 'supervisor-avatars';
+const PAGE = 25;
+type Sup = SupervisorRow & { created_at?: string };
+type Overlay =
+  | { kind: 'add' } | { kind: 'open'; id: string } | { kind: 'lines'; id: string } | { kind: 'edit'; id: string }
+  | { kind: 'stop'; id: string } | { kind: 'start'; id: string } | { kind: 'delete'; id: string } | { kind: 'photo'; id: string }
+  | { kind: 'password'; id: string } | { kind: 'assign'; lineId: string } | null;
 
-type Supervisor = SupervisorRow;
-type LineOption = LineName;
-
-/** Checkbox list of a company's lines. */
-const LinePicker: React.FC<{
-  lines: LineOption[];
-  selected: string[];
-  onChange: (ids: string[]) => void;
-}> = ({ lines, selected, onChange }) => {
-  if (lines.length === 0) {
-    return <p className="text-xs text-amber-700">لا توجد خطوط لهذه الشركة بعد. أضف خطاً من صفحة الخطوط أولاً.</p>;
-  }
-  const toggle = (id: string) =>
-    onChange(selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id]);
-  return (
-    <div className="flex flex-wrap gap-2">
-      {lines.map((line) => {
-        const on = selected.includes(line.id);
-        return (
-          <label key={line.id}
-            className={`flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-1.5 text-xs font-semibold transition ${
-              on ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-200 bg-white text-slate-600 hover:border-blue-300'}`}>
-            <input type="checkbox" className="accent-blue-600" checked={on} onChange={() => toggle(line.id)} />
-            <Bus className="h-3.5 w-3.5" />
-            {line.name}{!line.is_active && ' (موقوف)'}
-          </label>
-        );
-      })}
-    </div>
-  );
-};
-
+/**
+ * «المشرفون» (docs/canvas/AdmSupervisors*, AdmSupervisor*): who rides the bus and
+ * records boarding. A list; one supervisor in a side panel; every change through
+ * a named action, and the ones that stop, delete or move access through a question.
+ */
 export const SupervisorsPage: React.FC = () => {
-  const companyId = useCompany().id;
-  // New supervisor form
-  const [fullName, setFullName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [password, setPassword] = useState('');
-  const [lineIds, setLineIds] = useState<string[]>([]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // Editing the lines of an existing supervisor
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editingLines, setEditingLines] = useState<string[]>([]);
-  const [savingLines, setSavingLines] = useState(false);
-  const [uploadingId, setUploadingId] = useState<string | null>(null);
-
-  // Three lookups, each cached once and shared (the lines page shows the same supervisors and assignments).
-  const supervisorsPage = useSupervisors(companyId);
-  const linesPage = useLineNames(companyId);
-  const assignmentsPage = useSupervisorLines(companyId);
-  const supervisors = supervisorsPage.data ?? [];
-  const lines = useMemo(() => linesPage.data ?? [], [linesPage.data]);
-  const assignments = useMemo(() => {
-    const byRow: Record<string, string[]> = {};
-    (assignmentsPage.data ?? []).forEach((row) => { (byRow[row.supervisor_id] ||= []).push(row.line_id); });
-    return byRow;
-  }, [assignmentsPage.data]);
-  const loading = supervisorsPage.loading;
-  const pageError = supervisorsPage.error || linesPage.error || assignmentsPage.error;
-  const fetchData = async () => { await Promise.all([supervisorsPage.reload(), assignmentsPage.reload()]); };
+  const company = useCompany();
+  const companyId = company.id;
+  const online = useOnline();
   const client = useQueryClient();
   const guard = useGuard();
+
+  const supervisorsQ = useSupervisors(companyId);
+  const linesQ = useLineNames(companyId);
+  const assignQ = useSupervisorLines(companyId);
+  const overview = useCompanyOverview(companyId);
+  const supervisors = (supervisorsQ.data ?? []) as Sup[];
+  const lines = useMemo(() => linesQ.data ?? [], [linesQ.data]);
+  const assignments = useMemo(() => assignQ.data ?? [], [assignQ.data]);
+  const { linesOf, supervisorsOf } = useMemo(() => assignmentMaps(assignments), [assignments]);
+  const lineById = useMemo(() => new Map(lines.map((l) => [l.id, l])), [lines]);
+  const subscribers = useMemo(() => new Map((overview.data?.top_lines ?? []).map((l) => [l.id, l.subscribers])), [overview.data]);
+  const photos = useSignedUrls(PHOTO_BUCKET, supervisors.map((s) => s.profile_image_url));
+  const photoOf = (s?: SupervisorRow | null) => (s?.profile_image_url ? photos[s.profile_image_url] : null);
+
   const supervisorsKey = keys.company(companyId, 'supervisors');
   const assignmentsKey = keys.company(companyId, 'supervisorLines');
-  // A saved row goes straight into the list on screen; its announcement on the live topic
-  // then re-reads nothing here (the company's numbers still follow it).
-  const applyRow = (row: Supervisor) => {
+
+  // List state
+  const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState<SupervisorFilter>('all');
+  const [sort, setSort] = useState<SupervisorSort>('name');
+  const [page, setPage] = useState(1);
+  const counts = supervisorCounts(supervisors, linesOf);
+  const shown = useMemo(() => filterSupervisors(supervisors, linesOf, { search, filter, sort }), [supervisors, linesOf, search, filter, sort]);
+  const pageRows = shown.slice((page - 1) * PAGE, page * PAGE);
+  const uncovered = useMemo(() => linesWithoutSupervisor(lines, supervisors, supervisorsOf), [lines, supervisors, supervisorsOf]);
+  const uncoveredSet = useMemo(() => new Set(uncovered.map((l) => l.id)), [uncovered]);
+
+  // What is open
+  const [overlay, setOverlay] = useState<Overlay>(null);
+  const [panelId, setPanelId] = useState<string | null>(null); // the record under a dialog stays open
+  const [busy, setBusy] = useState(false);
+  const [formError, setFormError] = useState('');
+  const [created, setCreated] = useState<{ name: string; phone: string; password: string; lines: string[]; reset?: boolean } | null>(null);
+  const [uploadingId, setUploadingId] = useState<string | null>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
+  const photoTarget = useRef<Sup | null>(null);
+
+  const byId = (id?: string | null) => supervisors.find((s) => s.id === id) ?? null;
+  const targetId = overlay && 'id' in overlay ? overlay.id : null;
+  const target = byId(targetId);
+  const panelSup = byId(panelId);
+  const open = (o: Overlay) => { setFormError(''); setOverlay(o); };
+  const closeOverlay = () => { setOverlay(panelId ? { kind: 'open', id: panelId } : null); setFormError(''); };
+  const openRecord = (id: string) => { setPanelId(id); open({ kind: 'open', id }); };
+  const closeRecord = () => { setPanelId(null); setOverlay(null); };
+
+  // Lines of a full line row (trip counts), only while a record is open.
+  const fullLines = useLines(companyId, !!panelId);
+  const factsOf = (id: string): LineFacts[] => (linesOf.get(id) ?? []).flatMap((lineId) => {
+    const line = lineById.get(lineId);
+    if (!line) return [];
+    const full = fullLines.data?.find((l) => l.id === lineId);
+    const trips = full?.line_trips.filter((t) => t.is_active);
+    return [{ line, subscribers: subscribers.get(lineId), departures: trips?.filter((t) => t.direction === 'departure').length, returns: trips?.filter((t) => t.direction === 'return').length }];
+  });
+
+  const records = useSupervisorRecords(companyId, overlay?.kind === 'delete' ? overlay.id : null);
+
+  // ── Writes ──────────────────────────────────────────────────────────
+  const applyRow = (row: SupervisorRow) => {
     rememberApplied([row.id], ['supervisors']);
-    client.setQueryData<Supervisor[]>(supervisorsKey, (list) => list?.map((item) => (item.id === row.id ? row : item)));
+    client.setQueryData<Sup[]>(supervisorsKey, (list) => list?.map((item) => (item.id === row.id ? { ...item, ...row } : item)));
   };
+  const applyLines = (supervisorId: string, ids: string[]) => {
+    client.setQueryData<SupervisorLine[]>(assignmentsKey, (rows) => (rows ? [
+      ...rows.filter((r) => r.supervisor_id !== supervisorId), ...ids.map((line_id) => ({ supervisor_id: supervisorId, line_id })),
+    ] : rows));
+    refreshIfNotUpdated(assignmentsKey);
+  };
+  const names = (ids: string[]) => ids.map((id) => lineById.get(id)?.name ?? 'خط');
 
-  const linesById = useMemo(() => new Map(lines.map((line) => [line.id, line])), [lines]);
-  // Signed once per photo and reused (lib/signedUrls.ts): a focus or a return here does not download them again.
-  const photos = useSignedUrls(PHOTO_BUCKET, supervisors.map((s) => s.profile_image_url));
-
-  // The photo the supervisor sees in the app, and the students of their lines.
-  const handlePhoto = (sup: Supervisor, file: File | undefined) => guard(`photo:${sup.id}`, async () => {
-    if (!file) return;
+  const add = (d: AddDraft) => void guard('add', async () => {
+    setBusy(true); setFormError('');
     try {
-      setUploadingId(sup.id);
-      const image = await squareJpeg(file);
-      const path = `${sup.id}/${Date.now()}.jpg`;
-      const { error: uploadError } = await supabase.storage.from(PHOTO_BUCKET)
-        .upload(path, image, { contentType: 'image/jpeg', upsert: false });
-      if (uploadError) throw uploadError;
-      const { data, error: rowError } = await supabase.from('supervisors').update({ profile_image_url: path }).eq('id', sup.id).select(COLUMNS).single();
-      if (rowError || !data) {
-        await supabase.storage.from(PHOTO_BUCKET).remove([path]);
-        throw rowError ?? new Error('لم تُحفظ الصورة.');
-      }
-      // The new photo shows first; the old file is cleaned up behind it.
-      applyRow(data as Supervisor);
-      if (sup.profile_image_url) void supabase.storage.from(PHOTO_BUCKET).remove([sup.profile_image_url]);
-    } catch (err: any) {
-      notifyError('فشل رفع الصورة', err.message);
-    } finally {
-      setUploadingId(null);
-    }
+      await createSupervisor({ ...d, companyId });
+      setOverlay(null);
+      setCreated({ name: d.fullName, phone: d.phone, password: d.password, lines: names(d.lineIds) });
+      refreshIfNotUpdated(supervisorsKey);
+      refreshIfNotUpdated(assignmentsKey);
+    } catch (e) { setFormError(errorText(e)); }
+    setBusy(false);
   });
 
-  const handleRemovePhoto = (sup: Supervisor) => guard(`photo:${sup.id}`, async () => {
-    if (!sup.profile_image_url || !confirm(`إزالة صورة المشرف "${sup.full_name}"؟`)) return;
-    const { data, error } = await supabase.from('supervisors').update({ profile_image_url: null }).eq('id', sup.id).select(COLUMNS).single();
-    if (error || !data) return notifyError('فشل إزالة الصورة', error?.message);
-    applyRow(data as Supervisor);
-    void supabase.storage.from(PHOTO_BUCKET).remove([sup.profile_image_url]);
+  const saveLines = (s: Sup, ids: string[]) => void guard(`lines:${s.id}`, async () => {
+    setBusy(true); setFormError('');
+    try {
+      await setSupervisorLines(s.id, ids);
+      applyLines(s.id, ids);
+      closeOverlay();
+      notifyDone(ids.length ? `حُفظت خطوط ${s.full_name}: ${listText(names(ids))}.` : `رُفعت كل الخطوط عن ${s.full_name}.`);
+    } catch (e) { setFormError(errorText(e)); }
+    setBusy(false);
   });
 
-  const handleAddSupervisor = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!fullName.trim() || !phone.trim() || !companyId) return notifyError('يرجى ملء جميع الحقول المطلوبة.');
-    if (password.trim().length < 8) return notifyError('كلمة المرور يجب ألا تقل عن 8 أحرف.');
-    if (lineIds.length === 0) return notifyError('اختر خطاً واحداً على الأقل يكون المشرف مسؤولاً عنه.');
-
-    // A second submit while the first is on its way does nothing (the account must not be created twice).
-    void guard('add', async () => {
+  const assignLine = (lineId: string, supervisorId: string) => {
+    const s = byId(supervisorId);
+    if (!s) return;
+    const ids = [...new Set([...(linesOf.get(s.id) ?? []), lineId])];
+    void guard(`lines:${s.id}`, async () => {
+      setBusy(true); setFormError('');
       try {
-        setIsSubmitting(true);
-        // Server-side creation: confirmed Auth account, company-scoped row and the
-        // supervisor's lines, all-or-nothing. No password is stored by Basak.
-        await invokeEdgeFunction('admin-create-supervisor', {
-          fullName: fullName.trim(),
-          phone: phone.trim(),
-          password: password.trim(),
-          companyId,
-          lineIds,
-        });
-        setFullName('');
-        setPhone('');
-        setPassword('');
-        setLineIds([]);
-        notifyDone('تمت إضافة المشرف وتعيين خطوطه',
-          'يدخل التطبيق برقم الهاتف وكلمة المرور التي كتبتها، فسلّمها له الآن: تُحفظ مشفّرة ولا يمكن عرضها مرة أخرى.');
-        // The new supervisor and their lines are announced on the live topic, which reads both lists once.
-        refreshIfNotUpdated(supervisorsKey);
-        refreshIfNotUpdated(assignmentsKey);
-      } catch (err: any) {
-        notifyError('فشل إضافة المشرف', err.message);
-      } finally {
-        setIsSubmitting(false);
-      }
+        await setSupervisorLines(s.id, ids);
+        applyLines(s.id, ids);
+        setOverlay(null);
+        notifyDone(`أصبح ${s.full_name} مشرف خط ${lineById.get(lineId)?.name ?? ''}.`);
+      } catch (e) { setFormError(errorText(e)); }
+      setBusy(false);
     });
   };
 
-  const saveLines = (supervisor: Supervisor) => guard(`lines:${supervisor.id}`, async () => {
+  const toggle = (s: Sup) => void guard(`row:${s.id}`, async () => {
+    setBusy(true);
     try {
-      setSavingLines(true);
-      const lineIdsNow = editingLines;
-      const { error } = await supabase.rpc('set_supervisor_lines', {
-        p_supervisor_id: supervisor.id,
-        p_line_ids: lineIdsNow,
-      });
-      if (error) throw error;
-      // What was saved is what was sent: shown at once. The live topic confirms it with one read.
-      client.setQueryData<SupervisorLine[]>(assignmentsKey, (rows) => (rows ? [
-        ...rows.filter((row) => row.supervisor_id !== supervisor.id),
-        ...lineIdsNow.map((line_id) => ({ supervisor_id: supervisor.id, line_id })),
-      ] : rows));
-      setEditingId(null);
-      refreshIfNotUpdated(assignmentsKey);
-    } catch (err: any) {
-      notifyError('فشل حفظ خطوط المشرف', err.message);
-    } finally {
-      setSavingLines(false);
-    }
+      const row = await setSupervisorActive(s.id, !s.is_active);
+      applyRow(row);
+      closeOverlay();
+      notifyDone(row.is_active ? `عاد ${s.full_name} يعمل.` : `أُوقف ${s.full_name}. لا يرى خطوطه حتى تشغّله.`);
+    } catch (e) { notifyError(s.is_active ? 'تعذّر إيقاف المشرف' : 'تعذّر تشغيل المشرف', errorText(e)); }
+    setBusy(false);
   });
 
-  const handleToggleActive = (sup: Supervisor) => guard(`row:${sup.id}`, async () => {
-    const { data, error } = await supabase.from('supervisors').update({ is_active: !sup.is_active }).eq('id', sup.id).select(COLUMNS).single();
-    if (error || !data) notifyError('فشل تغيير الحالة', error?.message);
-    else applyRow(data as Supervisor);
+  const remove = (s: Sup) => void guard(`row:${s.id}`, async () => {
+    setBusy(true);
+    try {
+      await deleteSupervisor(s.id);
+      rememberApplied([s.id], ['supervisors']);
+      client.setQueryData<Sup[]>(supervisorsKey, (list) => list?.filter((item) => item.id !== s.id));
+      client.setQueryData<SupervisorLine[]>(assignmentsKey, (rows) => rows?.filter((r) => r.supervisor_id !== s.id));
+      setPanelId(null); setOverlay(null);
+      notifyDone(`حُذف المشرف ${s.full_name}.`, records.data?.kept && records.data.scans > 0 ? 'سجلات الركوب التي سجّلها باقية باسمه.' : undefined);
+    } catch (e) { notifyError('تعذّر حذف المشرف', errorText(e)); }
+    setBusy(false);
   });
 
-  const handleDelete = (id: string, name: string) => guard(`row:${id}`, async () => {
-    if (!confirm(`هل أنت متأكد من حذف المشرف "${name}"؟ سيتم حذف حساب الدخول الخاص به أيضاً.`)) return;
+  const edit = (s: Sup, fullName: string, phone: string) => void guard(`edit:${s.id}`, async () => {
+    setBusy(true); setFormError('');
     try {
-      await invokeEdgeFunction('admin-delete-supervisor', { supervisorId: id });
-      rememberApplied([id], ['supervisors']);
-      client.setQueryData<Supervisor[]>(supervisorsKey, (list) => list?.filter((item) => item.id !== id));
-      client.setQueryData<SupervisorLine[]>(assignmentsKey, (rows) => rows?.filter((row) => row.supervisor_id !== id));
-    } catch (err: any) {
-      notifyError('فشل الحذف', err.message);
-    }
+      const moved = normalizePhone(phone) !== s.phone;
+      const row = await updateSupervisor(s, fullName, phone);
+      applyRow(row);
+      closeOverlay();
+      notifyDone(moved ? `حُفظت بيانات ${row.full_name}. يدخل الآن بالرقم الجديد.` : `حُفظ اسم ${row.full_name}.`);
+    } catch (e) { setFormError(errorText(e)); }
+    setBusy(false);
   });
+
+  const resetPassword = (s: Sup, password: string) => void guard(`password:${s.id}`, async () => {
+    setBusy(true); setFormError('');
+    try {
+      const answer = await resetSupervisorPassword(s.id, password);
+      setOverlay(panelId ? { kind: 'open', id: panelId } : null);
+      setCreated({ name: s.full_name, phone: s.phone, password: answer?.password || password, lines: names(linesOf.get(s.id) ?? []), reset: true });
+    } catch (e) { setFormError(errorText(e)); }
+    setBusy(false);
+  });
+
+  // The photo the supervisor sees in the app, and the students of his lines.
+  const pickPhoto = (s: Sup) => { photoTarget.current = s; fileInput.current?.click(); };
+  const uploadPhoto = (file: File | undefined) => {
+    const s = photoTarget.current;
+    if (!file || !s) return;
+    void guard(`photo:${s.id}`, async () => {
+      setUploadingId(s.id);
+      try {
+        const image = await squareJpeg(file);
+        const path = `${s.id}/${Date.now()}.jpg`;
+        const { error: upErr } = await supabase.storage.from(PHOTO_BUCKET).upload(path, image, { contentType: 'image/jpeg', upsert: false });
+        if (upErr) throw upErr;
+        const { data, error } = await supabase.from('supervisors').update({ profile_image_url: path }).eq('id', s.id).select(SUPERVISOR_COLUMNS).single();
+        if (error || !data) { await supabase.storage.from(PHOTO_BUCKET).remove([path]); throw error ?? new Error('لم تُحفظ الصورة.'); }
+        applyRow(data as SupervisorRow);
+        if (s.profile_image_url) void supabase.storage.from(PHOTO_BUCKET).remove([s.profile_image_url]);
+        notifyDone(`حُفظت صورة ${s.full_name}.`);
+      } catch (e) { notifyError('تعذّر حفظ الصورة', errorText(e)); }
+      setUploadingId(null);
+    });
+  };
+  const removePhoto = (s: Sup) => void guard(`photo:${s.id}`, async () => {
+    if (!s.profile_image_url) return;
+    setBusy(true);
+    try {
+      const { data, error } = await supabase.from('supervisors').update({ profile_image_url: null }).eq('id', s.id).select(SUPERVISOR_COLUMNS).single();
+      if (error || !data) throw error ?? new Error('');
+      applyRow(data as SupervisorRow);
+      void supabase.storage.from(PHOTO_BUCKET).remove([s.profile_image_url]);
+      closeOverlay();
+      notifyDone(`أُزيلت صورة ${s.full_name}.`);
+    } catch (e) { notifyError('تعذّر إزالة الصورة', errorText(e)); }
+    setBusy(false);
+  });
+
+  // ── Page ────────────────────────────────────────────────────────────
+  const loading = supervisorsQ.loading || linesQ.loading || assignQ.loading;
+  const loadError = supervisorsQ.error || linesQ.error || assignQ.error;
+  const retry = () => { void supervisorsQ.reload(); void linesQ.reload(); void assignQ.reload(); };
+  const noLines = !loading && !loadError && lines.length === 0;
+  const canAdd = !noLines && !loading && !loadError;
+  const addButton = (full?: boolean) => <Button icon="plus" full={full} disabled={!online} onClick={() => open({ kind: 'add' })}>أضف مشرفاً</Button>;
+
+  const lineCell = (s: Sup) => {
+    const ids = linesOf.get(s.id) ?? [];
+    if (!ids.length) return <Badge tone="warning">بلا خطوط</Badge>;
+    return <span className="flex min-w-0 flex-wrap gap-1.5">{ids.map((id) => <LineTag key={id} line={lineById.get(id)} />)}</span>;
+  };
+  const menu = (s: Sup) => (
+    <RowMenu label={`إجراءات ${s.full_name}`} items={[
+      { label: 'افتح بيانات المشرف', icon: 'eye', onClick: () => openRecord(s.id) },
+      { label: 'تغيير الخطوط', icon: 'route', onClick: () => { setPanelId(null); open({ kind: 'lines', id: s.id }); }, hidden: !online },
+      { label: s.profile_image_url ? 'تغيير الصورة' : 'إضافة صورة', icon: 'image', onClick: () => pickPhoto(s), hidden: !online },
+      { label: s.is_active ? 'إيقاف المشرف' : 'تشغيل المشرف', icon: 'power', divider: true, onClick: () => { setPanelId(null); open({ kind: s.is_active ? 'stop' : 'start', id: s.id }); }, hidden: !online },
+      { label: 'حذف المشرف', icon: 'trash', danger: true, onClick: () => { setPanelId(null); open({ kind: 'delete', id: s.id }); }, hidden: !online },
+    ]} />
+  );
+  const columns: Column<Sup>[] = [
+    { key: 'name', label: 'المشرف', render: (s) => <PersonCell name={s.full_name} src={photoOf(s)} /> },
+    { key: 'phone', label: 'رقم الهاتف', w: 168, hideTablet: true, render: (s) => <PhoneLtr phone={s.phone} className={s.is_active ? '' : 'text-ink-3'} /> },
+    { key: 'lines', label: 'الخطوط', w: 300, render: lineCell },
+    { key: 'state', label: 'الحالة', w: 120, render: (s) => <StatePill state={s.is_active ? 'on' : 'off'} /> },
+    { key: 'menu', label: <span className="sr-only">إجراءات</span>, w: 64, align: 'end', render: menu },
+  ];
+
+  const uncoveredTitle = uncovered.length === 1 ? 'خط بلا مشرف' : uncovered.length === 2 ? 'خطان بلا مشرف' : `${countText(uncovered.length, ['خط', 'خطان', 'خطوط', 'خطاً'])} بلا مشرف`;
+  const firstUncovered = uncovered[0];
+
+  const stopImpact = target ? impactOn(target.id, linesOf.get(target.id) ?? [], lines, supervisors, supervisorsOf) : [];
+  const sole = stopImpact.filter((i) => i.line.is_active && i.others.length === 0).map((i) => ({ line: i.line, subscribers: subscribers.get(i.line.id) }));
+  const assignable = supervisors.filter((s) => s.is_active).map((s) => ({ ...s, lines: (linesOf.get(s.id) ?? []).length }));
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-800">إدارة المشرفين</h1>
-        <p className="text-sm text-slate-500">
-          الشركة ← الخط ← المشرف. يرى المشرف في التطبيق الخطوط المسندة إليه فقط. يدخل المشرف برقم الهاتف وكلمة المرور، وتُحفظ مشفّرة فلا تظهر بعد الإنشاء: سلّمها له عند إضافته. صورة المشرف تظهر له في التطبيق ولطلاب خطوطه
-        </p>
-      </div>
+    <Page>
+      <PageHeader title="المشرفون" phoneActions={false}
+        sub={<span className="hidden sm:inline">المشرف يركب مع الباص ويسجّل صعود الطلاب بهاتفه. يدخل التطبيق برقم هاتفه وكلمة مرور، ويرى خطوطه فقط.</span>}
+        actions={loading || (canAdd && supervisors.length > 0) ? addButton() : undefined} />
 
-      {pageError && (
-        <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
-          تعذر تحميل البيانات: {pageError}
-          <button className="mr-3 font-bold underline" onClick={() => void fetchData()}>إعادة المحاولة</button>
-        </div>
-      )}
+      {loading ? <SkeletonTable rows={6} cols={4} />
+        : loadError ? <ErrorState card title="تعذّر تحميل المشرفين" text="لم نستطع جلب المشرفين وخطوطهم. تأكد من اتصالك ثم حاول مرة أخرى." onRetry={retry} />
+          : noLines ? (
+            <EmptyState card icon="route" title="أضف خطاً أولاً" text="كل مشرف يلزمه خط واحد على الأقل يشرف عليه، وليس عندك خطوط بعد."
+              action={<Button icon="plus" to={`/c/${companyId}/lines/new`}>أضف أول خط</Button>} />
+          ) : supervisors.length === 0 ? (
+            <EmptyState card icon="scan" title="لا مشرفين بعد" text="المشرف يركب مع الباص ويسجّل صعود الطلاب بهاتفه، فتعرف من ركب فعلاً. أضف أول مشرف وأسند إليه خطاً."
+              action={addButton()} />
+          ) : (
+            <>
+              {uncovered.length > 0 && (
+                <Note tone="danger" title={`${uncoveredTitle}: ${listText(uncovered.map((l) => l.name))}`}
+                  action={online ? <Button kind="outline" sm className="hidden flex-none sm:inline-flex" onClick={() => open({ kind: 'assign', lineId: firstUncovered.id })}>اختر مشرفاً لخط {firstUncovered.name}</Button> : undefined}>
+                  {uncovered.length === 1 ? 'لا أحد يسجّل ركاب هذا الخط عند الصعود. أسنده لمشرف موجود أو أضف مشرفاً.'
+                    : uncovered.length === 2 ? 'لا أحد يسجّل ركاب هذين الخطين عند الصعود. أسندهما لمشرف موجود أو أضف مشرفاً.'
+                      : 'لا أحد يسجّل ركاب هذه الخطوط عند الصعود. أسندها لمشرف موجود أو أضف مشرفاً.'}
+                </Note>
+              )}
+              <DataTable<Sup>
+                caption="مشرفو الشركة" columns={columns} rows={pageRows} rowKey={(s) => s.id} onOpen={(s) => openRecord(s.id)} openKey={panelId}
+                muted={(s) => !s.is_active}
+                toolbar={<Toolbar
+                  search={<SearchBox value={search} onChange={(v) => { setSearch(v); setPage(1); }} placeholder="ابحث بالاسم أو رقم الهاتف" />}
+                  filters={<Chips<SupervisorFilter> value={filter} onChange={(v) => { setFilter(v); setPage(1); }} options={[
+                    { value: 'all', label: 'الكل', count: counts.all }, { value: 'on', label: 'يعمل', count: counts.on },
+                    { value: 'off', label: 'متوقف', count: counts.off }, { value: 'nolines', label: 'بلا خطوط', count: counts.nolines },
+                  ]} />}
+                  count={<span className="sm:hidden">{supervisorsCount(shown.length)}</span>}
+                  sort={<span className="hidden sm:contents"><SortSelect<SupervisorSort> value={sort} onChange={setSort} options={[{ value: 'name', label: 'الاسم' }, { value: 'newest', label: 'الأحدث' }]} /></span>} />}
+                empty={shown.length === 0 ? <EmptyState icon="search" title="لا مشرف يطابق" text="جرّب اسماً آخر أو جزءاً من الرقم، أو اعرض الكل."
+                  action={<Button kind="secondary" onClick={() => { setSearch(''); setFilter('all'); }}>اعرض الكل</Button>} /> : undefined}
+                pager={<Pager page={page} total={shown.length} onPage={setPage} />}
+                card={(s) => ({
+                  title: <span className="flex items-center gap-3"><PersonCell name={s.full_name} src={photoOf(s)} /></span>,
+                  end: <Icon name="fwd" size={18} className="mt-2.5 text-ink-3" />,
+                  fields: [['رقم الهاتف', <PhoneLtr key="p" phone={s.phone} />], ['الخطوط', <span key="l" className="inline-flex justify-end">{lineCell(s)}</span>], ['الحالة', <StatePill key="s" state={s.is_active ? 'on' : 'off'} />]],
+                })} />
+            </>
+          )}
 
-      {/* Add Supervisor Card */}
-      <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
-        <h2 className="text-base font-bold text-slate-700">تعيين مشرف جديد</h2>
-        <form onSubmit={handleAddSupervisor} className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div>
-            <label className="text-xs font-semibold text-slate-500">اسم المشرف</label>
-            <input type="text" placeholder="مثال: أحمد محمود" value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              className="mt-1 w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm focus:border-blue-500 focus:outline-none" required />
-          </div>
+      {canAdd && supervisors.length > 0 && <PhoneBar>{addButton(true)}</PhoneBar>}
 
-          <div>
-            <label className="text-xs font-semibold text-slate-500">رقم الهاتف (الفريد للدخول)</label>
-            <input type="tel" placeholder="01xxxxxxxxx" value={phone} onChange={(e) => setPhone(e.target.value)}
-              className="mt-1 w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm focus:border-blue-500 focus:outline-none" required />
-          </div>
+      <input ref={fileInput} type="file" accept="image/*" className="hidden" aria-hidden="true" tabIndex={-1}
+        onChange={(e) => { uploadPhoto(e.target.files?.[0]); e.target.value = ''; }} />
 
-          <div>
-            <label className="text-xs font-semibold text-slate-500">كلمة المرور لتطبيق الهاتف</label>
-            <input type="text" autoComplete="new-password" minLength={8} placeholder="8 أحرف على الأقل" value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="mt-1 w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm focus:border-blue-500 focus:outline-none" required />
-          </div>
+      <SupervisorAddPanel open={overlay?.kind === 'add'} onClose={() => setOverlay(null)} lines={lines} uncovered={uncoveredSet}
+        busy={busy} serverError={overlay?.kind === 'add' ? formError : ''} onSubmit={add} disabled={!online} />
 
-          <div className="sm:col-span-2 lg:col-span-4">
-            <label className="text-xs font-semibold text-slate-500">الخطوط المسؤول عنها (يمكن اختيار أكثر من خط)</label>
-            <div className="mt-2">
-              <LinePicker lines={lines} selected={lineIds} onChange={setLineIds} />
-            </div>
-          </div>
+      <SupervisorPanel open={!!panelSup} onClose={closeRecord} supervisor={panelSup} photo={photoOf(panelSup)}
+        uploading={uploadingId === panelSup?.id} lines={panelSup ? factsOf(panelSup.id) : []} writable={online}
+        onPhoto={() => panelSup && pickPhoto(panelSup)} onRemovePhoto={() => panelSup && open({ kind: 'photo', id: panelSup.id })}
+        onEdit={() => panelSup && open({ kind: 'edit', id: panelSup.id })} onLines={() => panelSup && open({ kind: 'lines', id: panelSup.id })}
+        onPassword={() => panelSup && open({ kind: 'password', id: panelSup.id })}
+        onToggle={() => panelSup && open({ kind: panelSup.is_active ? 'stop' : 'start', id: panelSup.id })}
+        onDelete={() => panelSup && open({ kind: 'delete', id: panelSup.id })} />
 
-          <div className="sm:col-span-2 lg:col-span-4 flex justify-end">
-            <button type="submit" disabled={isSubmitting || lineIds.length === 0}
-              className="flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-2.5 text-sm font-bold text-white transition hover:bg-blue-700 disabled:opacity-50">
-              <Plus className="h-4 w-4" />
-              {isSubmitting ? 'جاري الإضافة...' : 'إضافة المشرف'}
-            </button>
-          </div>
-        </form>
-      </div>
+      <SupervisorLinesPanel open={overlay?.kind === 'lines'} onClose={closeOverlay} supervisor={target} photo={photoOf(target)} lines={lines}
+        current={target ? linesOf.get(target.id) ?? [] : []}
+        uncovered={new Set(target ? linesWithoutSupervisor(lines, supervisors.filter((s) => s.id !== target.id), supervisorsOf).map((l) => l.id) : [])}
+        busy={busy} error={overlay?.kind === 'lines' ? formError : ''} onSave={(ids) => target && saveLines(target, ids)} />
 
-      {/* Supervisors Table */}
-      <div className="rounded-2xl border border-slate-100 bg-white shadow-sm overflow-x-auto">
-        {loading ? (
-          <SkeletonRows />
-        ) : supervisors.length === 0 ? (
-          <div className="p-8 text-center text-slate-500">لا يوجد مشرفون مسجلون حالياً.</div>
-        ) : (
-          <table className="w-full min-w-[760px] text-right text-sm">
-            <thead className="border-b border-slate-100 bg-slate-50/50 text-slate-500">
-              <tr>
-                <th className="p-4 font-bold">اسم المشرف</th>
-                <th className="p-4 font-bold">رقم الهاتف</th>
-                <th className="p-4 font-bold">الخطوط المسندة</th>
-                <th className="p-4 font-bold">الحالة</th>
-                <th className="p-4 font-bold">إجراءات</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {supervisors.map((s) => {
-                const assigned = assignments[s.id] || [];
-                const editing = editingId === s.id;
-                return (
-                  <tr key={s.id} className="align-top hover:bg-slate-50/80">
-                    <td className="p-4 font-semibold text-slate-800">
-                      <div className="flex items-center gap-3">
-                        <label className="relative shrink-0 cursor-pointer" title="إضافة أو تغيير صورة المشرف">
-                          {s.profile_image_url && photos[s.profile_image_url] ? (
-                            <img src={photos[s.profile_image_url]} alt={s.full_name}
-                              className="h-10 w-10 rounded-full object-cover" />
-                          ) : (
-                            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-400">
-                              <UserCheck className="h-5 w-5" />
-                            </span>
-                          )}
-                          <span className="absolute -bottom-1 -left-1 flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-white shadow">
-                            <Camera className="h-3 w-3" />
-                          </span>
-                          <input type="file" accept="image/*" className="hidden" disabled={uploadingId === s.id}
-                            onChange={(e) => { void handlePhoto(s, e.target.files?.[0]); e.target.value = ''; }} />
-                        </label>
-                        <div>
-                          {s.full_name}
-                          {uploadingId === s.id ? (
-                            <p className="text-[11px] font-normal text-blue-600">جاري رفع الصورة...</p>
-                          ) : s.profile_image_url ? (
-                            <button onClick={() => void handleRemovePhoto(s)}
-                              className="block text-[11px] font-normal text-rose-500 hover:underline">إزالة الصورة</button>
-                          ) : (
-                            <p className="text-[11px] font-normal text-slate-400">اضغط الصورة لإضافتها</p>
-                          )}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="p-4 text-slate-600 font-mono text-xs">{s.phone}</td>
-                    <td className="p-4">
-                      {editing ? (
-                        <div className="space-y-2">
-                          <LinePicker lines={lines} selected={editingLines} onChange={setEditingLines} />
-                          {editingLines.length === 0 && (
-                            <p className="text-[11px] text-amber-700">بدون خطوط لن يرى المشرف أي خط في التطبيق.</p>
-                          )}
-                          <div className="flex gap-2">
-                            <button disabled={savingLines} onClick={() => void saveLines(s)}
-                              className="flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-1 text-xs font-bold text-white disabled:opacity-50">
-                              <Save className="h-3.5 w-3.5" />حفظ
-                            </button>
-                            <button onClick={() => setEditingId(null)}
-                              className="flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1 text-xs text-slate-600">
-                              <X className="h-3.5 w-3.5" />إلغاء
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          {assigned.length === 0
-                            ? <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-700">بدون خطوط</span>
-                            : assigned.map((id) => (
-                              <span key={id} className="rounded-full bg-sky-50 px-2 py-0.5 text-[11px] font-bold text-sky-700">
-                                {linesById.get(id)?.name || 'خط'}
-                              </span>
-                            ))}
-                          <button title="تعديل الخطوط" onClick={() => { setEditingId(s.id); setEditingLines(assigned); }}
-                            className="text-slate-400 hover:text-blue-600">
-                            <Pencil className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                      )}
-                    </td>
-                    <td className="p-4">
-                      <button onClick={() => void handleToggleActive(s)}
-                        className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold transition hover:opacity-80 ${
-                          s.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
-                        {s.is_active ? <CheckCircle className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
-                        {s.is_active ? 'نشط' : 'معطل'}
-                      </button>
-                    </td>
-                    <td className="p-4">
-                      <button onClick={() => void handleDelete(s.id, s.full_name)}
-                        className="text-rose-400 hover:text-rose-600 transition" title="حذف المشرف">
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-      </div>
-    </div>
+      <SupervisorEditPanel open={overlay?.kind === 'edit'} onClose={closeOverlay} supervisor={target} busy={busy}
+        serverError={overlay?.kind === 'edit' ? formError : ''} onSave={(n, p) => target && edit(target, n, p)} />
+
+      <StopDialog open={overlay?.kind === 'stop'} supervisor={target} impact={stopImpact} busy={busy} onClose={closeOverlay} onConfirm={() => target && toggle(target)} />
+      <StartDialog open={overlay?.kind === 'start'} supervisor={target} lineNames={target ? names(linesOf.get(target.id) ?? []) : []} busy={busy} onClose={closeOverlay} onConfirm={() => target && toggle(target)} />
+      <DeleteDialog open={overlay?.kind === 'delete'} supervisor={target} sole={sole} busy={busy} onClose={closeOverlay} onConfirm={() => target && remove(target)}
+        records={{ data: records.data, loading: records.loading, error: records.error }} />
+      <RemovePhotoDialog open={overlay?.kind === 'photo'} supervisor={target} busy={busy} onClose={closeOverlay} onConfirm={() => target && removePhoto(target)} />
+      <ResetPasswordDialog open={overlay?.kind === 'password'} supervisor={target} busy={busy} error={overlay?.kind === 'password' ? formError : ''}
+        onClose={closeOverlay} onConfirm={(p) => target && resetPassword(target, p)} />
+      <AssignLineDialog open={overlay?.kind === 'assign'} line={overlay?.kind === 'assign' ? lineById.get(overlay.lineId) ?? null : null}
+        supervisors={assignable} busy={busy} error={overlay?.kind === 'assign' ? formError : ''} onClose={() => setOverlay(null)}
+        onConfirm={(sid) => overlay?.kind === 'assign' && assignLine(overlay.lineId, sid)} onAdd={() => open({ kind: 'add' })} />
+
+      <CredentialsDialog open={!!created} onClose={() => setCreated(null)} phone={created?.phone ?? ''} password={created?.password ?? ''}
+        title={created?.reset ? `كلمة مرور ${created.name} الجديدة. سلّمها له الآن` : `أُضيف ${created?.name ?? ''}. سلّمه بيانات الدخول الآن`}
+        text={created?.reset ? 'يدخل تطبيق باصك برقمه وهذه الكلمة. كلمة المرور القديمة لم تعد تعمل.'
+          : `يدخل تطبيق باصك بهذين، ويرى ${linesPhrase(created?.lines ?? [])}.`} />
+    </Page>
   );
 };

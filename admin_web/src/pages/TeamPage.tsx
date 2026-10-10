@@ -1,114 +1,117 @@
 import React, { useState } from 'react';
-import { KeyRound, Mail, Plus, ShieldCheck, UserRound } from 'lucide-react';
-import { Topbar } from '../components/Topbar';
-import { supabase } from '../lib/supabase';
-import { invokeEdgeFunction } from '../lib/edgeFunctions';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAdminScope, useCompany } from '../lib/adminScope';
-import { keys, unwrap, usePageData } from '../lib/query';
-import { SkeletonTable } from '../components/Skeleton';
+import { keys } from '../lib/query';
 import { useGuard } from '../lib/guard';
+import { notifyError } from '../lib/toasts';
+import { adminsCount, colleaguesOf, createCompanyAdmin, deleteCompanyAdmin, useCompanyAdmins, type CompanyAdmin } from '../lib/team';
+import {
+  Badge, Button, DataTable, EmptyState, ErrorState, Ltr, Note, Page, PageHeader, PhoneBar, SkeletonTable, dayText, cairo, errorText, useOnline, type Column,
+} from '../ui';
+import { PersonCell } from '../components/team/parts';
+import { AdminAddPanel, AdminAddedDialog, PLATFORM_ONLY, RemoveAdminDialog, type AdminDraft } from '../components/team/AdminParts';
 
-interface TeamAdmin { id: string; email: string; full_name: string; created_at: string; }
+const addedOn = (iso: string) => dayText(cairo(iso).day);
 
-const input = 'mt-1 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800';
-
-/** Who manages this company's workspace. New admin accounts are issued by the platform admin. */
+/**
+ * «مديرو الشركة» (docs/canvas/AdmManagers*, AdmManager*): who signs in to this
+ * company's dashboard. A company admin sees the list only; adding and removing
+ * are the platform admin's (inside the company, marked «لمدير المنصة فقط»).
+ */
 export const TeamPage: React.FC = () => {
   const me = useAdminScope();
   const company = useCompany();
-  const canAdd = me.role === 'super_admin';
-  const [form, setForm] = useState({ fullName: '', email: '', password: '' });
-  const [submitting, setSubmitting] = useState(false);
-  const [notice, setNotice] = useState('');
-  const [error, setError] = useState('');
-
-  const page = usePageData(keys.company(company.id, 'team'), () =>
-    unwrap<TeamAdmin[]>(supabase.from('admins').select('id, email, full_name, created_at').eq('company_id', company.id).order('created_at')));
-  const admins = page.data ?? [];
-  const loading = page.loading;
-  const load = page.reload;
-
+  const platform = me.role === 'super_admin';
+  const online = useOnline();
+  const client = useQueryClient();
   const guard = useGuard();
-  const createAdmin = (event: React.FormEvent) => {
-    event.preventDefault();
-    if (form.password && form.password.length < 8) { setError('كلمة المرور يجب ألا تقل عن 8 أحرف.'); return; }
-    // A second submit while the first is on its way does nothing (the account must not be created twice).
-    void guard('create', submitAdmin);
-  };
-  const submitAdmin = async () => {
-    setSubmitting(true);
-    setError('');
-    setNotice('');
+  const page = useCompanyAdmins(company.id);
+  const admins = page.data ?? [];
+  const only = admins.length === 1;
+
+  const [adding, setAdding] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [formError, setFormError] = useState('');
+  const [added, setAdded] = useState<{ name: string; email: string; invited: boolean } | null>(null);
+  const [removing, setRemoving] = useState<CompanyAdmin | null>(null);
+
+  const add = (d: AdminDraft) => void guard('add', async () => {
+    setBusy(true); setFormError('');
     try {
-      const result = await invokeEdgeFunction<{ invited?: boolean }>('admin-create-company-admin', {
-        companyId: company.id, fullName: form.fullName.trim(), email: form.email.trim(), password: form.password || undefined,
-      });
-      setNotice(result?.invited
-        ? 'تم إرسال دعوة بالبريد. يفتح المدير الرابط ويختار كلمة المرور.'
-        : 'تم إنشاء الحساب. يمكن للمدير تسجيل الدخول الآن بالبريد وكلمة المرور.');
-      setForm({ fullName: '', email: '', password: '' });
-      await load();
-    } catch (createError) {
-      setError(createError instanceof Error ? createError.message : 'تعذر إنشاء مدير الشركة.');
-    }
-    setSubmitting(false);
-  };
+      const r = await createCompanyAdmin({ companyId: company.id, fullName: d.fullName, email: d.email, password: d.how === 'password' ? d.password : undefined });
+      setAdding(false);
+      setAdded({ name: d.fullName.trim(), email: d.email.trim().toLowerCase(), invited: !!r?.invited });
+      void page.reload();
+      void client.invalidateQueries({ queryKey: keys.platform('companyAdmins') });
+    } catch (e) { setFormError(errorText(e)); }
+    setBusy(false);
+  });
+
+  const remove = (a: CompanyAdmin) => void guard(`remove:${a.id}`, async () => {
+    setBusy(true);
+    try {
+      await deleteCompanyAdmin(a.id);
+      client.setQueryData<CompanyAdmin[]>(keys.company(company.id, 'team'), (rows) => rows?.filter((r) => r.id !== a.id));
+      void client.invalidateQueries({ queryKey: keys.platform('companyAdmins') });
+      setRemoving(null);
+    } catch (e) { notifyError('تعذّر إزالة المدير', errorText(e)); }
+    setBusy(false);
+  });
+
+  const removeButton = (a: CompanyAdmin, phone?: boolean) => (
+    <Button kind="outline" sm icon="trash" disabled={!online || only || a.id === me.id} className={phone ? '!h-11' : ''}
+      aria-label={`إزالة ${a.full_name}`} onClick={() => setRemoving(a)}>إزالة</Button>
+  );
+  const you = (a: CompanyAdmin) => (a.id === me.id ? <Badge tone="teal">أنت</Badge> : null);
+  const columns: Column<CompanyAdmin>[] = [
+    { key: 'name', label: 'المدير', render: (a) => <PersonCell name={a.full_name} end={you(a)} /> },
+    { key: 'email', label: 'البريد الإلكتروني', w: platform ? 300 : 320, render: (a) => <div className="truncate"><Ltr>{a.email}</Ltr></div> },
+    { key: 'added', label: 'أُضيف في', w: platform ? 170 : 220, render: (a) => addedOn(a.created_at) },
+    ...(platform ? [{ key: 'remove', label: <span className="sr-only">إزالة</span>, w: 120, align: 'end' as const, render: (a: CompanyAdmin) => removeButton(a) }] : []),
+  ];
 
   return (
-    <div className="space-y-6">
-      <Topbar title="فريق الإدارة" subtitle={`الحسابات التي تدير مساحة ${company.name}`} />
+    <Page>
+      <PageHeader title="مديرو الشركة" meta={platform ? PLATFORM_ONLY : undefined} phoneActions={false}
+        sub="من يدخل هذه اللوحة باسم شركتك. كل مدير يرى كل الصفحات ويفعل كل شيء: لا درجات بينهم."
+        actions={platform ? <Button icon="plus" disabled={!online} onClick={() => { setFormError(''); setAdding(true); }}>أضف مديراً</Button> : undefined} />
 
-      {canAdd && (
-        <form onSubmit={createAdmin} className="glass-panel p-5 space-y-4">
-          <h2 className="flex items-center gap-2 font-bold text-slate-700"><Plus className="h-5 w-5 text-sky-600" /> إضافة مدير لهذه الشركة</h2>
-          <div className="grid gap-4 md:grid-cols-3">
-            <label className="text-xs font-semibold text-slate-500">اسم المدير
-              <input required value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} className={input} />
-            </label>
-            <label className="text-xs font-semibold text-slate-500">البريد الإلكتروني
-              <input required type="email" dir="ltr" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className={input} />
-            </label>
-            <label className="text-xs font-semibold text-slate-500">كلمة مرور مبدئية (اختياري)
-              <input type="password" dir="ltr" autoComplete="new-password" minLength={8} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className={input} />
-            </label>
-          </div>
-          <button disabled={submitting} className="flex items-center gap-2 rounded-xl bg-sky-700 px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50">
-            {form.password ? <KeyRound className="h-4 w-4" /> : <Mail className="h-4 w-4" />}
-            {submitting ? 'جاري الإنشاء...' : form.password ? 'إنشاء الحساب' : 'إرسال دعوة بالبريد'}
-          </button>
-        </form>
+      {page.loading ? <SkeletonTable rows={2} cols={3} />
+        : page.error ? <ErrorState card title="تعذّر تحميل المديرين" text="لم نستطع جلب قائمة المديرين. تأكد من اتصالك ثم حاول مرة أخرى." onRetry={() => void page.reload()} />
+          : (
+            <>
+              <DataTable<CompanyAdmin> caption="مديرو الشركة" columns={columns} rows={admins} rowKey={(a) => a.id}
+                empty={admins.length === 0 ? <EmptyState icon="shield" title="لا مديرين لهذه الشركة بعد" text={platform ? 'أضف أول مدير ليدخل لوحة الشركة.' : 'تواصل مع إدارة المنصة لإضافة مدير.'} /> : undefined}
+                toolbar={<div className="flex items-center text-label text-ink-2 sm:min-h-[52px] sm:border-b sm:border-hair sm:px-4">{adminsCount(admins.length)} · يدخلون بالبريد الإلكتروني وكلمة المرور</div>}
+                card={(a) => ({
+                  title: <PersonCell name={a.full_name} />, end: you(a),
+                  fields: [['البريد الإلكتروني', <Ltr key="e" className="break-all">{a.email}</Ltr>], ['أُضيف في', addedOn(a.created_at)]],
+                  actions: platform ? removeButton(a, true) : undefined,
+                })} />
+              {platform && only && (
+                <Note tone="warning" title="مدير واحد فقط">لا يُزال آخر مدير للشركة. أضف مديراً آخر إن أردت تغييره، وليبقى من يدخل اللوحة إن غاب.</Note>
+              )}
+              {platform ? (
+                !only && <p className="m-0 text-label text-ink-2">كل حساب هنا يرى بيانات هذه الشركة فقط. الإضافة والإزالة تظهران لمدير المنصة وحده؛ مدير الشركة يرى القائمة فقط.</p>
+              ) : (
+                <Note tone="teal" icon="shield" title="إضافة مدير أو إزالته عند إدارة المنصة">
+                  لا يستطيع مدير الشركة أن يضيف مديراً ولا أن يزيله. اطلب ذلك من إدارة المنصة واذكر الاسم والبريد الإلكتروني.
+                </Note>
+              )}
+            </>
+          )}
+
+      {platform && <PhoneBar><Button icon="plus" full disabled={!online} onClick={() => { setFormError(''); setAdding(true); }}>أضف مديراً</Button></PhoneBar>}
+
+      {platform && (
+        <>
+          <AdminAddPanel open={adding} onClose={() => setAdding(false)} variant="workspace" company={company} busy={busy}
+            serverError={formError} onSubmit={add} disabled={!online} />
+          <RemoveAdminDialog open={!!removing} admin={removing} companyName={company.name} variant="workspace" busy={busy}
+            left={removing ? colleaguesOf(removing, admins) : []} onClose={() => setRemoving(null)} onConfirm={() => removing && remove(removing)} />
+          <AdminAddedDialog result={added} onClose={() => setAdded(null)} />
+        </>
       )}
-
-      {notice && <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">{notice}</p>}
-      {(error || page.error) && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{error || page.error}</p>}
-
-      <div className="glass-panel overflow-hidden">
-        {loading ? <SkeletonTable rows={2} columns={3} /> : admins.length === 0 ? (
-          <div className="p-8 text-center text-slate-500">لا يوجد مديرون لهذه الشركة بعد.</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-right text-sm">
-              <thead className="bg-slate-50/60 text-slate-500"><tr><th className="p-4">المدير</th><th className="p-4">البريد</th><th className="p-4">تاريخ الإنشاء</th></tr></thead>
-              <tbody className="divide-y divide-slate-100">
-                {admins.map((admin) => (
-                  <tr key={admin.id}>
-                    <td className="p-4 font-semibold text-slate-800">
-                      <span className="inline-flex items-center gap-2"><UserRound className="h-4 w-4 text-sky-600" />{admin.full_name}</span>
-                      {admin.id === me.id && <span className="mr-2 rounded-full bg-[#D6EEF9] px-2 py-0.5 text-[10.5px] font-bold text-[#3E8FBF]">أنت</span>}
-                    </td>
-                    <td className="p-4 text-slate-600" dir="ltr">{admin.email}</td>
-                    <td className="p-4 text-slate-500">{new Date(admin.created_at).toLocaleDateString('ar-EG')}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-      <p className="flex items-center gap-2 text-xs text-slate-500">
-        <ShieldCheck className="h-4 w-4 text-emerald-600" />
-        {canAdd ? 'كل حساب هنا يرى بيانات هذه الشركة فقط.' : 'لإضافة مدير جديد أو إيقاف حساب، تواصل مع إدارة المنصة.'}
-      </p>
-    </div>
+    </Page>
   );
 };
