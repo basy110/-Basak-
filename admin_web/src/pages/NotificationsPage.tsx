@@ -1,46 +1,43 @@
 import React, { useState } from 'react';
-import { Info } from 'lucide-react';
-import { useCompany } from '../lib/adminScope';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useCompany, useAdminScope } from '../lib/adminScope';
 import type { StatusFilter } from '../lib/notifications';
 import { useNotificationActions, useNotificationHistory } from '../lib/notificationsData';
+import { Button, Note, Page, PageHeader, PhoneBar, useOnline } from '../ui';
 import { Composer } from '../components/notifications/Composer';
 import { History } from '../components/notifications/History';
 
 /**
- * Notifications to the company's students: written here (the whole company, a
- * line, a trip or a university; now or at a set time), sent by supervisors from
- * the app, or sent by the system itself. Everything appears below with what is
- * actually known about it: who received it, who read it, and what the push
- * provider accepted.
+ * «الإشعارات»: the company's messages to its students — written here, sent by
+ * supervisors from the app, or sent by the system — with who received and who
+ * read each. «إشعار جديد» is a page of its own (`?view=new`).
  */
 export const NotificationsPage: React.FC = () => {
   const companyId = useCompany().id;
+  const me = useAdminScope().full_name;
+  const online = useOnline();
+  const [params] = useSearchParams();
+  const navigate = useNavigate();
   const [filter, setFilter] = useState<StatusFilter>('all');
-  // One query feeds the list and tells whether push is connected.
+  // One query feeds the list and tells whether phone alerts are connected.
   const history = useNotificationHistory(companyId, filter);
   const actions = useNotificationActions(companyId);
+  const listPath = `/c/${companyId}/notifications`;
+  const newPath = `${listPath}?view=new`;
 
+  if (params.get('view') === 'new') {
+    return <Page><Composer companyId={companyId} backTo={listPath} onBack={() => navigate(listPath)} onDone={() => navigate(listPath)} /></Page>;
+  }
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-800">الإشعارات</h1>
-        <p className="text-sm text-slate-500">
-          أرسل إشعاراً لكل طلاب الشركة أو لخط أو رحلة أو جامعة، الآن أو في موعد تحدده. يرسل المشرفون أيضاً من التطبيق، ويظهر كل ما أُرسل هنا.
-        </p>
-      </div>
-
+    <Page>
+      <PageHeader title="الإشعارات" phoneActions={false}
+        sub="رسائلك إلى الطلاب: تصلهم داخل التطبيق وتنبيهاً على الهاتف. يظهر هنا أيضاً ما أرسله المشرفون وما يرسله النظام وحده."
+        actions={<Button icon="plus" to={newPath} disabled={!online}>إشعار جديد</Button>} />
       {history.pushConfigured === false && (
-        <div role="status" className="flex items-start gap-3 rounded-2xl border border-sky-100 bg-sky-50 p-4 text-sm text-sky-800">
-          <Info className="mt-0.5 h-4 w-4 shrink-0" />
-          <p>
-            <b>الإشعارات الفورية على الهاتف غير مربوطة بعد.</b>{' '}
-            الإشعارات التي ترسلها تصل إلى الطلاب داخل التطبيق في صفحة الإشعارات، ولن تظهر كتنبيه على الهاتف حتى يكتمل الربط.
-          </p>
-        </div>
+        <Note tone="teal" title="التنبيه على الهواتف لم يُفعَّل بعد">إشعاراتك تصل إلى الطلاب داخل التطبيق في صفحة الإشعارات، ولا تظهر تنبيهاً على الهاتف حتى تفعّله إدارة المنصة.</Note>
       )}
-
-      <Composer companyId={companyId} />
-      <History companyId={companyId} filter={filter} onFilter={setFilter} history={history} actions={actions} />
-    </div>
+      <History companyId={companyId} filter={filter} onFilter={setFilter} history={history} actions={actions} me={me} onNew={() => navigate(newPath)} />
+      <PhoneBar><Button full icon="plus" to={newPath} disabled={!online}>إشعار جديد</Button></PhoneBar>
+    </Page>
   );
 };
