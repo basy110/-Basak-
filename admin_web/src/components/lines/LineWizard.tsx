@@ -222,12 +222,21 @@ export const LineWizard: React.FC<{ mode: 'new' | 'edit'; line?: LineRow; startS
         <div className="hidden lg:block"><Summary d={d} uniName={uniName} badge={<UnsavedBadge edit={edit} dirty={dirty} />} /></div>
       </div>
       <PhoneBar>
-        <div className="flex gap-2">
-          {prev && <div className="flex-none">{prev}</div>}
-          <div className="flex-1 [&>*]:w-full">
-            {step === 5 ? primary : <Button iconEnd="arrowFwd" full onClick={() => go((step + 1) as StepNo)}>{STEPS[step - 1].next}</Button>}
+        {edit ? (
+          // Editing: «حفظ التعديلات» on every step, the steps around it one tap away.
+          <div className="flex gap-2">
+            {prev && <div className="flex-none">{prev}</div>}
+            {step < 5 && <Button kind="outline" iconEnd="arrowFwd" onClick={() => go((step + 1) as StepNo)}>التالي</Button>}
+            <div className="min-w-0 flex-1 [&>*]:w-full">{primary}</div>
           </div>
-        </div>
+        ) : (
+          <div className="flex gap-2">
+            {prev && <div className="flex-none">{prev}</div>}
+            <div className="flex-1 [&>*]:w-full">
+              {step === 5 ? primary : <Button iconEnd="arrowFwd" full onClick={() => go((step + 1) as StepNo)}>{STEPS[step - 1].next}</Button>}
+            </div>
+          </div>
+        )}
       </PhoneBar>
 
       <Dialog open={ask?.kind === 'leave'} onClose={() => setAsk(null)} icon="alert" tone="warning"

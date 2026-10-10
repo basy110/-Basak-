@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Button, Dialog, Icon, IconButton, errorText, useOnline, type IconName } from '../../ui';
+import { Button, Dialog, Icon, IconButton, errorText, useOnline, type ButtonKind, type IconName } from '../../ui';
 import { useGuard } from '../../lib/guard';
 import { notify, notifyError } from '../../lib/toasts';
 import { deleteLine, setLineActive, type LineStats } from '../../lib/linesData';
@@ -114,8 +114,10 @@ export function useLineActions(companyId: string, statsOf: (lineId: string) => L
 
 /** A row's «⋮» menu with optional second lines and a separator (docs/canvas/AdmLines). */
 export interface MenuItem { label: string; sub?: string; icon: IconName; danger?: boolean; onClick: () => void; disabled?: boolean; sep?: boolean }
-export const LineMenu: React.FC<{ items: MenuItem[]; label?: string; sm?: boolean }> = ({ items, label = 'إجراءات الخط', sm = true }) => {
-  const [pos, setPos] = useState<{ top: number; left: number; up: boolean } | null>(null);
+/** A named button that opens the menu instead of the «⋮» (e.g. «تعديل الخط ⌄»). */
+export interface MenuTrigger { text: string; icon?: IconName; kind?: ButtonKind; full?: boolean; disabled?: boolean }
+export const LineMenu: React.FC<{ items: MenuItem[]; label?: string; sm?: boolean; trigger?: MenuTrigger }> = ({ items, label = 'إجراءات الخط', sm = true, trigger }) => {
+  const [pos, setPos] = useState<{ top: number; left: number; up: boolean; width?: number } | null>(null);
   const btn = useRef<HTMLButtonElement>(null);
   const list = useRef<HTMLDivElement>(null);
   const open = !!pos;
@@ -124,7 +126,10 @@ export const LineMenu: React.FC<{ items: MenuItem[]; label?: string; sm?: boolea
     const r = btn.current!.getBoundingClientRect();
     // Below the button, aligned to its end side; above it when there is no room below.
     const up = window.innerHeight - r.bottom < 300 && r.top > 300;
-    setPos({ top: up ? r.top - 4 : r.bottom + 4, left: r.left, up });
+    // A full-width trigger (the phone's bottom bar) gets a list as wide as itself.
+    const width = trigger?.full ? r.width : undefined;
+    const left = width ? r.left : Math.max(8, Math.min(r.left, window.innerWidth - 240));
+    setPos({ top: up ? r.top - 4 : r.bottom + 4, left, up, width });
   };
   useEffect(() => {
     if (!open) return undefined;
@@ -149,12 +154,15 @@ export const LineMenu: React.FC<{ items: MenuItem[]; label?: string; sm?: boolea
     };
   }, [open]);
   return (
-    <div className="relative" onClick={(e) => e.stopPropagation()}>
-      <IconButton ref={btn} icon="dots" label={label} sm={sm} aria-haspopup="menu" aria-expanded={open} onClick={toggle} />
+    <div className={trigger?.full ? 'relative w-full' : 'relative'} onClick={(e) => e.stopPropagation()}>
+      {trigger
+        ? <Button ref={btn} kind={trigger.kind} icon={trigger.icon} iconEnd={open ? 'up' : 'down'} sm={sm} full={trigger.full} disabled={trigger.disabled}
+          aria-haspopup="menu" aria-expanded={open} onClick={toggle}>{trigger.text}</Button>
+        : <IconButton ref={btn} icon="dots" label={label} sm={sm} aria-haspopup="menu" aria-expanded={open} onClick={toggle} />}
       {pos && createPortal(
         <div ref={list} role="menu" aria-label={label} onClick={(e) => e.stopPropagation()}
           className="enter fixed z-[65] min-w-[232px] overflow-hidden rounded-inner bg-surface p-1.5 shadow-floating ring-1 ring-hair"
-          style={{ left: pos.left, ...(pos.up ? { bottom: window.innerHeight - pos.top } : { top: pos.top }) }}>
+          style={{ left: pos.left, ...(pos.width ? { width: pos.width } : {}), ...(pos.up ? { bottom: window.innerHeight - pos.top } : { top: pos.top }) }}>
           {items.map((i) => (
             <React.Fragment key={i.label}>
               {i.sep && <div role="separator" className="my-1.5 h-px bg-hair" />}

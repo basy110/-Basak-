@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Select } from '../ui/Select';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { useCompany } from '../lib/adminScope';
@@ -504,7 +504,7 @@ const previewColumns = (companyId: string): Column<LinePreview>[] => [
   ) },
   ...OPTIONS.map((o): Column<LinePreview> => ({ key: o, label: OPTION_NAME[o], hideTablet: o === 'summer', render: (l) => <Cell row={(l.options ?? []).find((x) => x.option === o)} lineOff={!l.is_active} /> })),
   { key: 'go', label: <span className="sr-only">أسعار الخط</span>, w: 120, align: 'end', hideTablet: true, render: (l) => (
-    <a href={`/c/${companyId}/lines/${l.line_id}`} onClick={(e) => e.preventDefault()} tabIndex={-1} className="inline-flex items-center gap-1 text-label font-medium text-teal">أسعار الخط<Icon name="fwd" size={14} stroke={2} /></a>
+    <Link to={`/c/${companyId}/lines/${l.line_id}?edit=4`} onClick={(e) => e.stopPropagation()} className="inline-flex items-center gap-1 text-label font-medium text-teal hover:underline">أسعار الخط<Icon name="fwd" size={14} stroke={2} /></Link>
   ) },
 ];
 const previewCard = (l: LinePreview) => ({

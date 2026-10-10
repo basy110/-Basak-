@@ -108,8 +108,11 @@ export const LinesPage: React.FC = () => {
   const menu = (r: Row) => (
     <LineMenu items={[
       { label: 'افتح الخط', icon: 'eye', onClick: () => navigate(`${base}/${r.line.id}`) },
-      { label: 'تعديل الخط', icon: 'pencil', onClick: () => navigate(`${base}/${r.line.id}?edit=1`), disabled: !actions.online },
-      { label: 'عيّن مشرفاً', sub: 'من صفحة المشرفون', icon: 'scan', onClick: () => navigate(`/c/${company.id}/supervisors`) },
+      { label: 'تعديل الخط', sub: 'الاسم والجامعات والمقاعد', icon: 'pencil', sep: true, onClick: () => navigate(`${base}/${r.line.id}?edit=1`), disabled: !actions.online },
+      { label: 'تعديل المحطات', icon: 'pin', onClick: () => navigate(`${base}/${r.line.id}?edit=2`), disabled: !actions.online },
+      { label: 'تعديل المواعيد', sub: 'رحلات الذهاب ومواعيد العودة', icon: 'clock', onClick: () => navigate(`${base}/${r.line.id}?edit=3`), disabled: !actions.online },
+      { label: 'تعديل الأسعار', icon: 'card', onClick: () => navigate(`${base}/${r.line.id}?edit=4`), disabled: !actions.online },
+      { label: 'عيّن مشرفاً', sub: 'من صفحة المشرفون', icon: 'scan', sep: true, onClick: () => navigate(`/c/${company.id}/supervisors`) },
       r.line.is_active
         ? { label: 'إيقاف الخط', icon: 'power', sep: true, onClick: () => actions.ask('stop', r.line), disabled: !actions.online }
         : { label: 'تشغيل الخط', icon: 'power', sep: true, onClick: () => actions.ask('start', r.line), disabled: !actions.online },
@@ -121,10 +124,14 @@ export const LinesPage: React.FC = () => {
     { key: 'name', label: 'الخط', w: 200, render: (r) => <div className="min-w-0"><div className="truncate font-semibold">{r.line.name}</div><div className="truncate text-cap text-ink-3">{r.unis.join(' · ') || 'بلا جامعة'}</div></div> },
     { key: 'st', label: 'المحطات والرحلات', w: 128, hideTablet: true, render: (r) => <StationsTrips r={r} /> },
     { key: 'subs', label: <span className="inline-flex items-center gap-1">المشتركون{sort === 'subs' && <Icon name="adown" size={14} stroke={2} />}</span>, w: 96, render: (r) => <span className="tabular">{r.stats.subscribers == null ? '—' : n(r.stats.subscribers)}</span> },
-    { key: 'riders', label: 'ركاب الغد', render: (r) => <Riders s={r.stats} /> },
+    { key: 'riders', label: 'ركاب الغد', w: 180, render: (r) => <Riders s={r.stats} /> },
     { key: 'seats', label: 'مقاعد الباص', w: 96, hideTablet: true, render: (r) => <Seats r={r} /> },
-    { key: 'sup', label: 'المشرف', w: 168, hideTablet: true, render: (r) => <Supervisors r={r} /> },
+    { key: 'sup', label: 'المشرف', w: 156, hideTablet: true, render: (r) => <Supervisors r={r} /> },
     { key: 'vis', label: 'للطلاب', render: (r) => <VisibilityCell vis={r.vis} /> },
+    // A visible «✎ تعديل» beside the «⋮» (whose list opens each part of the line at its own step).
+    { key: 'edit', label: <span className="sr-only">تعديل</span>, w: 92, align: 'end', render: (r) => (
+      <span onClick={(e) => e.stopPropagation()}><Button kind="link" sm icon="pencil" to={`${base}/${r.line.id}?edit=1`} disabled={!actions.online}>تعديل</Button></span>
+    ) },
     { key: 'menu', label: <span className="sr-only">إجراءات</span>, w: 56, align: 'end', render: menu },
   ];
 
@@ -201,7 +208,7 @@ export const LinesPage: React.FC = () => {
         ) : undefined}
         pager={<Pager page={page} total={shown.length} onPage={setPage} />}
         card={(r) => ({
-          title: r.line.name, sub: r.unis.join(' · '), end: <Icon name="fwd" size={18} className="mt-1 text-ink-3" />,
+          title: r.line.name, sub: r.unis.join(' · '), end: <div className="-me-2 -mt-1.5">{menu(r)}</div>,
           stats: [['المشتركون', r.stats.subscribers == null ? '—' : n(r.stats.subscribers)],
             ['ذهاب الغد', <span key="g" className={r.stats.riders_departure ? '' : 'text-disabled'}>{r.stats.riders_departure == null ? '—' : n(r.stats.riders_departure)}</span>],
             ['عودة الغد', <span key="b" className={r.stats.riders_return ? '' : 'text-disabled'}>{r.stats.riders_return == null ? '—' : n(r.stats.riders_return)}</span>]],
