@@ -17,6 +17,14 @@ export const NoteState: React.FC<{ status: string }> = ({ status }) => <StatePil
 const students = (n: number) => `${num(n)} ${n === 1 ? 'طالب' : n === 2 ? 'طالبان' : n <= 10 ? 'طلاب' : 'طالباً'}`;
 const supervisors = (n: number) => `${num(n)} ${n === 1 ? 'مشرف' : n === 2 ? 'مشرفان' : n <= 10 ? 'مشرفين' : 'مشرفاً'}`;
 
+/** A field's label with its length counter at the other end («14/80»). */
+const LabelRow: React.FC<{ htmlFor: string; label: string; n: number; max: number }> = ({ htmlFor, label, n, max }) => (
+  <div className="flex items-baseline gap-2">
+    <label htmlFor={htmlFor} className="flex-1 text-label font-medium">{label}</label>
+    <span dir="ltr" aria-label={`${n} من ${max} حرفاً`} className={`text-cap tabular ${n > max ? 'text-bad' : 'text-ink-3'}`}>{n}/{max}</span>
+  </div>
+);
+
 /** The phone notification as a student sees it, drawn from what is typed. */
 const PhoneCard: React.FC<{ title: string; body: string }> = ({ title, body }) => (
   <div className="flex flex-col gap-3 rounded-card bg-ink p-4">
@@ -136,10 +144,10 @@ export const PlatformCompose: React.FC = () => {
               </div>
             )}
             <div className="flex flex-col gap-1">
-              <TextField label="العنوان" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={TITLE_MAX + 20} error={show('title')}
-                end={<span className="text-cap text-ink-3 tabular" dir="ltr">{title.trim().length}/{TITLE_MAX}</span>} />
+              <LabelRow htmlFor="pn-title" label="العنوان" n={title.trim().length} max={TITLE_MAX} />
+              <TextField id="pn-title" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={TITLE_MAX + 20} error={show('title')} />
             </div>
-            <TextArea label="نص الإشعار" rows={4} value={body} onChange={(e) => setBody(e.target.value)} maxLength={BODY_MAX + 50} error={show('body')} help={`${body.trim().length}/${BODY_MAX}`} />
+            <div className="flex flex-col gap-1.5"><LabelRow htmlFor="pn-body" label="نص الإشعار" n={body.trim().length} max={BODY_MAX} /><TextArea id="pn-body" rows={4} value={body} onChange={(e) => setBody(e.target.value)} maxLength={BODY_MAX + 50} error={show('body')} /></div>
             <Toggle label="أولوية عالية" help="للأمور العاجلة فقط، مثل تغيير يخص رحلة اليوم." checked={high} onChange={setHigh} />
             <RadioCards label="موعد الإرسال" value={when} onChange={setWhen} cols={2} options={[{ value: 'now', label: 'الآن' }, { value: 'later', label: 'في موعد لاحق' }]} />
             {when === 'later' && (
