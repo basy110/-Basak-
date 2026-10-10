@@ -1,111 +1,17 @@
 import React, { useMemo, useState } from 'react';
-import { Bell, Bus, CalendarClock, Cog, Eye, PencilLine, RefreshCw, Search, Trash2, Users, XCircle } from 'lucide-react';
-import { Refreshing, SkeletonRows } from '../Skeleton';
 import {
-  PLATFORM_ANNOUNCEMENT, STATUS_FILTERS, percent, pushStatParts, senderLabel, statusClass, statusLabel, typeLabel, type HistoryRow,
-  type StatusFilter,
+  PLATFORM_ANNOUNCEMENT, STATUS_FILTERS, senderShort, studentsText, whenLabel, type HistoryRow, type StatusFilter,
 } from '../../lib/notifications';
-import { CAIRO_LABEL, formatCairo } from '../../lib/time';
+import { CAIRO_LABEL } from '../../lib/time';
 import type { HistoryActions, HistoryState } from '../../lib/notificationsData';
 import { useGuard } from '../../lib/guard';
+import type { CompanyBrand } from '../../lib/branding';
+import { Badge, Button, Chips, DataTable, EmptyState, ErrorState, IconButton, Menu, SearchBox, SkeletonTable, StatePill, Toolbar, errorText, type Column } from '../../ui';
+import { notifyError } from '../../lib/toasts';
+import { CompanyMark } from '../CompanyMark';
 import { EditScheduledDialog } from './EditScheduledDialog';
 import { NotificationDetails } from './NotificationDetails';
-import { CompanyMark } from '../CompanyMark';
-import type { CompanyBrand } from '../../lib/branding';
 import { ConfirmDialog } from './parts';
-
-const SENDER_STYLE: Record<string, { icon: typeof Bell; className: string; chip: string }> = {
-  admin: { icon: Bell, className: 'bg-blue-50 text-blue-600', chip: 'bg-blue-50 text-blue-700' },
-  supervisor: { icon: Bus, className: 'bg-emerald-50 text-emerald-600', chip: 'bg-emerald-50 text-emerald-700' },
-  system: { icon: Cog, className: 'bg-slate-100 text-slate-500', chip: 'bg-slate-100 text-slate-600' },
-};
-
-const chipClass = 'rounded-full px-2 py-0.5';
-
-interface RowProps {
-  row: HistoryRow;
-  onDetails: () => void;
-  /** Absent where a scheduled notification cannot be edited. */
-  onEdit?: () => void;
-  onCancel: () => void;
-  onDelete: () => void;
-  /** The sending company's marks, where the history spans companies. */
-  brand?: CompanyBrand;
-}
-
-const Row: React.FC<RowProps> = ({ row, onDetails, onEdit, onCancel, onDelete, brand }) => {
-  const style = SENDER_STYLE[row.sender_role] ?? SENDER_STYLE.admin;
-  const Icon = row.status === 'scheduled' ? CalendarClock : style.icon;
-  // What the system sends by itself is shown as it happened, with nothing to edit.
-  const manual = row.sender_role !== 'system';
-  const share = percent(row.read, row.students);
-  return (
-    <li className="flex gap-4 p-4">
-      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${style.className}`}>
-        <Icon className="h-5 w-5" />
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h3 className="font-bold text-slate-800">{row.title}</h3>
-          <span className="text-xs text-slate-400">{formatCairo(row.sent_at || row.created_at)}</span>
-        </div>
-        <p className="mt-1 line-clamp-2 whitespace-pre-line text-sm text-slate-600">{row.body}</p>
-        <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] font-bold">
-          {row.status !== 'sent' && <span className={`${chipClass} ${statusClass(row.status)}`}>{statusLabel(row.status)}</span>}
-          <span className={`${chipClass} bg-indigo-50 text-indigo-700`}>{typeLabel(row.type, row.category)}</span>
-          {row.company_name && (
-            <span className={`${chipClass} flex items-center gap-1.5 bg-sky-50 text-sky-700`}><CompanyMark name={row.company_name} brand={brand} size="xs" />{row.company_name}</span>
-          )}
-          <span className={`${chipClass} ${style.chip}`}>{senderLabel(row.sender_role, row.sender_name, row.type)}</span>
-          {row.audience && (
-            <span className={`${chipClass} flex items-center gap-1 bg-slate-100 text-slate-600`}><Users className="h-3 w-3" />{row.audience}</span>
-          )}
-          {row.priority === 'high' && <span className={`${chipClass} bg-amber-50 text-amber-700`}>أولوية عالية</span>}
-        </div>
-
-        {row.status === 'scheduled' && row.scheduled_at && (
-          <p className="mt-2 text-xs text-slate-600">يُرسل {formatCairo(row.scheduled_at, true)} {CAIRO_LABEL}</p>
-        )}
-        {(row.status === 'failed' || row.status === 'cancelled') && row.status_note && (
-          <p className="mt-2 text-xs text-slate-500">{row.status_note}</p>
-        )}
-        {row.status === 'sent' && (
-          <div className="mt-2 space-y-1 text-[11px] text-slate-500">
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="h-1.5 w-24 overflow-hidden rounded-full bg-slate-100">
-                <div className="h-full rounded-full bg-emerald-500" style={{ width: `${share}%` }} />
-              </div>
-              <span>المستلمون {row.students} · قرأه {row.read} · فتحه من الإشعار الفوري {row.opened}</span>
-            </div>
-            <p>
-              <span className="font-bold text-slate-600">الإشعارات الفورية: </span>
-              {pushStatParts(row.push).map((part) => `${part.value} ${part.key === 'skipped' ? 'لم تُرسل' : part.label}`).join(' · ')}
-            </p>
-          </div>
-        )}
-      </div>
-
-      <div className="flex shrink-0 items-start gap-1 self-start">
-        <button type="button" onClick={onDetails} title="التفاصيل" aria-label="التفاصيل"
-          className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-50 hover:text-blue-600"><Eye className="h-4 w-4" /></button>
-        {manual && row.status === 'scheduled' && (
-          <>
-            {onEdit && (
-              <button type="button" onClick={onEdit} title="تعديل" aria-label="تعديل"
-                className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-50 hover:text-blue-600"><PencilLine className="h-4 w-4" /></button>
-            )}
-            <button type="button" onClick={onCancel} title="إلغاء الإرسال" aria-label="إلغاء الإرسال"
-              className="rounded-lg p-1.5 text-rose-400 transition hover:bg-rose-50 hover:text-rose-600"><XCircle className="h-4 w-4" /></button>
-          </>
-        )}
-        {manual && row.status !== 'scheduled' && (
-          <button type="button" onClick={onDelete} title="حذف الإشعار" aria-label="حذف الإشعار"
-            className="rounded-lg p-1.5 text-rose-400 transition hover:bg-rose-50 hover:text-rose-600"><Trash2 className="h-4 w-4" /></button>
-        )}
-      </div>
-    </li>
-  );
-};
 
 interface Props {
   /** The company whose scheduled notifications can be edited here; absent in the platform's history. */
@@ -118,133 +24,138 @@ interface Props {
   filters?: React.ReactNode;
   /** Every company's marks by id: the platform's history shows who sent each notification. */
   brands?: Record<string, CompanyBrand>;
+  /** The admin reading (their own notifications say «أنت»). */
+  me?: string | null;
+  /** The empty list's button: «اكتب أول إشعار». */
+  onNew?: () => void;
 }
 
 type Open = { kind: 'details' | 'edit' | 'cancel' | 'delete'; row: HistoryRow };
 
+const at = (r: HistoryRow) => r.sent_at ?? r.scheduled_at ?? r.created_at;
+const EMPTY: Record<StatusFilter, [string, string]> = {
+  all: ['لم يُرسل أي إشعار بعد', 'أخبر طلابك بإجازة، أو بتعديل في المواعيد، أو ذكّرهم بالدفع. تختار من يصله، وترى كم طالباً قرأه.'],
+  sent: ['لا إشعارات مُرسلة', 'ما ترسله يظهر هنا مع عدد من قرأه.'],
+  scheduled: ['لا إشعارات مجدولة', 'الإشعار الذي تختار له موعداً لاحقاً يظهر هنا حتى يُرسل.'],
+  cancelled: ['لا إشعارات ملغاة', 'الإشعار المجدول الذي تلغيه قبل موعده يظهر هنا.'],
+  failed: ['لا إشعارات فاشلة', 'إن تعذّر إرسال إشعار يظهر هنا مع السبب.'],
+};
+
+const ReadCell: React.FC<{ r: HistoryRow }> = ({ r }) => (r.status !== 'sent' ? <span className="text-ink-3">—</span> : (
+  <div className="flex flex-col gap-1">
+    <span className="whitespace-nowrap text-small"><b className="font-semibold tabular">{r.read.toLocaleString('en-US')}</b> <span className="text-label text-ink-2">من {r.students.toLocaleString('en-US')}</span></span>
+    <span aria-hidden="true" className="block h-1 w-[96px] overflow-hidden rounded bg-sunken"><span className="block h-1 rounded bg-ok" style={{ width: `${r.students ? Math.min(100, Math.round((r.read / r.students) * 100)) : 0}%` }} /></span>
+  </div>
+));
+const statePill = (r: HistoryRow) => <StatePill state={r.status} />;
+
 /**
- * What was sent, what waits for its time, and what was cancelled or failed,
- * a page at a time. The numbers are the server's; a live change refreshes them.
+ * «سجل الإشعارات»: what was sent, what waits for its time, and what was cancelled
+ * or failed, 25 at a time. Numbers say who received and who read; the delivery
+ * machinery behind the phone alerts is not shown to a company.
  */
-export const History: React.FC<Props> = ({ companyId, filter, onFilter, history, actions, filters, brands }) => {
+export const History: React.FC<Props> = ({ companyId, filter, onFilter, history, actions, filters, brands, me, onNew }) => {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState<Open | null>(null);
-  const [error, setError] = useState('');
-
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return history.rows;
-    return history.rows.filter((row) => [row.title, row.body, row.sender_name, row.audience, row.company_name]
-      .some((field) => (field || '').toLowerCase().includes(q)));
+    return history.rows.filter((row) => [row.title, row.body, row.sender_name, row.audience, row.company_name].some((f) => (f || '').toLowerCase().includes(q)));
   }, [history.rows, query]);
 
-  // The row leaves (or changes) at once; a refusal puts it back and says why, in the server's words.
-  // A second click on the confirmation does nothing while the first is being carried out.
+  // The row changes at once; a refusal puts it back and says why.
   const guard = useGuard();
-  const act = (run: (id: string) => Promise<void>) => {
-    if (!open) return;
-    const { row } = open;
+  const act = (run: (id: string) => Promise<void>, row: HistoryRow) => {
     setOpen(null);
-    setError('');
-    void guard(row.id, () => run(row.id).catch((err: unknown) => setError(err instanceof Error ? err.message : 'تعذر تنفيذ الطلب.')));
+    void guard(row.id, () => run(row.id).catch((err: unknown) => notifyError('لم يتم', errorText(err))));
   };
-
-  // The details follow the live row, so a refresh updates the numbers on screen.
   const openRow = open ? history.rows.find((row) => row.id === open.row.id) ?? open.row : null;
+  const platform = !companyId;
+  const editable = (r: HistoryRow) => r.sender_role !== 'system' && r.status === 'scheduled';
+  const canEdit = (r: HistoryRow) => !!companyId && editable(r) && r.type !== PLATFORM_ANNOUNCEMENT;
 
-  return (
-    <div className="rounded-2xl border border-slate-100 bg-white shadow-sm">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 p-4">
-        <div className="flex flex-wrap items-center gap-2">
-          {STATUS_FILTERS.map((item) => (
-            <button key={item.key} type="button" onClick={() => onFilter(item.key)} aria-pressed={filter === item.key}
-              className={`rounded-full px-3 py-1 text-xs font-bold transition ${
-                filter === item.key ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
-              {item.label}
-            </button>
-          ))}
-          {filters}
-          <Refreshing active={history.refreshing} />
-        </div>
-        <div className="flex w-full items-center gap-2 sm:w-auto">
-          <div className="relative flex-1 sm:w-64">
-            <Search className="absolute right-3 top-2.5 h-4 w-4 text-slate-400" />
-            <input type="search" placeholder="ابحث في الإشعارات المعروضة" value={query} onChange={(e) => setQuery(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 py-2 pl-3 pr-9 text-sm focus:border-blue-500 focus:outline-none" />
-          </div>
-          <button type="button" onClick={history.reload} title="تحديث" aria-label="تحديث"
-            className="rounded-xl border border-slate-200 p-2 text-slate-500 transition hover:bg-slate-50">
-            <RefreshCw className="h-4 w-4" />
-          </button>
-        </div>
+  const columns: Column<HistoryRow>[] = [
+    { key: 'title', label: 'الإشعار', render: (r) => (
+      <div className="min-w-0">
+        <div className="flex items-center gap-2"><span className="truncate font-semibold">{r.title}</span>{r.priority === 'high' && <Badge tone="danger">عاجل</Badge>}</div>
+        <div className={`truncate text-cap ${r.status === 'failed' && r.status_note ? 'text-bad' : 'text-ink-3'}`}>{(r.status === 'failed' || r.status === 'cancelled') && r.status_note ? r.status_note : r.body}</div>
       </div>
+    ) },
+    ...(platform ? [{ key: 'company', label: 'الشركة', w: 160, render: (r: HistoryRow) => (r.company_name
+      ? <span className="flex min-w-0 items-center gap-2"><CompanyMark name={r.company_name} brand={r.company_id ? brands?.[r.company_id] : undefined} size="xs" /><span className="truncate">{r.company_name}</span></span> : '—') }] : []),
+    { key: 'to', label: 'إلى', w: 170, hideTablet: true, render: (r) => <span className="line-clamp-2">{r.audience ?? '—'}</span> },
+    { key: 'from', label: 'المرسل', w: 130, hideTablet: true, render: (r) => <span className="line-clamp-2">{senderShort(r, me)}</span> },
+    { key: 'at', label: 'الموعد', w: 170, render: (r) => <span className={`whitespace-nowrap ${r.status === 'cancelled' ? 'text-ink-3' : ''}`}>{whenLabel(at(r))}</span> },
+    { key: 'read', label: 'قرأه', w: 120, render: (r) => <ReadCell r={r} /> },
+    { key: 'state', label: 'الحالة', w: 120, render: statePill },
+    { key: 'act', label: <span className="sr-only">إجراءات</span>, w: 128, align: 'end', render: (r) => (
+      <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+        {canEdit(r) && <Button sm kind="outline" onClick={() => setOpen({ kind: 'edit', row: r })}>تعديل</Button>}
+        <Menu label={`إجراءات «${r.title}»`} items={[
+          { label: 'التفاصيل', icon: 'eye', onClick: () => setOpen({ kind: 'details', row: r }) },
+          { label: 'إلغاء الإرسال', icon: 'x', danger: true, hidden: !editable(r), onClick: () => setOpen({ kind: 'cancel', row: r }) },
+          { label: 'حذف الإشعار', icon: 'trash', danger: true, hidden: r.sender_role === 'system' || r.status === 'scheduled', onClick: () => setOpen({ kind: 'delete', row: r }) },
+        ]} />
+      </div>
+    ) },
+  ];
+  const card = (r: HistoryRow) => ({
+    title: <span className="flex items-center gap-2">{r.title}{r.priority === 'high' && <Badge tone="danger">عاجل</Badge>}</span>,
+    sub: <span className={`line-clamp-2 ${r.status === 'failed' && r.status_note ? 'text-bad' : ''}`}>{(r.status === 'failed' || r.status === 'cancelled') && r.status_note ? r.status_note : r.body}</span>,
+    end: statePill(r),
+    fields: [['إلى', r.audience ?? '—'], ['المرسل', senderShort(r, me)], ['الموعد', whenLabel(at(r))],
+      ...(r.status === 'sent' ? [['قرأه', <span key="r"><b className="font-semibold">{r.read}</b> من {r.students}</span>]] : [])] as [React.ReactNode, React.ReactNode][],
+    actions: canEdit(r) ? <><Button kind="secondary" className="!h-11" onClick={() => setOpen({ kind: 'edit', row: r })}>تعديل</Button><Button kind="outline" className="!h-11" onClick={() => setOpen({ kind: 'cancel', row: r })}>إلغاء الإرسال</Button></> : undefined,
+  });
+  const toolbar = (
+    <Toolbar search={<SearchBox value={query} onChange={setQuery} placeholder="ابحث في الإشعارات" />}
+      filters={<div className="flex items-center gap-2"><Chips<StatusFilter> value={filter} onChange={onFilter} options={STATUS_FILTERS.map((f) => ({ value: f.key, label: f.label }))} />{filters}</div>}
+      actions={<IconButton icon="refresh" label="تحديث" sm className={`hidden shadow-ring sm:inline-flex ${history.refreshing ? 'animate-spin' : ''}`} onClick={history.reload} />} />
+  );
+  const [eTitle, eText] = EMPTY[filter];
+  const empty = history.loading ? undefined : history.error && history.rows.length === 0 ? (
+    <ErrorState title="تعذّر تحميل الإشعارات" text="لم نستطع جلب السجل. تأكد من اتصالك ثم حاول مرة أخرى." onRetry={history.reload} />
+  ) : shown.length === 0 ? (
+    history.rows.length > 0
+      ? <EmptyState icon="search" title="لا إشعار يطابق بحثك" text="البحث فيما عُرض فقط. اعرض الأقدم أو غيّر الكلمة." />
+      : <EmptyState icon="megaphone" title={eTitle} text={eText} action={filter === 'all' && onNew && <Button icon="plus" onClick={onNew}>اكتب أول إشعار</Button>} />
+  ) : undefined;
 
-      {error && (
-        <div role="alert" className="flex items-start justify-between gap-3 border-b border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-          <span>{error}</span>
-          <button type="button" className="font-bold underline" onClick={() => setError('')}>إخفاء</button>
-        </div>
-      )}
-      {history.error && (
-        <div role="alert" className="border-b border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-          تعذر تحميل الإشعارات: {history.error}
-          <button type="button" className="mr-3 font-bold underline" onClick={history.reload}>إعادة المحاولة</button>
-        </div>
-      )}
-
-      {history.loading ? (
-        <SkeletonRows rows={5} />
-      ) : shown.length === 0 ? (
-        !history.error && (
-          <div className="p-8 text-center text-slate-500">
-            {history.rows.length > 0 ? 'لا يوجد إشعار يطابق البحث فيما عُرض.'
-              : filter === 'all' ? 'لم يُرسل أي إشعار بعد.' : 'لا توجد إشعارات بهذه الحالة.'}
+  if (history.loading) return <SkeletonTable rows={8} cols={6} />;
+  return (
+    <>
+      <DataTable<HistoryRow> rows={shown} rowKey={(r) => r.id} caption="سجل الإشعارات" columns={columns} card={card} toolbar={toolbar} empty={empty}
+        rowH={58} onOpen={(r) => setOpen({ kind: 'details', row: r })} openKey={open?.kind === 'details' ? open.row.id : null}
+        pager={shown.length > 0 && (
+          <div className="flex min-h-14 flex-col items-stretch gap-3 px-0 sm:flex-row sm:items-center sm:border-t sm:border-hair sm:px-4">
+            <span className="hidden flex-1 text-label text-ink-2 sm:block">يُعرض {history.rows.length <= 25 ? `أحدث ${history.rows.length.toLocaleString('en-US')} ${history.rows.length > 10 ? 'إشعاراً' : 'إشعارات'}` : `${history.rows.length.toLocaleString('en-US')} إشعاراً`}</span>
+            {history.hasMore && <Button kind="outline" sm icon="adown" className="max-sm:!h-12" loading={history.loadingMore} onClick={history.loadMore}>اعرض 25 أقدم</Button>}
           </div>
-        )
-      ) : (
-        <ul className="divide-y divide-slate-100">
-          {shown.map((row) => (
-            <Row key={row.id} row={row} brand={row.company_id ? brands?.[row.company_id] : undefined}
-              onDetails={() => setOpen({ kind: 'details', row })}
-              // A platform announcement is one of many, written for every company: it is not reworded for one.
-              onEdit={companyId && row.type !== PLATFORM_ANNOUNCEMENT ? () => setOpen({ kind: 'edit', row }) : undefined}
-              onCancel={() => setOpen({ kind: 'cancel', row })} onDelete={() => setOpen({ kind: 'delete', row })} />
-          ))}
-        </ul>
-      )}
-
-      {history.hasMore && !history.loading && (
-        <div className="border-t border-slate-100 p-3 text-center">
-          <button type="button" onClick={history.loadMore} disabled={history.loadingMore}
-            className="rounded-xl bg-slate-100 px-5 py-2 text-sm font-bold text-slate-600 transition hover:bg-slate-200 disabled:opacity-50">
-            {history.loadingMore ? 'جاري التحميل…' : 'عرض المزيد'}
-          </button>
-        </div>
-      )}
+        )} />
 
       {open?.kind === 'details' && openRow && (
-        <NotificationDetails row={openRow} pushConfigured={history.pushConfigured} onClose={() => setOpen(null)} />
+        <NotificationDetails row={openRow} pushConfigured={history.pushConfigured} onClose={() => setOpen(null)} showPush={platform} me={me}
+          onDelete={openRow.sender_role !== 'system' && openRow.status !== 'scheduled' ? () => setOpen({ kind: 'delete', row: openRow }) : undefined}
+          onCancel={editable(openRow) ? () => setOpen({ kind: 'cancel', row: openRow }) : undefined}
+          onEdit={canEdit(openRow) ? () => setOpen({ kind: 'edit', row: openRow }) : undefined} />
       )}
-      {open?.kind === 'edit' && companyId && <EditScheduledDialog companyId={companyId} row={open.row} onClose={() => setOpen(null)} />}
+      {open?.kind === 'edit' && companyId && (
+        <EditScheduledDialog companyId={companyId} row={open.row} onClose={() => setOpen(null)} onCancelSend={() => setOpen({ kind: 'cancel', row: open.row })} />
+      )}
       {open?.kind === 'cancel' && (
-        <ConfirmDialog danger title="إلغاء الإشعار المجدول" confirmLabel="إلغاء الإرسال"
-          onConfirm={() => act(actions.cancel)} onClose={() => setOpen(null)}>
-          <p>
-            لن يُرسل الإشعار «<b>{open.row.title}</b>»{open.row.audience ? <> إلى {open.row.audience}</> : null}
-            {open.row.company_name ? <> في شركة «{open.row.company_name}»</> : null}
-            {open.row.scheduled_at ? <> في موعده ({formatCairo(open.row.scheduled_at, true)} {CAIRO_LABEL})</> : null}. يبقى في السجل كإشعار ملغى.
-          </p>
+        <ConfirmDialog danger icon="x" title={`إلغاء إرسال «${open.row.title}»؟`} confirmLabel="إلغاء الإرسال"
+          onConfirm={() => act(actions.cancel, open.row)} onClose={() => setOpen(null)}>
+          <p className="m-0">لن يُرسل إلى {open.row.audience ?? 'المستلمين'}{open.row.company_name ? ` في «${open.row.company_name}»` : ''}
+            {open.row.scheduled_at ? ` في موعده (${whenLabel(open.row.scheduled_at).replace(' · ', '، ')} ${CAIRO_LABEL})` : ''}. يبقى في السجل كإشعار ملغى.</p>
         </ConfirmDialog>
       )}
       {open?.kind === 'delete' && (
-        <ConfirmDialog danger title="حذف الإشعار" confirmLabel="حذف"
-          onConfirm={() => act(actions.remove)} onClose={() => setOpen(null)}>
-          <p>
-            حذف الإشعار «<b>{open.row.title}</b>»{open.row.company_name ? <> من شركة «{open.row.company_name}»</> : null}؟
-            {' '}سيختفي من عند كل الطلاب والمشرفين{open.row.company_name ? ' في هذه الشركة' : ''}.
-          </p>
+        <ConfirmDialog danger title={`حذف إشعار «${open.row.title}»؟`} confirmLabel="حذف الإشعار"
+          onConfirm={() => act(actions.remove, open.row)} onClose={() => setOpen(null)}>
+          <p className="m-0">يختفي من عند كل الطلاب والمشرفين الذين وصلهم{open.row.students ? ` (${studentsText(open.row.students)})` : ''}{open.row.company_name ? ` في «${open.row.company_name}»` : ''}، ومن هذا السجل. من قرأه لا يُمحى من ذاكرته، ولا يمكن استرجاع الإشعار.</p>
         </ConfirmDialog>
       )}
-    </div>
+    </>
   );
 };
+

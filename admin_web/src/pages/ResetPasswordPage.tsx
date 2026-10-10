@@ -1,82 +1,97 @@
-import React, { useState } from 'react';
-import { ArrowRight, Eye, EyeOff, LockKeyhole } from 'lucide-react';
-import { BasakLogo } from '../components/BasakLogo';
+import React, { useEffect, useState } from 'react';
+import { Button } from '../ui/Button';
+import { PasswordField } from '../ui/Field';
+import { AuthFrame, AuthHead, AuthNote } from '../components/platform/AuthFrame';
 import { supabase } from '../lib/supabase';
+import { useGuard } from '../lib/guard';
 
 interface ResetPasswordPageProps {
   onComplete: () => void;
 }
 
+/** Same as LoginPage's: the sign-in page opens «استعادة كلمة المرور» when it finds it. */
+const FORGOT_FLAG = 'basak.admin.forgot';
+
+/**
+ * «كلمة مرور جديدة» (docs/canvas/AdmSignInNewPassword*): reached from a recovery or an
+ * invitation link. The admin chooses a password and goes straight in; an expired link
+ * holds the fields back and offers a new one in one press.
+ */
 export const ResetPasswordPage: React.FC<ResetPasswordPageProps> = ({ onComplete }) => {
+  const invite = /type=invite/.test(window.location.hash);
   const [password, setPassword] = useState('');
   const [confirmation, setConfirmation] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
+  const [errors, setErrors] = useState<{ password?: string; confirmation?: string }>({});
+  const [failure, setFailure] = useState('');
+  const [expired, setExpired] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const guard = useGuard();
 
-  const handleSubmit = async (event: React.FormEvent) => {
+  // A link that was used before or opened too late arrives without a session.
+  useEffect(() => {
+    let live = true;
+    const t = window.setTimeout(() => {
+      void supabase.auth.getSession().then(({ data }) => { if (live && !data.session) setExpired(true); });
+    }, 600);
+    return () => { live = false; window.clearTimeout(t); };
+  }, []);
+
+  const newLink = () => {
+    try { sessionStorage.setItem(FORGOT_FLAG, '1'); } catch { /* private window */ }
+    window.history.replaceState({}, document.title, window.location.pathname);
+    void supabase.auth.signOut().finally(onComplete);
+  };
+
+  const submit = (event: React.FormEvent) => {
     event.preventDefault();
-    setError('');
-    if (password.length < 8) {
-      setError('كلمة المرور يجب أن تكون 8 أحرف على الأقل.');
-      return;
-    }
-    if (password !== confirmation) {
-      setError('كلمتا المرور غير متطابقتين.');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('رابط الاستعادة انتهت صلاحيته. ارجع لصفحة الدخول واطلب رابطاً جديداً.');
-      const { error: updateError } = await supabase.auth.updateUser({ password });
-      if (updateError) throw updateError;
-      // Keep the verified session: the admin continues straight into the dashboard.
-      window.history.replaceState({}, document.title, window.location.pathname);
-      onComplete();
-    } catch (resetError) {
-      const message = resetError instanceof Error ? resetError.message : '';
-      setError(message.includes('expired') || message.includes('انتهت')
-        ? 'رابط الاستعادة انتهت صلاحيته. ارجع لصفحة الدخول واطلب رابطاً جديداً.'
-        : 'تعذر تغيير كلمة المرور. اطلب رابط استعادة جديداً وحاول مرة أخرى.');
-    } finally {
-      setLoading(false);
-    }
+    const e = {
+      password: password.length < 8 ? (password ? 'قصيرة. اكتب 8 أحرف على الأقل.' : 'اكتب كلمة المرور الجديدة.') : undefined,
+      confirmation: !e0(password) && confirmation !== password ? 'الكلمتان غير متطابقتين. أعد كتابة الثانية.' : undefined,
+    };
+    setErrors(e);
+    setFailure('');
+    if (e.password || e.confirmation) return;
+    void guard('save', async () => {
+      setLoading(true);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) { setExpired(true); return; }
+        const { error } = await supabase.auth.updateUser({ password });
+        if (error) throw error;
+        // The verified session stays: the admin continues straight into the dashboard.
+        window.history.replaceState({}, document.title, window.location.pathname);
+        onComplete();
+      } catch (err) {
+        const m = err instanceof Error ? err.message.toLowerCase() : '';
+        if (/expired|invalid.*token|session/.test(m)) setExpired(true);
+        else if (/different from the old|same password/.test(m)) setErrors({ password: 'هذه كلمة المرور القديمة نفسها. اختر غيرها.' });
+        else if (/weak|pwned|characters/.test(m)) setErrors({ password: 'كلمة مرور ضعيفة أو شائعة. اختر أطول منها، وفيها أرقام وحروف.' });
+        else if (/fetch|network/.test(m) || !navigator.onLine) setFailure('تعذّر الاتصال. تأكد من اتصالك بالإنترنت ثم حاول مرة أخرى.');
+        else setFailure('لم تُحفظ كلمة المرور. حاول مرة أخرى بعد قليل، أو اطلب رابطاً جديداً.');
+      } finally {
+        setLoading(false);
+      }
+    });
   };
 
   return (
-    <main className="min-h-screen flex items-center justify-center p-4" dir="rtl" style={{ background: 'radial-gradient(ellipse 80% 60% at 20% 10%, #EAF7FD 0%, #F3FAFD 50%, #ffffff 100%)' }}>
-      <section className="w-full max-w-md rounded-3xl border border-white/70 bg-white/80 p-8 shadow-2xl backdrop-blur-xl">
-        <div className="mb-7 flex flex-col items-center text-center">
-          <BasakLogo className="mb-3 h-14 w-14" />
-          <h1 className="text-2xl font-extrabold text-slate-800">تعيين كلمة مرور جديدة</h1>
-          <p className="mt-2 text-sm text-slate-500">اختر كلمة مرور لحساب إدارة باصك.</p>
+    <AuthFrame>
+      <form className="flex flex-col gap-6" onSubmit={submit} noValidate>
+        <AuthHead title={invite ? 'اختر كلمة مرورك' : 'كلمة مرور جديدة'} sub={invite ? 'أهلاً بك في باصك. اختر كلمة مرور لحسابك، ثم تدخل مباشرة.' : 'اختر كلمة مرور جديدة لحسابك، ثم تدخل مباشرة.'} />
+        {expired && <AuthNote tone="danger" title="انتهت صلاحية الرابط">{invite ? 'رابط الدعوة يعمل مرة واحدة ولمدة محدودة. اطلب رابطاً جديداً ببريدك.' : 'رابط الاستعادة يعمل مرة واحدة ولمدة قصيرة. اطلب رابطاً جديداً.'}</AuthNote>}
+        {failure && <AuthNote tone="danger" title="لم تُحفظ كلمة المرور">{failure}</AuthNote>}
+        <div className="flex flex-col gap-4">
+          <PasswordField label="كلمة المرور الجديدة" placeholder="8 أحرف على الأقل" autoComplete="new-password" value={password} disabled={expired} maxLength={200}
+            onChange={(e) => { setPassword(e.target.value); setErrors((x) => ({ ...x, password: undefined })); }} error={errors.password} help="8 أحرف أو أكثر." />
+          <PasswordField label="أعد كتابتها" placeholder="أعد كتابة كلمة المرور" autoComplete="new-password" value={confirmation} disabled={expired} maxLength={200}
+            onChange={(e) => { setConfirmation(e.target.value); setErrors((x) => ({ ...x, confirmation: undefined })); }} error={errors.confirmation} />
         </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <label className="block text-sm font-bold text-slate-600">
-            كلمة المرور الجديدة
-            <div className="relative mt-2">
-              <LockKeyhole className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <input required minLength={8} autoComplete="new-password" type={showPassword ? 'text' : 'password'} value={password} onChange={(event) => setPassword(event.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-10 py-3 text-sm font-normal text-slate-800 outline-none transition focus:border-sky-300 focus:ring-2 focus:ring-sky-100" placeholder="8 أحرف على الأقل" />
-              <button type="button" aria-label={showPassword ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'} onClick={() => setShowPassword((shown) => !shown)} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button>
-            </div>
-          </label>
-
-          <label className="block text-sm font-bold text-slate-600">
-            تأكيد كلمة المرور
-            <input required minLength={8} autoComplete="new-password" type={showPassword ? 'text' : 'password'} value={confirmation} onChange={(event) => setConfirmation(event.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-normal text-slate-800 outline-none transition focus:border-sky-300 focus:ring-2 focus:ring-sky-100" placeholder="أعد كتابة كلمة المرور" />
-          </label>
-
-          {error && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</p>}
-
-          <button disabled={loading} className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-l from-[#1F6F8B] to-[#3E8FBF] py-3 font-bold text-white shadow-lg shadow-sky-200 transition disabled:opacity-60">
-            <ArrowRight className="h-4 w-4" />
-            {loading ? 'جاري حفظ كلمة المرور...' : 'حفظ كلمة المرور'}
-          </button>
-        </form>
-      </section>
-    </main>
+        <Button type="submit" full loading={loading} disabled={expired}>حفظ كلمة المرور والدخول</Button>
+        {expired && <Button kind="secondary" full onClick={newLink}>اطلب رابطاً جديداً</Button>}
+      </form>
+    </AuthFrame>
   );
 };
+
+/** True when the first field already has its own error (the second is not judged against it). */
+const e0 = (password: string) => password.length < 8;

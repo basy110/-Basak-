@@ -1,212 +1,383 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { ArrowDown, ArrowUp, Landmark, Pencil, Plus, Power, Smartphone, Trash2, Wallet, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useCompany } from '../lib/adminScope';
 import { keys, unwrap, usePageData } from '../lib/query';
-import { rememberApplied } from '../lib/recentChanges';
+import { forgetApplied, rememberApplied } from '../lib/recentChanges';
+import { rpcOr } from '../lib/rpc';
 import { useGuard } from '../lib/guard';
-import { notifyError } from '../lib/toasts';
-import { SkeletonRows } from '../components/Skeleton';
+import { notify, notifyDone, notifyError } from '../lib/toasts';
+import {
+  DISPLAY_NAME_MAX, INSTRUCTIONS_MAX, METHOD_LABEL, METHOD_TYPES, emptyMethod, inOrder, methodErrors, methodRow, methodToDraft,
+  methodsWord, moved, namesList, type MethodDraft, type MethodType, type PaymentMethod,
+} from '../lib/money';
+import {
+  Button, Card, Dialog, EmptyState, ErrorState, Icon, IconButton, Menu, Note, Page, PageHeader, PhoneBar, Pill, RadioCards, RecordCard,
+  SidePanel, SkeletonTable, TextArea, TextField, Toggle, errorText, useOnline,
+} from '../ui';
+import { AccountText, METHOD_ICON, PaymentPreview } from '../components/money/PaymentPreview';
 
-type MethodType = 'instapay' | 'vodafone_cash' | 'bank';
+const COLUMNS = 'id, company_id, method_type, display_name, account_holder, instapay_address, wallet_phone, bank_name, bank_account_number, iban, instructions, is_active, sort_order, created_at';
+const LISTS = ['paymentMethods'];
 
-interface PaymentMethod {
-  id: string; company_id: string; method_type: MethodType; display_name: string;
-  account_holder: string | null; instapay_address: string | null; wallet_phone: string | null;
-  bank_name: string | null; bank_account_number: string | null; iban: string | null;
-  instructions: string | null; is_active: boolean; sort_order: number;
-}
-type Draft = Omit<PaymentMethod, 'id'> & { id?: string };
+type Ask = { kind: 'stop' | 'start' | 'delete'; m: PaymentMethod };
 
-const TYPES: Record<MethodType, { label: string; icon: React.ReactNode }> = {
-  instapay: { label: 'InstaPay', icon: <Wallet className="h-4 w-4" /> },
-  vodafone_cash: { label: 'Vodafone Cash', icon: <Smartphone className="h-4 w-4" /> },
-  bank: { label: 'حساب بنكي', icon: <Landmark className="h-4 w-4" /> },
-};
-
-const COLUMNS = 'id, company_id, method_type, display_name, account_holder, instapay_address, wallet_phone, bank_name, bank_account_number, iban, instructions, is_active, sort_order';
-/** As the page lists them: by position, then as they were added (a new one goes last among equals). */
-const inOrder = (methods: PaymentMethod[]) => [...methods].sort((a, b) => a.sort_order - b.sort_order);
-
-const empty = (companyId: string, order: number): Draft => ({
-  company_id: companyId, method_type: 'instapay', display_name: 'InstaPay', account_holder: '', instapay_address: '',
-  wallet_phone: '', bank_name: '', bank_account_number: '', iban: '', instructions: '', is_active: true, sort_order: order,
-});
-
-/** Company-specific payment methods shown to students when they pay (no hardcoded accounts). */
+/** «وسائل الدفع»: the accounts students pay into, in the order they see them. */
 export const PaymentMethodsPage: React.FC = () => {
   const companyId = useCompany().id;
-  const [draft, setDraft] = useState<Draft | null>(null);
-  const [error, setError] = useState('');
-
-  const [saving, setSaving] = useState(false);
+  const online = useOnline();
   const client = useQueryClient();
   const guard = useGuard();
   const queryKey = keys.company(companyId, 'paymentMethods');
+  const page = usePageData(queryKey, () => unwrap<PaymentMethod[]>(supabase.from('company_payment_methods').select(COLUMNS)
+    .eq('company_id', companyId).order('sort_order').order('created_at')));
+  const methods = useMemo(() => inOrder(page.data ?? []), [page.data]);
+  const active = methods.filter((m) => m.is_active);
 
-  const page = usePageData(queryKey, async () =>
-    unwrap<PaymentMethod[]>(supabase.from('company_payment_methods').select(COLUMNS)
-      .eq('company_id', companyId).order('sort_order').order('created_at')));
-  const methods = page.data ?? [];
-  const loading = page.loading;
+  const [editing, setEditing] = useState<MethodDraft | null>(null);
+  const [ask, setAsk] = useState<Ask | null>(null);
+  const [busy, setBusy] = useState(false);
 
-  // Every write answers with the saved row, which goes straight into the list on
-  // screen: nothing is read again, not even when the change is announced back to us.
+  // Every write answers with the saved row, which goes straight into the list on screen.
   const apply = (change: (list: PaymentMethod[]) => PaymentMethod[], ...ids: string[]) => {
-    rememberApplied(ids, ['paymentMethods']);
+    rememberApplied(ids, LISTS);
     client.setQueryData<PaymentMethod[]>(queryKey, (list) => (list ? inOrder(change(list)) : list));
   };
-  const put = (row: PaymentMethod) =>
-    apply((list) => (list.some((m) => m.id === row.id) ? list.map((m) => (m.id === row.id ? row : m)) : [...list, row]), row.id);
+  const put = (row: PaymentMethod) => apply((list) => (list.some((m) => m.id === row.id) ? list.map((m) => (m.id === row.id ? row : m)) : [...list, row]), row.id);
 
-  const save = () => guard('save', async () => {
-    if (!draft) return;
-    setError('');
-    const clean = (v: string | null) => (v && v.trim() ? v.trim() : null);
-    // Only the fields of the chosen type are stored.
-    const row = {
-      company_id: draft.company_id, method_type: draft.method_type, display_name: draft.display_name.trim(),
-      account_holder: clean(draft.account_holder),
-      instapay_address: draft.method_type === 'instapay' ? clean(draft.instapay_address) : null,
-      wallet_phone: draft.method_type === 'vodafone_cash' ? clean(draft.wallet_phone)?.replace(/\D/g, '') ?? null : null,
-      bank_name: draft.method_type === 'bank' ? clean(draft.bank_name) : null,
-      bank_account_number: draft.method_type === 'bank' ? clean(draft.bank_account_number) : null,
-      iban: draft.method_type === 'bank' ? clean(draft.iban) : null,
-      instructions: clean(draft.instructions), is_active: draft.is_active, sort_order: draft.sort_order,
-      updated_at: new Date().toISOString(),
-    };
-    setSaving(true);
-    const { data, error: saveError } = draft.id
-      ? await supabase.from('company_payment_methods').update(row).eq('id', draft.id).select(COLUMNS).single()
-      : await supabase.from('company_payment_methods').insert(row).select(COLUMNS).single();
-    setSaving(false);
-    if (saveError || !data) {
-      setError(saveError?.message.includes('payment_method_fields')
-        ? 'أكمل بيانات الوسيلة: عنوان InstaPay، أو رقم محفظة فودافون كاش (01xxxxxxxxx)، أو اسم البنك ورقم الحساب.'
-        : saveError?.message ?? 'تعذر حفظ وسيلة الدفع.');
-      return;
+  /** A new order, at once on screen; the database gets the whole order in one go. */
+  const reorder = (next: PaymentMethod[]) => guard('order', async () => {
+    const before = methods;
+    const ordered = next.map((m, i) => ({ ...m, sort_order: i }));
+    apply(() => ordered, ...ordered.map((m) => m.id));
+    try {
+      await rpcOr('reorder_payment_methods',
+        () => supabase.rpc('reorder_payment_methods', { p_company_id: companyId, p_ids: ordered.map((m) => m.id) }),
+        async () => {
+          // An older database: only the rows whose place changed, one by one.
+          for (const m of ordered.filter((x, i) => before[i]?.id !== x.id)) {
+            const { error } = await supabase.from('company_payment_methods').update({ sort_order: m.sort_order }).eq('id', m.id).select('id').single();
+            if (error) throw new Error(error.message);
+          }
+          return null;
+        });
+    } catch {
+      forgetApplied(ordered.map((m) => m.id));
+      client.setQueryData<PaymentMethod[]>(queryKey, before);
+      notify({ title: 'لم يتغيّر الترتيب. أعدنا الوسائل إلى ترتيبها المحفوظ.', tone: 'error', action: { label: 'حاول مرة أخرى', run: () => void reorder(next) } }, 12_000);
+      void page.reload();
     }
-    put(data as PaymentMethod);
-    setDraft(null);
   });
+  const move = (i: number, to: number) => { if (online) void reorder(moved(methods, i, to)); };
 
-  const update = (m: PaymentMethod, patch: Partial<PaymentMethod>) => guard(m.id, async () => {
-    const { data, error: e } = await supabase.from('company_payment_methods').update(patch).eq('id', m.id).select(COLUMNS).single();
-    if (e || !data) notifyError('تعذر تعديل وسيلة الدفع', e?.message);
-    else put(data as PaymentMethod);
-  });
-  // One move at a time: a second click waits for the first swap to be saved.
-  const move = (index: number, delta: number) => guard('move', async () => {
-    const a = methods[index]; const b = methods[index + delta];
-    if (!a || !b) return;
-    // The two rows swap places: independent updates, sent together, shown at once.
-    const orderA = b.sort_order;
-    const orderB = a.sort_order === b.sort_order ? a.sort_order + delta : a.sort_order;
-    apply((list) => list.map((m) => (m.id === a.id ? { ...m, sort_order: orderA } : m.id === b.id ? { ...m, sort_order: orderB } : m)), a.id, b.id);
-    const [first, second] = await Promise.all([
-      supabase.from('company_payment_methods').update({ sort_order: orderA }).eq('id', a.id).select('id').single(),
-      supabase.from('company_payment_methods').update({ sort_order: orderB }).eq('id', b.id).select('id').single(),
-    ]);
-    const failed = first.error ?? second.error;
-    if (!failed) return;
-    notifyError('تعذر تغيير الترتيب', failed.message);
-    // What was really saved is unknown (one of the two may have gone through): read it.
-    await page.reload();
+  const setActive = (m: PaymentMethod, on: boolean) => guard(m.id, async () => {
+    setBusy(true);
+    const { data, error } = await supabase.from('company_payment_methods').update({ is_active: on, updated_at: new Date().toISOString() }).eq('id', m.id).select(COLUMNS).single();
+    setBusy(false);
+    setAsk(null);
+    if (error || !data) return notifyError(on ? 'لم تُشغَّل الوسيلة' : 'لم تُوقَف الوسيلة', errorText(error));
+    put(data as PaymentMethod);
+    notifyDone(on ? `تظهر «${m.display_name}» للطلاب الآن` : `أوقفت «${m.display_name}»`, on ? undefined : 'تبقى محفوظة هنا لتشغّلها متى أردت.');
   });
   const remove = (m: PaymentMethod) => guard(m.id, async () => {
-    if (!confirm(`حذف "${m.display_name}"؟ الإيصالات السابقة تبقى محفوظة بدون ربط بالوسيلة. يمكنك تعطيلها بدلاً من الحذف.`)) return;
-    const { data, error: e } = await supabase.from('company_payment_methods').delete().eq('id', m.id).select('id');
-    if (e || !data?.length) notifyError('تعذر حذف وسيلة الدفع', e?.message);
-    else apply((list) => list.filter((item) => item.id !== m.id), m.id);
+    setBusy(true);
+    const { data, error } = await supabase.from('company_payment_methods').delete().eq('id', m.id).select('id');
+    setBusy(false);
+    setAsk(null);
+    if (error || !data?.length) return notifyError('لم تُحذف الوسيلة', errorText(error));
+    apply((list) => list.filter((x) => x.id !== m.id), m.id);
+    setEditing(null);
+    notifyDone(`حُذفت «${m.display_name}»`);
   });
 
-  const input = 'mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none';
-  const detail = (m: PaymentMethod) => m.method_type === 'instapay' ? m.instapay_address
-    : m.method_type === 'vodafone_cash' ? m.wallet_phone : `${m.bank_name} · ${m.bank_account_number}${m.iban ? ` · ${m.iban}` : ''}`;
+  const header = (
+    <PageHeader title="وسائل الدفع" phoneActions={false}
+      sub="الحسابات التي يحوّل عليها الطلاب ثمن الاشتراك. الطالب يحوّل ثم يرفع صورة التحويل، وأنت تراجعها في «الإيصالات»."
+      actions={<Button icon="plus" disabled={!online} onClick={() => setEditing(emptyMethod())}>إضافة وسيلة دفع</Button>} />
+  );
+
+  if (page.error && !page.data) {
+    return <Page>{header}<ErrorState card title="تعذّر تحميل وسائل الدفع" text="لم نستطع جلب الوسائل. تأكد من اتصالك ثم حاول مرة أخرى." onRetry={() => void page.reload()} /></Page>;
+  }
+
+  const firstStopped = methods.find((m) => !m.is_active);
+  const rowActions = (m: PaymentMethod, i: number) => [
+    { label: m.is_active ? 'إيقاف الوسيلة' : 'تشغيل الوسيلة', icon: 'power' as const, onClick: () => setAsk({ kind: m.is_active ? 'stop' : 'start', m }) },
+    { label: 'اجعلها الأولى', icon: 'aup' as const, hidden: i === 0, onClick: () => move(i, 0) },
+    { label: 'حذف الوسيلة', icon: 'trash' as const, danger: true, onClick: () => setAsk({ kind: 'delete', m }) },
+  ];
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800">وسائل الدفع</h1>
-          <p className="text-sm text-slate-500">ما يراه الطالب عند الدفع لهذه الشركة: InstaPay وفودافون كاش والحسابات البنكية.</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button onClick={() => setDraft(empty(companyId, (methods[methods.length - 1]?.sort_order ?? 0) + 1))}
-            className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
-            <Plus className="h-4 w-4" /> إضافة وسيلة دفع
-          </button>
-        </div>
-      </div>
-
-      {(error || page.error) && !draft && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-700">{error || page.error}</p>}
-
-      <div className="space-y-3">
-        {loading ? <SkeletonRows /> : methods.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center text-slate-500">لا توجد وسائل دفع لهذه الشركة. أضف وسيلة ليتمكن الطلاب من الدفع.</div>
-        ) : methods.map((m, i) => (
-          <div key={m.id} className={`flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-white p-4 shadow-sm ${m.is_active ? 'border-slate-100' : 'border-slate-200 opacity-60'}`}>
-            <div className="flex items-center gap-3">
-              <div className="rounded-xl bg-blue-50 p-2.5 text-blue-600">{TYPES[m.method_type].icon}</div>
-              <div>
-                <p className="font-bold text-slate-800">{m.display_name} <span className="text-xs font-medium text-slate-400">· {TYPES[m.method_type].label}</span></p>
-                <p className="font-mono text-xs text-slate-500" dir="ltr">{detail(m)}</p>
-                {m.account_holder && <p className="text-xs text-slate-500">باسم: {m.account_holder}</p>}
-              </div>
+    <Page>
+      {header}
+      {page.loading ? <SkeletonTable rows={4} cols={5} /> : methods.length === 0 ? (
+        <>
+          <Note tone="danger" title="الطلاب لا يستطيعون الدفع الآن">
+            <span className="hidden sm:inline">لا توجد وسيلة دفع. يرى الطالب الخطوط والأسعار، لكن لا يجد حساباً يحوّل عليه.</span>
+            <span className="sm:hidden">لا توجد وسيلة دفع يحوّلون عليها.</span>
+          </Note>
+          <EmptyState card icon="card" title="أضف أول وسيلة دفع"
+            text="حساب إنستاباي، أو محفظة فودافون كاش، أو حساب بنكي. يظهر للطالب في صفحة الدفع ليحوّل عليه ثمن الاشتراك."
+            action={<Button icon="plus" disabled={!online} onClick={() => setEditing(emptyMethod())}>إضافة وسيلة دفع</Button>} />
+        </>
+      ) : (
+        <>
+          {active.length === 0 && (
+            <Note tone="danger" title="الطلاب لا يستطيعون الدفع الآن"
+              action={firstStopped && <Button sm kind="danger" className="hidden sm:inline-flex" disabled={!online} onClick={() => setAsk({ kind: 'start', m: firstStopped })}>شغّل «{firstStopped.display_name}»</Button>}>
+              كل وسائل الدفع متوقفة. شغّل واحدة على الأقل ليعود الدفع.
+            </Note>
+          )}
+          {/* Desktop and tablet */}
+          <Card className="hidden overflow-hidden sm:block">
+            <div className="flex min-h-[60px] items-center border-b border-hair px-4 text-label text-ink-2">
+              {methodsWord(methods.length)} · {active.length === 0 ? 'لا واحدة تظهر للطلاب' : methods.length === 1 ? 'تظهر للطلاب' : `${active.length === methods.length ? 'كلها تظهر' : `${active.length} تظهر`} للطلاب بهذا الترتيب`}
             </div>
-            <div className="flex items-center gap-1">
-              <span className={`ml-2 rounded-full px-2 py-0.5 text-[11px] font-bold ${m.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{m.is_active ? 'مفعّلة' : 'معطّلة'}</span>
-              <button onClick={() => void move(i, -1)} disabled={i === 0} className="rounded-lg p-1.5 text-slate-400 disabled:opacity-30" title="لأعلى"><ArrowUp className="h-4 w-4" /></button>
-              <button onClick={() => void move(i, 1)} disabled={i === methods.length - 1} className="rounded-lg p-1.5 text-slate-400 disabled:opacity-30" title="لأسفل"><ArrowDown className="h-4 w-4" /></button>
-              <button onClick={() => setDraft({ ...m })} className="rounded-lg p-1.5 text-blue-500" title="تعديل"><Pencil className="h-4 w-4" /></button>
-              <button onClick={() => void update(m, { is_active: !m.is_active })} className={m.is_active ? 'rounded-lg p-1.5 text-amber-500' : 'rounded-lg p-1.5 text-emerald-600'} title={m.is_active ? 'تعطيل' : 'تفعيل'}><Power className="h-4 w-4" /></button>
-              <button onClick={() => void remove(m)} className="rounded-lg p-1.5 text-rose-400" title="حذف"><Trash2 className="h-4 w-4" /></button>
-            </div>
+            <table className="w-full table-fixed border-collapse">
+              <caption className="sr-only">وسائل الدفع بترتيبها عند الطالب</caption>
+              <thead>
+                <tr className="h-11 bg-ground text-label text-ink-2">
+                  <th scope="col" className="w-[120px] ps-4 text-start font-medium">الترتيب</th>
+                  <th scope="col" className="px-3 text-start font-medium">الوسيلة</th>
+                  <th scope="col" className="hidden w-[22%] px-3 text-start font-medium lg:table-cell">الحساب الذي يحوّل عليه الطالب</th>
+                  <th scope="col" className="hidden w-[18%] px-3 text-start font-medium lg:table-cell">صاحب الحساب</th>
+                  <th scope="col" className="w-[140px] px-3 text-start font-medium">الحالة</th>
+                  <th scope="col" className="w-[132px] pe-4"><span className="sr-only">إجراءات</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                {methods.map((m, i) => (
+                  <tr key={m.id} tabIndex={0} onClick={() => setEditing(methodToDraft(m))} onKeyDown={(e) => { if (e.key === 'Enter' && e.target === e.currentTarget) setEditing(methodToDraft(m)); }}
+                    className={`h-[61px] cursor-pointer border-t border-hair hover:bg-ground focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-teal ${editing?.id === m.id ? 'bg-teal-tint shadow-[inset_-3px_0_0_#00658D]' : ''}`}>
+                    <td className="ps-4" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center gap-1">
+                        <span className="w-6 text-small font-semibold tabular">{i + 1}</span>
+                        <IconButton sm icon="aup" size={18} label={`انقل «${m.display_name}» لأعلى`} disabled={i === 0 || !online} onClick={() => move(i, i - 1)} />
+                        <IconButton sm icon="adown" size={18} label={`انقل «${m.display_name}» لأسفل`} disabled={i === methods.length - 1 || !online} onClick={() => move(i, i + 1)} />
+                      </div>
+                    </td>
+                    <td className="px-3">
+                      <div className="min-w-0">
+                        <div className="truncate text-small font-semibold">{m.display_name}</div>
+                        <div className="flex items-center gap-1.5 text-cap text-ink-3"><Icon name={METHOD_ICON[m.method_type]} size={13} /><span>{METHOD_LABEL[m.method_type]}</span></div>
+                        <div className="truncate text-cap text-ink-2 lg:hidden"><AccountText m={m} /></div>
+                      </div>
+                    </td>
+                    <td className="hidden truncate px-3 text-small font-medium lg:table-cell"><AccountText m={m} /></td>
+                    <td className="hidden truncate px-3 text-small lg:table-cell">{m.account_holder ?? '—'}</td>
+                    <td className="px-3">{m.is_active ? <Pill tone="success">تظهر للطلاب</Pill> : <Pill tone="neutral">متوقفة</Pill>}</td>
+                    <td className="pe-4" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center justify-end gap-1">
+                        <Button sm kind="outline" disabled={!online} onClick={() => setEditing(methodToDraft(m))}>تعديل</Button>
+                        <Menu label={`إجراءات «${m.display_name}»`} items={rowActions(m, i).map((a) => ({ ...a, onClick: () => { if (online) a.onClick(); } }))} />
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Card>
+          {/* Phone */}
+          <div className="flex flex-col gap-3 sm:hidden">
+            <div className="text-label text-ink-2">{methodsWord(methods.length)} · {active.length === 0 ? 'لا واحدة تظهر للطلاب' : `${active.length} تظهر للطلاب بهذا الترتيب`}</div>
+            {active.length === 0 && firstStopped && <Button kind="danger" full onClick={() => setAsk({ kind: 'start', m: firstStopped })}>شغّل «{firstStopped.display_name}»</Button>}
+            {methods.map((m, i) => (
+              <RecordCard key={m.id} onOpen={() => setEditing(methodToDraft(m))} spec={{
+                title: m.display_name,
+                sub: <span className="flex items-center gap-1.5"><Icon name={METHOD_ICON[m.method_type]} size={13} />{METHOD_LABEL[m.method_type]}</span>,
+                end: m.is_active ? <Pill tone="success">تظهر للطلاب</Pill> : <Pill tone="neutral">متوقفة</Pill>,
+                fields: [['الحساب', <AccountText key="a" m={m} />], ['صاحب الحساب', m.account_holder ?? '—']],
+                actions: (
+                  <>
+                    <IconButton icon="aup" label={`انقل «${m.display_name}» لأعلى`} className="shadow-ring" disabled={i === 0 || !online} onClick={() => move(i, i - 1)} />
+                    <IconButton icon="adown" label={`انقل «${m.display_name}» لأسفل`} className="shadow-ring" disabled={i === methods.length - 1 || !online} onClick={() => move(i, i + 1)} />
+                    <span className="flex-1" />
+                    <Button kind="outline" className="!h-12" disabled={!online} onClick={() => setAsk({ kind: m.is_active ? 'stop' : 'start', m })}>{m.is_active ? 'إيقاف' : 'تشغيل'}</Button>
+                    <Button kind="secondary" className="!h-12" disabled={!online} onClick={() => setEditing(methodToDraft(m))}>تعديل</Button>
+                  </>
+                ),
+              }} />
+            ))}
           </div>
-        ))}
-      </div>
-
-      {draft && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" dir="rtl">
-          <div className="w-full max-w-lg space-y-4 rounded-3xl bg-white p-6 shadow-2xl">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-bold text-slate-800">{draft.id ? 'تعديل وسيلة الدفع' : 'وسيلة دفع جديدة'}</h2>
-              <button onClick={() => setDraft(null)} className="text-slate-400" aria-label="إغلاق"><X className="h-5 w-5" /></button>
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              {(Object.keys(TYPES) as MethodType[]).map((type) => (
-                <button key={type} onClick={() => setDraft({ ...draft, method_type: type, display_name: draft.display_name && !Object.values(TYPES).some((t) => t.label === draft.display_name) ? draft.display_name : TYPES[type].label })}
-                  className={`flex items-center justify-center gap-1.5 rounded-xl border px-2 py-2 text-xs font-bold ${draft.method_type === type ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-200 text-slate-600'}`}>
-                  {TYPES[type].icon}{TYPES[type].label}
-                </button>
-              ))}
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <label className="text-xs font-semibold text-slate-500">الاسم الظاهر للطالب<input value={draft.display_name} onChange={(e) => setDraft({ ...draft, display_name: e.target.value })} className={input} /></label>
-              <label className="text-xs font-semibold text-slate-500">اسم صاحب الحساب<input value={draft.account_holder ?? ''} onChange={(e) => setDraft({ ...draft, account_holder: e.target.value })} className={input} /></label>
-              {draft.method_type === 'instapay' && (
-                <label className="text-xs font-semibold text-slate-500 sm:col-span-2">عنوان InstaPay أو معرّف الحساب<input dir="ltr" value={draft.instapay_address ?? ''} onChange={(e) => setDraft({ ...draft, instapay_address: e.target.value })} placeholder="name@instapay" className={input} /></label>
-              )}
-              {draft.method_type === 'vodafone_cash' && (
-                <label className="text-xs font-semibold text-slate-500 sm:col-span-2">رقم محفظة فودافون كاش<input dir="ltr" inputMode="tel" value={draft.wallet_phone ?? ''} onChange={(e) => setDraft({ ...draft, wallet_phone: e.target.value })} placeholder="010xxxxxxxx" className={input} /></label>
-              )}
-              {draft.method_type === 'bank' && (<>
-                <label className="text-xs font-semibold text-slate-500">اسم البنك<input value={draft.bank_name ?? ''} onChange={(e) => setDraft({ ...draft, bank_name: e.target.value })} className={input} /></label>
-                <label className="text-xs font-semibold text-slate-500">رقم الحساب<input dir="ltr" value={draft.bank_account_number ?? ''} onChange={(e) => setDraft({ ...draft, bank_account_number: e.target.value })} className={input} /></label>
-                <label className="text-xs font-semibold text-slate-500 sm:col-span-2">IBAN (اختياري)<input dir="ltr" value={draft.iban ?? ''} onChange={(e) => setDraft({ ...draft, iban: e.target.value })} className={input} /></label>
-              </>)}
-              <label className="text-xs font-semibold text-slate-500 sm:col-span-2">تعليمات الدفع للطالب<textarea rows={3} value={draft.instructions ?? ''} onChange={(e) => setDraft({ ...draft, instructions: e.target.value })} placeholder="مثال: حوّل المبلغ كاملاً ثم ارفع صورة إيصال التحويل." className={input} /></label>
-              <label className="flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" checked={draft.is_active} onChange={(e) => setDraft({ ...draft, is_active: e.target.checked })} />مفعّلة وتظهر للطلاب</label>
-            </div>
-            {error && <p role="alert" className="rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>}
-            <div className="flex justify-end gap-2">
-              <button onClick={() => setDraft(null)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-bold text-slate-600">إلغاء</button>
-              <button onClick={() => void save()} disabled={saving} className="rounded-xl bg-blue-600 px-5 py-2 text-sm font-bold text-white disabled:opacity-50">{saving ? 'جاري الحفظ…' : 'حفظ'}</button>
-            </div>
-          </div>
-        </div>
+          <Note tone="teal" title="الترتيب هنا هو ترتيبها عند الطالب" className="hidden sm:flex">
+            ضع في الأعلى الوسيلة التي تفضّل أن يحوّل عليها الطلاب. الوسيلة المتوقفة تبقى محفوظة ولا يراها أحد.
+          </Note>
+        </>
       )}
+
+      {methods.length > 0 && <PhoneBar><Button full icon="plus" disabled={!online} onClick={() => setEditing(emptyMethod())}>إضافة وسيلة دفع</Button></PhoneBar>}
+
+      {editing && (
+        <MethodPanel key={editing.id ?? 'new'} start={editing} companyId={companyId} methods={methods} online={online}
+          onClose={() => setEditing(null)} onSaved={(row) => { put(row); setEditing(null); }}
+          onDelete={(m) => setAsk({ kind: 'delete', m })} />
+      )}
+      {ask && <AskDialog ask={ask} active={active} busy={busy} onClose={() => setAsk(null)}
+        onConfirm={() => (ask.kind === 'delete' ? void remove(ask.m) : void setActive(ask.m, ask.kind === 'start'))} />}
+    </Page>
+  );
+};
+
+// ── Stop, start, delete ─────────────────────────────────────────────
+const AskDialog: React.FC<{ ask: Ask; active: PaymentMethod[]; busy: boolean; onClose: () => void; onConfirm: () => void }> = ({ ask, active, busy, onClose, onConfirm }) => {
+  const { m } = ask;
+  const others = active.filter((x) => x.id !== m.id);
+  const last = m.is_active && others.length === 0;
+  const back = <Button key="b" kind="secondary" onClick={onClose} disabled={busy}>رجوع</Button>;
+  const cantPay = (
+    <Note tone="danger" title="لن يستطيع أي طالب أن يدفع">تظهر له صفحة الدفع بلا حساب يحوّل عليه، حتى تشغّل وسيلة أخرى.</Note>
+  );
+  if (ask.kind === 'start') {
+    return (
+      <Dialog open onClose={onClose} title={`تشغيل «${m.display_name}»؟`} icon="power" tone="success"
+        actions={[back, <Button key="c" onClick={onConfirm} loading={busy}>تشغيل الوسيلة</Button>]}>
+        <p className="m-0">تظهر في صفحة الدفع عند الطلاب فوراً، في مكانها من الترتيب. يحوّلون عليها ثم يرفعون صورة التحويل.</p>
+      </Dialog>
+    );
+  }
+  if (ask.kind === 'stop') {
+    return last ? (
+      <Dialog open onClose={onClose} title="إيقاف آخر وسيلة دفع تعمل؟" icon="alert" tone="danger"
+        actions={[back, <Button key="c" kind="danger" onClick={onConfirm} loading={busy}>إيقاف الوسيلة</Button>]}>
+        <p className="m-0">«{m.display_name}» هي الوسيلة الوحيدة التي يراها الطلاب الآن.</p>
+        {cantPay}
+      </Dialog>
+    ) : (
+      <Dialog open onClose={onClose} title={`إيقاف «${m.display_name}»؟`} icon="power" tone="warning"
+        actions={[back, <Button key="c" onClick={onConfirm} loading={busy}>إيقاف الوسيلة</Button>]}>
+        <p className="m-0">تختفي من صفحة الدفع عند الطلاب فوراً، وتبقى محفوظة هنا لتشغّلها متى أردت.</p>
+        <p className="m-0">{others.length === 1 ? `تبقى وسيلة واحدة تعمل: ${others[0].display_name}.` : `تبقى ${others.length === 2 ? 'وسيلتان تعملان' : `${others.length} وسائل تعمل`}: ${namesList(others.map((x) => x.display_name))}.`} الإيصالات التي رُفعت عليها من قبل لا تتأثر.</p>
+      </Dialog>
+    );
+  }
+  return (
+    <Dialog open onClose={onClose} title={`حذف «${m.display_name}»؟`} icon="trash" tone="danger"
+      actions={[back, <Button key="c" kind="danger" onClick={onConfirm} loading={busy}>حذف الوسيلة</Button>]}>
+      <p className="m-0">تُحذف الوسيلة نهائياً ولا يمكن استرجاعها. الإيصالات السابقة تبقى محفوظة، لكن بلا اسم الوسيلة التي دُفعت بها.</p>
+      {m.is_active
+        ? (last ? cantPay : <p className="m-0">هي تظهر للطلاب الآن، وتختفي من صفحة الدفع فوراً. إن أردت إخفاءها فقط فأوقفها بدل حذفها.</p>)
+        : <p className="m-0">هي متوقفة الآن ولا يراها الطلاب، فلا حاجة إلى الحذف إن أردت إخفاءها فقط.</p>}
+    </Dialog>
+  );
+};
+
+// ── Add / edit ──────────────────────────────────────────────────────
+const FIELD_LABELS: Record<MethodType, { account: string; holder: string; holderHelp?: string }> = {
+  instapay: { account: 'عنوان إنستاباي', holder: 'اسم صاحب الحساب' },
+  vodafone_cash: { account: 'رقم المحفظة', holder: 'اسم صاحب المحفظة', holderHelp: 'كما يظهر للطالب عند التحويل.' },
+  bank: { account: 'رقم الحساب', holder: 'اسم صاحب الحساب' },
+};
+
+const MethodPanel: React.FC<{
+  start: MethodDraft; companyId: string; methods: PaymentMethod[]; online: boolean;
+  onClose: () => void; onSaved: (row: PaymentMethod) => void; onDelete: (m: PaymentMethod) => void;
+}> = ({ start, companyId, methods, online, onClose, onSaved, onDelete }) => {
+  const [d, setD] = useState<MethodDraft>(start);
+  const [shown, setShown] = useState<Set<string>>(new Set());
+  const [tried, setTried] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [leaving, setLeaving] = useState(false);
+  const [serverError, setServerError] = useState('');
+  const guard = useGuard();
+  const saved = methods.find((m) => m.id === d.id);
+  const errors = methodErrors(d);
+  const err = (k: keyof MethodDraft) => ((tried || shown.has(k)) ? errors[k] : undefined);
+  const set = (patch: Partial<MethodDraft>) => { setD((x) => ({ ...x, ...patch })); setServerError(''); };
+  const blur = (k: keyof MethodDraft) => () => setShown((s) => new Set(s).add(k));
+  const dirty = JSON.stringify(d) !== JSON.stringify(start);
+  const close = () => { if (dirty && !saving) setLeaving(true); else onClose(); };
+  const others = methods.filter((m) => m.is_active && m.id !== d.id);
+  const labels = FIELD_LABELS[d.method_type];
+
+  const save = () => guard('save', async () => {
+    setTried(true);
+    if (Object.keys(methodErrors(d)).length) return;
+    setSaving(true);
+    const row = { ...methodRow(d), company_id: companyId, updated_at: new Date().toISOString() };
+    const order = methods.length ? Math.max(...methods.map((m) => m.sort_order)) + 1 : 0;
+    const { data, error } = d.id
+      ? await supabase.from('company_payment_methods').update(row).eq('id', d.id).select(COLUMNS).single()
+      : await supabase.from('company_payment_methods').insert({ ...row, sort_order: order }).select(COLUMNS).single();
+    setSaving(false);
+    if (error || !data) {
+      setServerError(/payment_method_fields/.test(error?.message ?? '') ? 'أكمل بيانات الحساب: العنوان، أو رقم المحفظة، أو اسم البنك ورقم الحساب.' : errorText(error));
+      return;
+    }
+    notifyDone(d.id ? 'حُفظت وسيلة الدفع' : `أُضيفت «${(data as PaymentMethod).display_name}»`, d.is_active ? 'تظهر للطلاب في صفحة الدفع الآن.' : 'محفوظة ومتوقفة؛ لا يراها الطلاب.');
+    onSaved(data as PaymentMethod);
+  });
+
+  const form = (
+    <div className="flex flex-col gap-4">
+      <RadioCards<MethodType> label="نوع الوسيلة" value={d.method_type} onChange={(t) => set({ method_type: t })}
+        options={METHOD_TYPES.map((t) => ({ value: t, label: METHOD_LABEL[t] }))} />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <TextField label="الاسم الظاهر للطالب" value={d.display_name} maxLength={DISPLAY_NAME_MAX} placeholder={`مثل: ${METHOD_LABEL[d.method_type]} الشركة`}
+          onChange={(e) => set({ display_name: e.target.value })} onBlur={blur('display_name')} error={err('display_name')} />
+        {d.method_type !== 'vodafone_cash' && (
+          <TextField label={labels.holder} value={d.account_holder} maxLength={80} onChange={(e) => set({ account_holder: e.target.value })} onBlur={blur('account_holder')} error={err('account_holder')} />
+        )}
+        {d.method_type === 'vodafone_cash' && (
+          <TextField label={labels.account} value={d.wallet_phone} inputMode="tel" ltr placeholder="01xxxxxxxxx" maxLength={16}
+            onChange={(e) => set({ wallet_phone: e.target.value })} onBlur={blur('wallet_phone')} error={err('wallet_phone')} />
+        )}
+      </div>
+      {d.method_type === 'vodafone_cash' && (
+        <TextField label={labels.holder} value={d.account_holder} maxLength={80} help={labels.holderHelp} onChange={(e) => set({ account_holder: e.target.value })} onBlur={blur('account_holder')} error={err('account_holder')} />
+      )}
+      {d.method_type === 'instapay' && (
+        <TextField label="عنوان إنستاباي" value={d.instapay_address} ltr placeholder="name@instapay" maxLength={60} autoCapitalize="off" spellCheck={false}
+          help="العنوان كما في تطبيق إنستاباي، أو رقم الهاتف المربوط به." onChange={(e) => set({ instapay_address: e.target.value })} onBlur={blur('instapay_address')} error={err('instapay_address')} />
+      )}
+      {d.method_type === 'bank' && (
+        <>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <TextField label="اسم البنك والفرع" value={d.bank_name} maxLength={80} placeholder="مثل: البنك الأهلي المصري · فرع دمياط" onChange={(e) => set({ bank_name: e.target.value })} onBlur={blur('bank_name')} error={err('bank_name')} />
+            <TextField label="رقم الحساب" value={d.bank_account_number} inputMode="numeric" ltr maxLength={40} onChange={(e) => set({ bank_account_number: e.target.value })} onBlur={blur('bank_account_number')} error={err('bank_account_number')} />
+          </div>
+          <TextField label="رقم الآيبان" optional value={d.iban} ltr placeholder="EG00 0000 0000 0000 0000 0000 0000 0" maxLength={40} autoCapitalize="characters" spellCheck={false}
+            help="EG ثم 27 رقماً، كما في كشف الحساب." onChange={(e) => set({ iban: e.target.value })} onBlur={blur('iban')} error={err('iban')} />
+        </>
+      )}
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor="pm-instructions" className="flex items-baseline gap-2 text-label font-medium text-ink">
+          <span>تعليمات للطالب</span><span className="font-normal text-ink-3">اختياري</span><span className="flex-1" />
+          <span className="font-normal text-cap text-ink-3 tabular" dir="ltr">{d.instructions.length} / {INSTRUCTIONS_MAX}</span>
+        </label>
+        <TextArea id="pm-instructions" value={d.instructions} maxLength={INSTRUCTIONS_MAX} rows={3}
+          placeholder="مثال: حوّل المبلغ كاملاً ثم ارفع صورة التحويل." help={d.id ? 'تظهر تحت رقم الحساب. مثال: حوّل المبلغ كاملاً ثم ارفع صورة التحويل.' : undefined}
+          onChange={(e) => set({ instructions: e.target.value })} error={err('instructions')} />
+      </div>
+      <Toggle label="تظهر للطلاب" checked={d.is_active} onChange={(on) => set({ is_active: on })}
+        help={d.id ? 'عند إيقافها تبقى محفوظة هنا ولا يراها أحد في التطبيق.' : 'تظهر فور الحفظ في صفحة الدفع.'} />
+      {serverError && <Note tone="danger" title="لم تُحفظ الوسيلة">{serverError}</Note>}
     </div>
+  );
+
+  return (
+    <>
+      <SidePanel open onClose={close} w={920} backLabel="وسائل الدفع"
+        title={d.id ? 'تعديل وسيلة الدفع' : 'وسيلة دفع جديدة'}
+        meta={saved && (saved.is_active ? <Pill tone="success">تظهر للطلاب</Pill> : <Pill tone="neutral">متوقفة</Pill>)}
+        sub={saved ? `${saved.display_name} · ${METHOD_LABEL[saved.method_type]}` : undefined}
+        footer={(
+          <>
+            {saved && <Button kind="dangerQuiet" icon="trash" className="hidden sm:inline-flex" disabled={!online} onClick={() => onDelete(saved)}>حذف الوسيلة</Button>}
+            <span className="hidden flex-1 sm:block" />
+            <Button kind="secondary" className="hidden sm:inline-flex" onClick={close}>رجوع</Button>
+            <Button onClick={() => void save()} loading={saving} disabled={!online}>حفظ وسيلة الدفع</Button>
+          </>
+        )}>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="rounded-card bg-surface p-4 sm:p-0">{form}</div>
+          <PaymentPreview draft={d} others={others} className="lg:self-start" />
+          {saved && <Button kind="dangerQuiet" icon="trash" full className="sm:hidden" disabled={!online} onClick={() => onDelete(saved)}>حذف الوسيلة</Button>}
+        </div>
+      </SidePanel>
+      <Dialog open={leaving} onClose={() => setLeaving(false)} title="إغلاق دون حفظ؟" icon="alert" tone="warning"
+        actions={[<Button key="s" kind="secondary" onClick={() => setLeaving(false)}>رجوع إلى الوسيلة</Button>, <Button key="l" kind="dangerQuiet" onClick={() => { setLeaving(false); onClose(); }}>الإغلاق دون حفظ</Button>]}>
+        <p className="m-0">غيّرت بيانات الوسيلة ولم تحفظ. إن أغلقت الآن يبقى كل شيء كما كان.</p>
+      </Dialog>
+    </>
   );
 };

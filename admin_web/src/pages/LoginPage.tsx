@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
-import { Eye, EyeOff, ShieldCheck, LogIn } from 'lucide-react';
-import { BasakLogo } from '../components/BasakLogo';
+import React, { useEffect, useState } from 'react';
+import { Button } from '../ui/Button';
+import { PasswordField, TextField } from '../ui/Field';
+import { Icon } from '../ui/Icon';
+import { AuthFrame, AuthHead, AuthNote } from '../components/platform/AuthFrame';
 import { supabase } from '../lib/supabase';
 import { AdminProfile } from '../lib/adminScope';
 import { loadAdminProfile } from '../lib/adminProfile';
@@ -10,199 +12,171 @@ interface LoginPageProps {
   onLogin: (admin: AdminProfile) => void;
 }
 
+type View = 'signin' | 'forgot' | 'sent' | 'expired';
+type Problem = null | 'credentials' | 'notAdmin' | 'network' | 'unconfirmed' | 'busy' | 'other';
+
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+/** Set by the dashboard when a session ran out while working; read once here. */
+export const SESSION_EXPIRED_FLAG = 'basak.admin.sessionExpired';
+/** Set by the new-password page when its link had expired: open «استعادة كلمة المرور» at once. */
+export const FORGOT_FLAG = 'basak.admin.forgot';
+const readFlag = (key: string) => { try { const v = sessionStorage.getItem(key); sessionStorage.removeItem(key); return !!v; } catch { return false; } };
+
+/** What went wrong, from the sign-in service's answer; the admin never reads that answer itself. */
+export function signInProblem(message: string, online = true): Exclude<Problem, null> {
+  const m = message.toLowerCase();
+  if (!online || /fetch|network|timeout|load failed/.test(m)) return 'network';
+  if (/invalid login|invalid_credentials|user not found|invalid grant/.test(m)) return 'credentials';
+  if (/email not confirmed/.test(m)) return 'unconfirmed';
+  if (/too many|rate limit|429/.test(m)) return 'busy';
+  return 'other';
+}
+
+/**
+ * «تسجيل الدخول» (docs/canvas/AdmSignIn, AdmSignInStates, AdmSignInForgotPhone): e-mail
+ * and password, each problem in plain Arabic above or under the field it is about,
+ * and «نسيت كلمة المرور؟» as its own small page that answers the same either way.
+ */
 export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
+  const linkExpired = /error_code=otp_expired|error=access_denied/.test(window.location.hash);
+  const [view, setView] = useState<View>(() => (linkExpired ? 'expired' : readFlag(FORGOT_FLAG) ? 'forgot' : 'signin'));
+  const [sessionEnded] = useState(() => readFlag(SESSION_EXPIRED_FLAG));
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState('');
+  const [problem, setProblem] = useState<Problem>(null);
+  const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
   const [loading, setLoading] = useState(false);
-  const [resetNotice, setResetNotice] = useState('');
-
-  // One request to the sign-in service at a time, whichever button or key started it.
+  const [wait, setWait] = useState(0);
   const guard = useGuard();
-  const handlePasswordReset = () => guard('auth', async () => {
-    setError('');
-    setResetNotice('');
-    const cleanEmail = email.trim();
-    if (!cleanEmail) {
-      setError('اكتب البريد الإلكتروني أولاً لإرسال رابط الاستعادة.');
-      return;
-    }
-    setLoading(true);
-    try {
-      const { error: resetError } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
-        redirectTo: window.location.origin,
-      });
-      if (resetError) throw resetError;
-      setResetNotice('لو البريد مسجل، هيوصلك رابط استعادة. افتحه واختر كلمة مرور جديدة.');
-    } catch {
-      setError('تعذر إرسال رابط الاستعادة. حاول مرة أخرى بعد قليل.');
-    } finally {
-      setLoading(false);
-    }
-  });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    if (linkExpired) window.history.replaceState({}, document.title, window.location.pathname);
+  }, [linkExpired]);
+  useEffect(() => {
+    if (wait <= 0) return undefined;
+    const t = window.setTimeout(() => setWait((w) => w - 1), 1000);
+    return () => window.clearTimeout(t);
+  }, [wait]);
+
+  const go = (v: View) => { setProblem(null); setFieldErrors({}); setView(v); };
+
+  const signIn = (e: React.FormEvent) => {
     e.preventDefault();
-    void guard('auth', signIn);
+    const clean = email.trim();
+    const errors = {
+      email: !clean ? 'اكتب بريدك الإلكتروني.' : !EMAIL.test(clean) ? 'اكتب البريد الإلكتروني كاملاً، وفيه @ ونقطة.' : undefined,
+      password: !password ? 'اكتب كلمة المرور.' : undefined,
+    };
+    setFieldErrors(errors);
+    setProblem(null);
+    if (errors.email || errors.password) return;
+    void guard('auth', async () => {
+      setLoading(true);
+      try {
+        const { data, error } = await supabase.auth.signInWithPassword({ email: clean, password });
+        if (error) throw error;
+        const admin = await loadAdminProfile(data.user.id);
+        if (!admin) {
+          // A student, a supervisor or an account no company holds any more: signed out again.
+          await supabase.auth.signOut();
+          setProblem('notAdmin');
+          setPassword('');
+          return;
+        }
+        onLogin(admin);
+      } catch (err) {
+        const p = signInProblem(err instanceof Error ? err.message : String((err as { message?: string })?.message ?? ''), navigator.onLine);
+        setProblem(p);
+        if (p === 'credentials') { setPassword(''); document.getElementById('login-password')?.focus(); }
+      } finally {
+        setLoading(false);
+      }
+    });
   };
-  const signIn = async () => {
-    setError('');
-    setLoading(true);
 
-    try {
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
-      if (signInError) throw signInError;
-      const admin = await loadAdminProfile(data.user.id);
-      if (!admin) {
-        await supabase.auth.signOut();
-        throw new Error('هذا الحساب غير مسجل كمسؤول في النظام.');
+  const sendLink = (e?: React.FormEvent) => {
+    e?.preventDefault();
+    const clean = email.trim();
+    if (!EMAIL.test(clean)) { setFieldErrors({ email: clean ? 'اكتب البريد الإلكتروني كاملاً، وفيه @ ونقطة.' : 'اكتب بريدك الإلكتروني.' }); return; }
+    setFieldErrors({});
+    void guard('auth', async () => {
+      setLoading(true);
+      setProblem(null);
+      try {
+        const { error } = await supabase.auth.resetPasswordForEmail(clean, { redirectTo: window.location.origin });
+        // The same answer whether or not the e-mail is registered; only a failed request is told.
+        if (error && signInProblem(error.message, navigator.onLine) === 'network') throw error;
+        setView('sent');
+        setWait(60);
+      } catch {
+        setProblem('network');
+      } finally {
+        setLoading(false);
       }
-      onLogin(admin);
-    } catch (err) {
-      const message = err instanceof Error ? err.message.toLowerCase() : '';
-      if (
-        message.includes('invalid login credentials') ||
-        message.includes('invalid_credentials') ||
-        message.includes('user not found')
-      ) {
-        setError('البريد الإلكتروني أو كلمة المرور غير صحيحة.');
-      } else if (message.includes('email not confirmed')) {
-        setError('يجب تأكيد البريد الإلكتروني أولاً.');
-      } else if (
-        message.includes('هذا الحساب غير مسجل كمسؤول') ||
-        message.includes('not registered as an administrator')
-      ) {
-        setError('هذا الحساب غير مسجل كمسؤول في النظام.');
-      } else if (
-        message.includes('fetch') ||
-        message.includes('network') ||
-        message.includes('timeout')
-      ) {
-        setError('تعذر الاتصال بالخادم. تحقق من الإنترنت وحاول مرة أخرى.');
-      } else {
-        setError('تعذر تسجيل الدخول. تحقق من بيانات الحساب وحاول مرة أخرى.');
-      }
-    } finally {
-      setLoading(false);
-    }
+    });
   };
+
+  const notes: Record<Exclude<Problem, null | 'credentials'>, [tone: 'danger' | 'warning', title: string, text: string]> = {
+    notAdmin: ['danger', 'هذا الحساب ليس حساب مدير', 'لوحة الشركات لمديري شركات النقل فقط. إن كنت طالباً أو مشرفاً فادخل من تطبيق باصك.'],
+    network: ['danger', 'تعذّر الاتصال', view === 'signin' ? 'تأكد من اتصالك بالإنترنت ثم اضغط «دخول» مرة أخرى.' : 'تأكد من اتصالك بالإنترنت ثم حاول مرة أخرى.'],
+    unconfirmed: ['warning', 'أكّد بريدك الإلكتروني أولاً', 'أرسلنا إليك رسالة عند إنشاء الحساب. افتحها واضغط الرابط، ثم ادخل.'],
+    busy: ['warning', 'محاولات كثيرة', 'انتظر دقيقة ثم حاول مرة أخرى.'],
+    other: ['danger', 'تعذّر الدخول الآن', 'حدث خطأ من جهتنا. حاول مرة أخرى بعد قليل، وإن تكرر فتواصل مع إدارة المنصة.'],
+  };
+  const note = problem && problem !== 'credentials' ? notes[problem] : null;
+  const emailField = (
+    <TextField label="البريد الإلكتروني" type="email" ltr value={email} autoComplete="username" inputMode="email" maxLength={120}
+      onChange={(e) => { setEmail(e.target.value); setFieldErrors((f) => ({ ...f, email: undefined })); }} error={fieldErrors.email} />
+  );
+
+  if (view === 'expired') {
+    return (
+      <AuthFrame>
+        <div className="flex flex-col gap-6">
+          <AuthHead title="كلمة مرور جديدة" sub="اختر كلمة مرور جديدة لحسابك، ثم تدخل مباشرة." />
+          <AuthNote tone="danger" title="انتهت صلاحية الرابط">رابط الاستعادة يعمل مرة واحدة ولمدة قصيرة. اطلب رابطاً جديداً.</AuthNote>
+          <Button full onClick={() => go('forgot')}>اطلب رابطاً جديداً</Button>
+          <Button kind="link" onClick={() => go('signin')} className="self-start">رجوع إلى تسجيل الدخول</Button>
+        </div>
+      </AuthFrame>
+    );
+  }
+
+  if (view === 'forgot' || view === 'sent') {
+    return (
+      <AuthFrame>
+        <form className="flex flex-col gap-6" onSubmit={sendLink} noValidate>
+          <button type="button" onClick={() => go('signin')} className="inline-flex items-center gap-1.5 self-start text-label font-medium text-teal hover:underline">
+            <Icon name="arrowBack" size={14} stroke={2} />رجوع إلى تسجيل الدخول
+          </button>
+          <AuthHead title="استعادة كلمة المرور" sub="اكتب بريدك الإلكتروني، ونرسل إليه رابطاً تختار منه كلمة مرور جديدة." />
+          {view === 'sent' && <AuthNote tone="success" title="إن كان البريد مسجلاً فقد أرسلنا الرابط">افتح بريدك واضغط الرابط. إن لم تجده فانظر في البريد غير المرغوب، ثم أعد المحاولة بعد دقيقة.</AuthNote>}
+          {note && <AuthNote tone={note[0]} title={note[1]}>{note[2]}</AuthNote>}
+          {emailField}
+          {view === 'sent'
+            ? <Button type="submit" kind="secondary" full loading={loading} disabled={wait > 0}>{wait > 0 ? `أرسل الرابط مرة أخرى بعد ${wait} ث` : 'أرسل الرابط مرة أخرى'}</Button>
+            : <Button type="submit" full loading={loading}>أرسل رابط الاستعادة</Button>}
+        </form>
+      </AuthFrame>
+    );
+  }
 
   return (
-    <div
-      className="min-h-screen flex items-center justify-center p-4"
-      dir="rtl"
-      style={{
-        background: 'radial-gradient(ellipse 80% 60% at 20% 10%, #EAF7FD 0%, #F3FAFD 50%, #ffffff 100%)',
-      }}
-    >
-      {/* Decorative blobs */}
-      <div className="pointer-events-none fixed inset-0 overflow-hidden">
-        <div className="absolute -top-32 -right-32 h-[400px] w-[400px] rounded-full bg-[#7EC8E3]/15 blur-3xl" />
-        <div className="absolute -bottom-32 -left-32 h-[350px] w-[350px] rounded-full bg-[#A8D8F0]/10 blur-3xl" />
-      </div>
-
-      <div className="relative w-full max-w-sm">
-        {/* Card */}
-        <div
-          className="rounded-3xl p-8 shadow-2xl"
-          style={{
-            background: 'rgba(255,255,255,0.72)',
-            backdropFilter: 'blur(20px)',
-            WebkitBackdropFilter: 'blur(20px)',
-            border: '1px solid rgba(255,255,255,0.7)',
-            boxShadow: '0 8px 40px rgba(126,200,227,0.22)',
-          }}
-        >
-          {/* Logo */}
-          <div className="flex flex-col items-center mb-8">
-            <BasakLogo className="h-16 w-16 mb-3" />
-            <h1 className="text-2xl font-extrabold text-[#1F2937]">باصك</h1>
-            <p className="text-sm font-medium text-[#5B6B7A] mt-1">لوحة تحكم الإدارة</p>
-          </div>
-
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-xs font-bold text-[#5B6B7A] mb-1.5">
-                البريد الإلكتروني للمسؤول
-              </label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@example.com"
-                autoComplete="username"
-                required
-                className="w-full rounded-xl border border-slate-200 bg-white/70 px-4 py-3 text-sm text-[#1F2937] placeholder-slate-400 focus:border-[#7EC8E3] focus:outline-none focus:ring-2 focus:ring-[#7EC8E3]/20 transition"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-[#5B6B7A] mb-1.5">
-                كلمة المرور
-              </label>
-              <div className="relative">
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  autoComplete="current-password"
-                  required
-                  className="w-full rounded-xl border border-slate-200 bg-white/70 px-4 py-3 text-sm text-[#1F2937] placeholder-slate-400 focus:border-[#7EC8E3] focus:outline-none focus:ring-2 focus:ring-[#7EC8E3]/20 transition pl-12"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition"
-                  tabIndex={-1}
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
-              <button type="button" onClick={() => void handlePasswordReset()} disabled={loading} className="mt-2 text-xs font-bold text-[#287D9A] underline-offset-2 hover:underline disabled:opacity-50">
-                نسيت كلمة المرور؟ أرسل رابط استعادة
-              </button>
-            </div>
-
-            {resetNotice && <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-semibold text-emerald-700">{resetNotice}</p>}
-
-            {/* Error */}
-            {error && (
-              <div className="rounded-xl bg-rose-50 border border-rose-200 px-4 py-3 text-xs font-semibold text-rose-700">
-                {error}
-              </div>
-            )}
-
-            {/* Submit */}
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold text-white transition disabled:opacity-60"
-              style={{
-                background: 'linear-gradient(135deg, #3E8FBF 0%, #7EC8E3 100%)',
-                boxShadow: '0 4px 20px rgba(126,200,227,0.4)',
-              }}
-            >
-              {loading ? (
-                <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-              ) : (
-                <>
-                  <LogIn className="h-4 w-4" />
-                  تسجيل الدخول
-                </>
-              )}
-            </button>
-          </form>
-
-          {/* Footer */}
-          <div className="mt-6 flex items-center justify-center gap-1.5 text-[11px] text-[#5B6B7A]">
-            <ShieldCheck className="h-3.5 w-3.5 text-[#3E8FBF]" />
-            <span>وصول مقيد للإدارة فقط</span>
-          </div>
+    <AuthFrame>
+      <form className="flex flex-col gap-6" onSubmit={signIn} noValidate aria-busy={loading || undefined}>
+        <AuthHead title="تسجيل الدخول" sub="ادخل ببريدك الإلكتروني وكلمة المرور التي اخترتها." />
+        {sessionEnded && !problem && <AuthNote tone="warning" title="انتهت جلستك">للأمان نطلب الدخول من جديد بعد مدة. ادخل لتعود إلى حيث كنت.</AuthNote>}
+        {note && <AuthNote tone={note[0]} title={note[1]}>{note[2]}</AuthNote>}
+        <div className="flex flex-col gap-4">
+          {emailField}
+          <PasswordField id="login-password" label="كلمة المرور" placeholder="كلمة المرور" value={password} autoComplete="current-password" maxLength={200}
+            onChange={(e) => { setPassword(e.target.value); setFieldErrors((f) => ({ ...f, password: undefined })); if (problem === 'credentials') setProblem(null); }}
+            error={problem === 'credentials' ? 'البريد الإلكتروني أو كلمة المرور غير صحيحة.' : fieldErrors.password} />
+          <button type="button" onClick={() => go('forgot')} className="self-start text-label font-medium text-teal hover:underline">نسيت كلمة المرور؟</button>
         </div>
-      </div>
-    </div>
+        <Button type="submit" full loading={loading}>دخول</Button>
+        <p className="m-0 flex items-start gap-2 text-label text-ink-2"><Icon name="lock" size={14} className="mt-[3px]" />للمديرين فقط. الطلاب والمشرفون يدخلون من تطبيق باصك برقم الهاتف.</p>
+      </form>
+    </AuthFrame>
   );
 };

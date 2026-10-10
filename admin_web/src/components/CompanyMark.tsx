@@ -3,9 +3,9 @@ import { companyInitials, emblemUrl, type CompanyBrand } from '../lib/branding';
 
 const SIZES = {
   xs: { box: 'h-5 w-5 rounded-md text-[10px]', px: 20 },
-  sm: { box: 'h-8 w-8 rounded-lg text-xs', px: 32 },
-  md: { box: 'h-10 w-10 rounded-xl text-sm', px: 40 },
-  lg: { box: 'h-16 w-16 rounded-2xl text-xl', px: 64 },
+  sm: { box: 'h-8 w-8 rounded-[8px] text-cap', px: 32 },
+  md: { box: 'h-10 w-10 rounded-control text-small', px: 40 },
+  lg: { box: 'h-16 w-16 rounded-inner text-[22px]', px: 64 },
 } as const;
 
 interface CompanyMarkProps {
@@ -29,11 +29,11 @@ export const CompanyMark: React.FC<CompanyMarkProps> = ({ name, brand, size = 'm
   const frame = `${box} inline-flex flex-shrink-0 select-none items-center justify-center overflow-hidden ${className}`;
   if (url && failed !== url) {
     return (
-      <span className={`${frame} border border-slate-200/80 bg-white`}>
+      <span className={`${frame} bg-surface shadow-ring`}>
         <img src={url} alt="" loading="lazy" decoding="async" draggable={false} onError={() => setFailed(url)}
           className="h-full w-full object-contain" />
       </span>
     );
   }
-  return <span aria-hidden="true" className={`${frame} bg-[#D6EEF9] font-extrabold text-[#3E8FBF]`}>{companyInitials(name)}</span>;
+  return <span aria-hidden="true" className={`${frame} bg-teal-tint font-semibold text-teal`}>{companyInitials(name)}</span>;
 };

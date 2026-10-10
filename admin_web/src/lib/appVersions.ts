@@ -93,3 +93,35 @@ export function toSave(platform: Platform, draft: AppVersionDraft): AppVersionSa
     p_store_url: draft.storeUrl.trim() || null,
   };
 }
+
+/** The same rules as draftProblem, each under its own field (AdmPlatVersionsStates · Validation). */
+export interface DraftErrors { minVersion?: string; latestVersion?: string; storeUrl?: string; whatsNew?: string }
+export function draftErrors(draft: AppVersionDraft): DraftErrors {
+  const e: DraftErrors = {};
+  const shape = 'اكتب رقم الإصدار بالأرقام والنقاط فقط، مثل 2.5.0.';
+  if (!versionParts(draft.minVersion)) e.minVersion = shape;
+  if (!versionParts(draft.latestVersion)) e.latestVersion = shape;
+  if (!e.minVersion && !e.latestVersion && compareVersions(draft.minVersion, draft.latestVersion) > 0) e.minVersion = 'أقل إصدار مسموح لا يمكن أن يكون أحدث من آخر إصدار.';
+  if (draft.whatsNew.some((line) => line.trim().length > WHATS_NEW_MAX)) e.whatsNew = `السطر أطول من ${WHATS_NEW_MAX} حرفاً.`;
+  const url = draft.storeUrl.trim();
+  if (url && (!/^https:\/\//.test(url) || url.length > STORE_URL_MAX)) e.storeUrl = 'رابط المتجر يجب أن يبدأ بـ https://';
+  return e;
+}
+
+/** «2.5» is read as 2.5.0: said under the field so nobody wonders. */
+export function readAs(version: string): string | null {
+  const p = versionParts(version);
+  if (!p) return null;
+  const full = p.join('.');
+  return full !== version.trim() ? full : null;
+}
+
+/** Whether saving raises the oldest version still allowed in (the app then stops for everyone older): asked first. */
+export const raisesMinimum = (row: AppVersionRow | undefined, draft: AppVersionDraft) =>
+  !!versionParts(draft.minVersion) && compareVersions(draft.minVersion, row?.min_version ?? '0.0.0') > 0;
+
+/** Both at 0.0.0: nobody is asked to update. */
+export const neverSet = (draft: AppVersionDraft) => compareVersions(draft.minVersion, '0') === 0 && compareVersions(draft.latestVersion, '0') === 0;
+
+export const storeName: Record<Platform, string> = { android: 'Google Play', ios: 'App Store' };
+export const platformLabel: Record<Platform, string> = { android: 'أندرويد', ios: 'آيفون' };

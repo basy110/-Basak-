@@ -1,75 +1,72 @@
 import React from 'react';
-import { percent, pushStatParts, senderLabel, statusClass, statusLabel, typeLabel, type HistoryRow } from '../../lib/notifications';
-import { CAIRO_LABEL, formatCairo } from '../../lib/time';
-import { Dialog } from './parts';
-
-const Fact: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
-  <div className="flex items-baseline justify-between gap-4 border-b border-slate-50 py-1.5 text-sm last:border-0">
-    <span className="shrink-0 text-xs font-semibold text-slate-500">{label}</span>
-    <span className="text-left text-slate-800">{children}</span>
-  </div>
-);
+import { percent, pushStatParts, senderLabel, senderShort, statusLabel, typeLabel, whenLabel, type HistoryRow } from '../../lib/notifications';
+import { CAIRO_LABEL } from '../../lib/time';
+import { Button, InfoRows, Note, SidePanel, StatePill } from '../../ui';
 
 const Count: React.FC<{ label: string; value: number; note?: string }> = ({ label, value, note }) => (
-  <div className="rounded-xl bg-slate-50 p-3">
-    <p className="text-lg font-extrabold text-slate-800">{value}</p>
-    <p className="text-[11px] leading-4 text-slate-500">{label}</p>
-    {note && <p className="text-[11px] font-bold text-emerald-700">{note}</p>}
+  <div className="rounded-inner bg-ground px-3 py-2.5">
+    <div className="flex items-baseline gap-1.5"><span className="text-[20px] font-semibold tabular">{value.toLocaleString('en-US')}</span>{note && <span className="text-cap font-semibold text-ok">{note}</span>}</div>
+    <div className="text-cap text-ink-2">{label}</div>
   </div>
 );
 
-/** Everything known about one notification, with numbers that only say what was measured. */
-export const NotificationDetails: React.FC<{ row: HistoryRow; pushConfigured: boolean | null; onClose: () => void }> = ({ row, pushConfigured, onClose }) => {
+/**
+ * Everything known about one notification. A company sees who received it and
+ * who read it; the phone-alert delivery numbers are for the platform (`showPush`).
+ */
+export const NotificationDetails: React.FC<{
+  row: HistoryRow; pushConfigured: boolean | null; onClose: () => void;
+  showPush?: boolean; me?: string | null; onDelete?: () => void; onCancel?: () => void; onEdit?: () => void;
+}> = ({ row, pushConfigured, onClose, showPush, me, onDelete, onCancel, onEdit }) => {
   const sent = row.status === 'sent';
+  const mine = me && row.sender_name === me;
   return (
-    <Dialog wide onClose={onClose} title={(
-      <div className="flex flex-wrap items-center gap-2">
-        <span>{row.title}</span>
-        <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${statusClass(row.status)}`}>{statusLabel(row.status)}</span>
-      </div>
-    )}>
-      <p className="whitespace-pre-line rounded-2xl bg-slate-50 p-4 text-sm leading-relaxed text-slate-700">{row.body}</p>
-
-      <div className="mt-4">
-        <Fact label="النوع">{typeLabel(row.type, row.category)}{row.priority === 'high' ? ' · أولوية عالية' : ''}</Fact>
-        {row.company_name && <Fact label="الشركة">{row.company_name}</Fact>}
-        <Fact label="المرسل">{senderLabel(row.sender_role, row.sender_name, row.type)}</Fact>
-        <Fact label="المستلمون">{row.audience || '—'}</Fact>
-        <Fact label="أُنشئ">{formatCairo(row.created_at, true)}</Fact>
-        {row.scheduled_at && <Fact label="موعد الإرسال المجدول">{formatCairo(row.scheduled_at, true)}</Fact>}
-        {row.sent_at && <Fact label="أُرسل">{formatCairo(row.sent_at, true)}</Fact>}
-        {row.status_note && <Fact label="ملاحظة">{row.status_note}</Fact>}
-      </div>
-      <p className="mt-1 text-[11px] text-slate-400">كل الأوقات {CAIRO_LABEL}.</p>
-
-      {sent && (
+    <SidePanel open onClose={onClose} title={row.title} backLabel="الإشعارات"
+      meta={<StatePill state={row.status} label={statusLabel(row.status)} />}
+      sub={`${row.audience ?? ''}${row.sent_at || row.scheduled_at ? ` · ${whenLabel(row.sent_at ?? row.scheduled_at)}` : ''}`}
+      footer={(
         <>
-          <h3 className="mt-5 text-sm font-bold text-slate-700">داخل التطبيق</h3>
-          <div className="mt-2 grid grid-cols-3 gap-2">
-            <Count label="طالب أُضيف الإشعار إلى صندوقه" value={row.students} />
-            <Count label="قرؤوه" value={row.read} note={row.students ? `${percent(row.read, row.students)}٪` : undefined} />
-            <Count label="فتحوه من الإشعار الفوري" value={row.opened} />
-          </div>
-
-          <h3 className="mt-5 text-sm font-bold text-slate-700">الإشعارات الفورية (Push)</h3>
-          {pushConfigured !== true && (
-            <p className="mt-1 text-xs text-slate-500">الإشعارات الفورية غير مربوطة بعد، فلم يُرسل شيء إلى الهواتف خارج التطبيق.</p>
-          )}
-          <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-5">
-            {pushStatParts(row.push).map((part) => <Count key={part.key} label={part.label} value={part.value} />)}
-          </div>
-          <p className="mt-2 text-[11px] leading-5 text-slate-400">
-            «قبِلها مزوّد الإشعارات» تعني أن مزوّد الخدمة استلم الرسالة ليوصلها، ولا تعني أنها ظهرت على الهاتف.
-          </p>
+          {onDelete && <Button kind="dangerQuiet" icon="trash" onClick={onDelete}>حذف الإشعار</Button>}
+          {onCancel && <Button kind="dangerQuiet" icon="x" onClick={onCancel}>إلغاء الإرسال</Button>}
+          <span className="hidden flex-1 sm:block" />
+          {onEdit && <Button kind="outline" onClick={onEdit}>تعديل</Button>}
+          <Button kind="secondary" onClick={onClose}>إغلاق</Button>
         </>
+      )}>
+      <p className="m-0 whitespace-pre-line rounded-inner bg-ground px-4 py-3 text-small text-ink">{row.body}</p>
+      {row.status_note && <Note tone={row.status === 'failed' ? 'danger' : 'teal'}>{row.status_note}</Note>}
+      <InfoRows rows={[
+        ['إلى', row.audience || '—'],
+        ...(row.company_name ? [['الشركة', row.company_name] as [string, string]] : []),
+        ['المرسل', mine ? `${row.sender_name} (أنت)` : senderShort(row) === 'النظام' ? 'النظام' : senderLabel(row.sender_role, row.sender_name, row.type).replace(/^الإدارة · /, '')],
+        ['النوع', `${typeLabel(row.type, row.category)}${row.priority === 'high' ? ' · عاجل' : ''}`],
+        ['أُنشئ', whenLabel(row.created_at)],
+        ...(row.scheduled_at ? [['موعد الإرسال', whenLabel(row.scheduled_at)] as [string, string]] : []),
+        ...(row.sent_at ? [['أُرسل', whenLabel(row.sent_at)] as [string, string]] : []),
+      ]} />
+      {sent && (
+        <section className="flex flex-col gap-2">
+          <h3 className="m-0 text-small font-semibold">داخل التطبيق</h3>
+          <div className="grid grid-cols-3 gap-2">
+            <Count label="طالباً وصلهم" value={row.students} />
+            <Count label="قرؤوه" value={row.read} note={row.students ? `${percent(row.read, row.students)}%` : undefined} />
+            <Count label="فتحوه من التنبيه" value={row.opened} />
+          </div>
+        </section>
       )}
-
-      <div className="mt-5 flex justify-end">
-        <button type="button" onClick={onClose}
-          className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-bold text-slate-600 transition hover:bg-slate-200">
-          إغلاق
-        </button>
-      </div>
-    </Dialog>
+      {sent && showPush && (
+        <section className="flex flex-col gap-2">
+          <h3 className="m-0 text-small font-semibold">التنبيه على الهواتف</h3>
+          {pushConfigured !== true && <p className="m-0 text-label text-ink-2">التنبيه على الهواتف لم يُفعَّل بعد، فلم يُرسل شيء خارج التطبيق.</p>}
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {pushStatParts(row.push).filter((p) => p.key !== 'queued').map((p) => (
+              <Count key={p.key} value={p.value} label={{ devices: 'هاتفاً مسجّلاً', accepted: 'أُرسل إليها', failed: 'فشلت', skipped: 'بلا تنبيه', queued: '' }[p.key]} />
+            ))}
+          </div>
+          <p className="m-0 text-cap text-ink-3">«أُرسل إليها» تعني أن خدمة التنبيهات استلمت الرسالة لتوصلها، ولا تؤكد أنها ظهرت على الهاتف. «بلا تنبيه»: طالب بلا هاتف مسجّل أو أوقف التنبيهات.</p>
+        </section>
+      )}
+      <p className="m-0 text-cap text-ink-3">كل الأوقات {CAIRO_LABEL}.</p>
+    </SidePanel>
   );
 };

@@ -1,50 +1,66 @@
-import {
-  BarChart3, Bell, Building2, Bus, CalendarRange, CreditCard, FileCheck2, GraduationCap, LayoutDashboard,
-  ShieldCheck, Smartphone, UserCheck, Users, UsersRound, Wallet, type LucideIcon,
-} from 'lucide-react';
+import type { IconName } from '../ui/Icon';
 import * as routes from './routes';
 
+/**
+ * The single source for grouping, labels, icons and routes
+ * (docs/admin-redesign/generator/kit.mjs · NAV). A page's title equals its label.
+ */
+export type BadgeKey = 'receipts' | 'requests' | 'corrections';
 export interface NavItem {
-  /** Absolute path. */
-  to: string;
-  name: string;
-  /** Label for the narrow mobile bar. */
-  short: string;
-  icon: LucideIcon;
-  /** Match the path exactly (for an area's first page). */
-  end?: boolean;
-  /** Which count, if any, is shown on this item as a red badge. */
-  badge?: 'receipts' | 'requests';
-  /** Fetches the page's code ahead of the click (called when the entry is pointed at or focused). */
+  id: string;
+  /** Under /c/:companyId/ or /platform/ ('' = the area's first page). */
+  slug: string;
+  label: string;
+  icon: IconName;
+  badge?: BadgeKey;
   preload?: () => void;
 }
+export interface NavGroup { group: string | null; items: NavItem[] }
 
-/** The platform admin's area: everything that spans companies. */
-export const platformNav: NavItem[] = [
-  { to: '/platform', name: 'نظرة عامة على المنصة', short: 'المنصة', icon: LayoutDashboard, end: true, preload: routes.PlatformOverviewPage.preload },
-  { to: '/platform/companies', name: 'كل الشركات', short: 'الشركات', icon: Building2, preload: routes.AllCompaniesPage.preload },
-  { to: '/platform/students', name: 'كل الطلاب', short: 'الطلاب', icon: Users, preload: routes.AllStudentsPage.preload },
-  { to: '/platform/notifications', name: 'إشعارات المنصة', short: 'الإشعارات', icon: Bell, preload: routes.PlatformNotificationsPage.preload },
-  { to: '/platform/admins', name: 'مديرو الشركات', short: 'المديرون', icon: ShieldCheck, preload: routes.CompanyAdminsPage.preload },
-  { to: '/platform/universities', name: 'الجامعات والوجهات', short: 'الجامعات', icon: GraduationCap, preload: routes.UniversitiesPage.preload },
-  { to: '/platform/defaults', name: 'الإعدادات الافتراضية', short: 'الافتراضي', icon: CalendarRange, preload: routes.PlatformDefaultsPage.preload },
-  { to: '/platform/app-versions', name: 'إصدارات التطبيق', short: 'الإصدارات', icon: Smartphone, preload: routes.AppVersionsPage.preload },
+export const COMPANY_NAV: NavGroup[] = [
+  { group: null, items: [{ id: 'today', slug: '', label: 'اليوم', icon: 'home', preload: routes.TodayPage.preload }] },
+  { group: 'كل يوم', items: [
+    { id: 'receipts', slug: 'receipts', label: 'الإيصالات', icon: 'receipt', badge: 'receipts', preload: routes.ReceiptsPage.preload },
+    { id: 'password-requests', slug: 'password-requests', label: 'طلبات كلمة المرور', icon: 'key', badge: 'requests', preload: routes.PasswordRequestsPage.preload },
+    { id: 'notifications', slug: 'notifications', label: 'الإشعارات', icon: 'megaphone', preload: routes.NotificationsPage.preload }] },
+  { group: 'الطلاب والفريق', items: [
+    { id: 'students', slug: 'students', label: 'الطلاب', icon: 'users', preload: routes.StudentsPage.preload },
+    { id: 'supervisors', slug: 'supervisors', label: 'المشرفون', icon: 'scan', preload: routes.SupervisorsPage.preload },
+    { id: 'team', slug: 'team', label: 'مديرو الشركة', icon: 'shield', preload: routes.TeamPage.preload }] },
+  { group: 'الخطوط والرحلات', items: [
+    { id: 'lines', slug: 'lines', label: 'الخطوط', icon: 'route', preload: routes.LinesPage.preload },
+    { id: 'ride-confirmation', slug: 'ride-confirmation', label: 'تأكيد الركوب', icon: 'clock', preload: routes.RideConfirmationPage.preload }] },
+  { group: 'الاشتراكات والمدفوعات', items: [
+    { id: 'subscription-periods', slug: 'subscription-periods', label: 'مواعيد الاشتراك', icon: 'calendar', preload: routes.SubscriptionPeriodsPage.preload },
+    { id: 'payment-methods', slug: 'payment-methods', label: 'وسائل الدفع', icon: 'card', preload: routes.PaymentMethodsPage.preload },
+    { id: 'reports', slug: 'reports', label: 'الإيرادات', icon: 'chart', preload: routes.ReportsPage.preload }] },
+  { group: 'هوية الشركة', items: [
+    { id: 'wallet-card', slug: 'wallet-card', label: 'بطاقة الطالب', icon: 'idcard', preload: routes.WalletCardPage.preload },
+    { id: 'receipt-details', slug: 'receipt-details', label: 'بيانات الإيصال', icon: 'building', preload: routes.ReceiptDetailsPage.preload }] },
 ];
 
-/** One company's workspace. Every page under it shows that company only. */
-export const workspaceNav = (companyId: string): NavItem[] => {
-  const base = `/c/${companyId}`;
-  return [
-    { to: base, name: 'نظرة عامة', short: 'الرئيسية', icon: LayoutDashboard, end: true, preload: routes.OverviewPage.preload },
-    { to: `${base}/students`, name: 'الطلاب', short: 'الطلاب', icon: Users, badge: 'requests', preload: routes.StudentsPage.preload },
-    { to: `${base}/receipts`, name: 'فحص الإيصالات', short: 'الإيصالات', icon: FileCheck2, badge: 'receipts', preload: routes.ReceiptsPage.preload },
-    { to: `${base}/lines`, name: 'الخطوط والمحطات', short: 'الخطوط', icon: Bus, preload: routes.LinesPage.preload },
-    { to: `${base}/supervisors`, name: 'المشرفون', short: 'المشرفون', icon: UserCheck, preload: routes.SupervisorsPage.preload },
-    { to: `${base}/notifications`, name: 'الإشعارات', short: 'الإشعارات', icon: Bell, preload: routes.NotificationsPage.preload },
-    { to: `${base}/reports`, name: 'التقارير المالية', short: 'التقارير', icon: BarChart3, preload: routes.ReportsPage.preload },
-    { to: `${base}/payment-methods`, name: 'وسائل الدفع', short: 'الدفع', icon: Wallet, preload: routes.PaymentMethodsPage.preload },
-    { to: `${base}/wallet-card`, name: 'بطاقة المحفظة', short: 'البطاقة', icon: CreditCard, preload: routes.WalletCardDesignPage.preload },
-    { to: `${base}/team`, name: 'فريق الإدارة', short: 'الفريق', icon: UsersRound, preload: routes.TeamPage.preload },
-    { to: `${base}/settings`, name: 'إعدادات الشركة', short: 'الإعدادات', icon: CalendarRange, preload: routes.CompanySettingsPage.preload },
-  ];
-};
+export const PLATFORM_NAV: NavGroup[] = [
+  { group: null, items: [{ id: 'p-today', slug: '', label: 'اليوم', icon: 'home', preload: routes.PlatformTodayPage.preload }] },
+  { group: 'يحتاج قرارك', items: [
+    { id: 'p-corrections', slug: 'corrections', label: 'طلبات تصحيح البيانات', icon: 'pencil', badge: 'corrections', preload: routes.CorrectionsPage.preload },
+    { id: 'p-password-requests', slug: 'password-requests', label: 'طلبات كلمة المرور', icon: 'key', badge: 'requests', preload: routes.PlatformPasswordRequestsPage.preload }] },
+  { group: 'الشركات', items: [
+    { id: 'p-companies', slug: 'companies', label: 'الشركات', icon: 'building', preload: routes.CompaniesPage.preload },
+    { id: 'p-admins', slug: 'admins', label: 'مديرو الشركات', icon: 'shield', preload: routes.CompanyAdminsPage.preload }] },
+  { group: 'الطلاب', items: [
+    { id: 'p-students', slug: 'students', label: 'كل الطلاب', icon: 'users', preload: routes.AllStudentsPage.preload },
+    { id: 'p-notifications', slug: 'notifications', label: 'إشعارات المنصة', icon: 'megaphone', preload: routes.PlatformNotificationsPage.preload }] },
+  { group: 'إعدادات المنصة', items: [
+    { id: 'p-universities', slug: 'universities', label: 'الجامعات والكليات', icon: 'school', preload: routes.UniversitiesPage.preload },
+    { id: 'p-defaults', slug: 'defaults', label: 'الإعدادات الافتراضية', icon: 'sliders', preload: routes.PlatformDefaultsPage.preload },
+    { id: 'p-app-versions', slug: 'app-versions', label: 'إصدارات التطبيق', icon: 'smartphone', preload: routes.AppVersionsPage.preload }] },
+];
+
+/** Old addresses (bookmarks, links in e-mails and live toasts) → where that job lives now. */
+export const MOVED_SLUGS: Record<string, string> = { settings: 'subscription-periods' };
+
+/** The nav entry a path belongs to (`/c/x/lines/abc` → lines). */
+export function activeItem(groups: NavGroup[], subPath: string): NavItem | undefined {
+  const first = subPath.split('/').filter(Boolean)[0] ?? '';
+  return groups.flatMap((g) => g.items).find((i) => i.slug === first);
+}
