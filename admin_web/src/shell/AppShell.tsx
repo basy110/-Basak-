@@ -6,7 +6,7 @@ import { Button, IconButton } from '../ui/Button';
 import { Drawer } from '../ui/Overlay';
 import { OfflineBar, Toaster } from '../ui/Feedback';
 import { PhoneHeadProvider, usePhoneHead } from '../ui/Layout';
-import { activeItem, type BadgeKey, type NavGroup, type NavItem, type NavTone } from '../lib/nav';
+import { activeItem, type BadgeKey, type NavGroup, type NavItem } from '../lib/nav';
 import { StudentSearch } from './StudentSearch';
 import { BasakLogo } from '../components/BasakLogo';
 import { EnterCompany } from './EnterCompany';
@@ -46,19 +46,14 @@ const Brand: React.FC<{ mark?: React.ReactNode; scope: string; iconOnly?: boolea
   </div>
 );
 
-const TONE_TILE: Record<NavTone, string> = {
-  teal: 'bg-teal-tint text-teal', amber: 'bg-amber-bg text-amber', violet: 'bg-violet-bg text-violet',
-  blue: 'bg-blue-bg text-blue', green: 'bg-green-bg text-green', pink: 'bg-pink-bg text-pink',
-};
-
-/** One navigation entry: 44 high in the sidebar, 48 in the phone drawer; its icon in its group's colour. */
-const NavRow: React.FC<{ base: string; item: NavItem; tone?: NavTone; count?: number; tall?: boolean; onClick?: () => void }> = ({ base, item, tone = 'teal', count = 0, tall, onClick }) => (
+/** One navigation entry: 44 high in the sidebar, 48 in the phone drawer. */
+const NavRow: React.FC<{ base: string; item: NavItem; count?: number; tall?: boolean; onClick?: () => void }> = ({ base, item, count = 0, tall, onClick }) => (
   <NavLink to={to(base, item)} end={!item.slug} onClick={onClick} onMouseEnter={item.preload} onFocus={item.preload} onTouchStart={item.preload}
-    className={({ isActive }) => `relative flex items-center gap-3 rounded-control px-2.5 ${tall ? 'h-12 text-body' : 'h-11 text-small'} ${isActive ? 'bg-teal-tint font-bold text-teal' : 'font-semibold text-ink hover:bg-ground'}`}>
+    className={({ isActive }) => `relative flex items-center gap-3 rounded-control px-3 ${tall ? 'h-12 text-body' : 'h-11 text-small'} ${isActive ? 'bg-teal-tint font-bold text-teal' : 'font-medium text-ink hover:bg-ground'}`}>
     {({ isActive }) => (
       <>
         {isActive && <span aria-hidden="true" className="absolute -start-3 bottom-2 top-2 w-[3px] rounded-sm bg-teal" />}
-        <span className={`flex h-8 w-8 flex-none items-center justify-center rounded-lg ${isActive ? 'bg-teal text-white' : TONE_TILE[tone]}`}><Icon name={item.icon} size={17} stroke={2} /></span>
+        <span className={`flex ${isActive ? 'text-teal' : 'text-ink-2'}`}><Icon name={item.icon} size={19} /></span>
         <span className="min-w-0 flex-1 truncate">{item.label}</span>
         <CountBadge n={count} />
       </>
@@ -70,8 +65,8 @@ const NavGroups: React.FC<{ base: string; groups: NavGroup[]; badges: ShellProps
   <>
     {groups.map((g, gi) => (
       <div key={gi} className="flex flex-col gap-0.5">
-        {g.group && <div className={`px-3 pb-1 text-cap font-bold text-ink-3 ${tall ? 'pt-3.5' : 'pt-3'}`}>{g.group}</div>}
-        {g.items.map((it) => <NavRow key={it.id} base={base} item={it} tone={g.tone} count={it.badge ? badges[it.badge] : 0} tall={tall} onClick={onNavigate} />)}
+        {g.group && <div className={`px-3 pb-1 text-cap font-semibold text-ink-3 ${tall ? 'pt-3.5' : 'pt-3'}`}>{g.group}</div>}
+        {g.items.map((it) => <NavRow key={it.id} base={base} item={it} count={it.badge ? badges[it.badge] : 0} tall={tall} onClick={onNavigate} />)}
       </div>
     ))}
   </>
@@ -107,7 +102,7 @@ const SideNav: React.FC<ShellProps & { collapsed: boolean; setCollapsed: (c: boo
               const n = it.badge ? p.badges[it.badge] ?? 0 : 0;
               return (
                 <NavLink key={it.id} to={to(p.base, it)} end={!it.slug} aria-label={it.label} onMouseEnter={it.preload} onFocus={it.preload}
-                  className={({ isActive }) => `group relative flex h-11 w-11 items-center justify-center rounded-control ${isActive ? 'bg-teal text-white' : `${TONE_TILE[g.tone ?? 'teal']} hover:brightness-95`}`}>
+                  className={({ isActive }) => `group relative flex h-11 w-11 items-center justify-center rounded-control ${isActive ? 'bg-teal-tint text-teal' : 'text-ink-2 hover:bg-ground'}`}>
                   <Icon name={it.icon} size={20} />
                   {n > 0 && <CountBadge n={n} className="absolute -end-1 -top-0.5 !h-[18px] !min-w-[18px] !px-1 !text-[11px] !leading-[18px] shadow-[0_0_0_2px_#fff]" />}
                   <span role="tooltip" className="pointer-events-none absolute start-[54px] top-1.5 z-40 hidden h-8 whitespace-nowrap rounded-control bg-ink px-3 text-label font-medium leading-8 text-white shadow-floating group-hover:block group-focus-visible:block">{it.label}</span>
