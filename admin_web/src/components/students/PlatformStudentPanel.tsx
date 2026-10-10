@@ -43,7 +43,7 @@ export const PlatformStudentPanel: React.FC<{ row: PlatformStudent; block?: Bloc
       <section className="flex flex-col gap-1">
         <PanelHead>الحساب</PanelHead>
         <InfoRows rows={[
-          ['رقم الهاتف', <a key="p" href={`tel:${row.phone}`} className="hover:text-teal"><Ltr>{phoneText(row.phone)}</Ltr></a>],
+          ['رقم الهاتف', <a key="p" href={`tel:${row.phone}`} className="text-ink hover:text-teal"><Ltr>{phoneText(row.phone)}</Ltr></a>],
           ['الجامعة', [row.university, d ? studyLine(d.college, d.specialisation, '', ' · ') : ''].filter(Boolean).join(' · ') || '—'],
           ['سُجّل في', fullDay(row.created_at)],
           ['اشتراكات نشطة', num(d?.active_subscriptions ?? row.active_subscriptions)],

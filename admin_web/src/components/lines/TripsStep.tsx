@@ -194,20 +194,21 @@ const ReturnRow: React.FC<{
   t: TripDraft; set: (p: Partial<TripDraft>) => void; uniOptions: { value: string; label: string }[]; onCopy: () => void; onRemove: () => void; show: boolean;
 }> = ({ t, set, uniOptions, onCopy, onRemove, show }) => {
   const [named, setNamed] = useState(!!t.label);
+  const phone = typeof window !== 'undefined' && !!window.matchMedia?.('(max-width: 639px)').matches;
   const err = show && !t.start_time ? 'اكتب موعد تحرك الباص من الجامعة.' : undefined;
   return (
     <div className="flex flex-col gap-2 rounded-inner p-2 shadow-ring sm:p-0 sm:shadow-none">
       <div className="flex items-start gap-2">
-        <TimeField value={t.start_time} assume="pm" ariaLabel="موعد تحرك الباص من الجامعة" placeholder="مثال: 2:00 م" error={err} className="w-[118px] flex-none sm:w-[132px]" onChange={(v) => set({ start_time: v })} />
-        <div className="min-w-0 flex-1 sm:max-w-[200px]">
+        <TimeField value={t.start_time} assume="pm" ariaLabel="موعد تحرك الباص من الجامعة" placeholder="مثال: 2:00 م" error={err} className="w-[118px] flex-none" onChange={(v) => set({ start_time: v })} />
+        <div className="min-w-0 flex-1 sm:w-[184px] sm:flex-none">
           <SelectField aria-label="من أي جامعة" value={t.university_id} onChange={(e) => set({ university_id: e.target.value })}
-            options={uniOptions.map((o) => ({ ...o, label: o.value ? o.label : 'من كل جامعات الخط' }))} />
+            options={uniOptions.map((o) => ({ ...o, label: phone ? o.label : o.value ? `من ${o.label}` : 'من كل جامعات الخط' }))} />
         </div>
         <div className="hidden min-w-0 flex-1 sm:block">
           <TextField aria-label="اسم الموعد" value={t.label} maxLength={40} placeholder="اسم (اختياري)" onChange={(e) => set({ label: e.target.value })} />
         </div>
         <LineMenu label="إجراءات الموعد" sm={false} items={[
-          ...(typeof window !== 'undefined' && window.matchMedia?.('(max-width: 639px)').matches ? [{ label: 'سمِّ الموعد', icon: 'pencil' as const, onClick: () => setNamed(true) }] : []),
+          ...(phone ? [{ label: 'سمِّ الموعد', icon: 'pencil' as const, onClick: () => setNamed(true) }] : []),
           { label: 'انسخ الموعد', icon: 'copy', onClick: onCopy },
           { label: 'احذف الموعد', icon: 'trash', danger: true, sep: true, onClick: onRemove },
         ]} />

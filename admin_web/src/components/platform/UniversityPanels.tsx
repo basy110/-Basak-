@@ -63,7 +63,7 @@ export const UniversityPanel: React.FC<{
       sub={`${u.city}${n ? ` · ${studentsText(n.students)}` : ''}`}
       footer={<>
         {u.is_active
-          ? <Button kind="dangerQuiet" icon="eyeOff" disabled={!online || busy === 'uni'} onClick={() => onUniversity(false)}>أخفِ الجامعة</Button>
+          ? <Button kind="dangerQuiet" icon="eye" disabled={!online || busy === 'uni'} onClick={() => onUniversity(false)}>أخفِ الجامعة</Button>
           : <Button icon="eye" loading={busy === 'uni'} disabled={!online} onClick={() => onUniversity(true)}>أظهر الجامعة</Button>}
         <span className="hidden flex-1 sm:block" />
         <Button kind="secondary" onClick={onClose} className="hidden sm:inline-flex">إغلاق</Button>
@@ -78,7 +78,7 @@ export const UniversityPanel: React.FC<{
           <p className="m-0 text-label text-ink-2">يتغيّر الاسم أيضاً عند {countText(n.students, NOUN.student)} مسجّلين بها، وعلى بطاقاتهم.</p>
         )}
         <div className="flex">
-          <Button kind="tonal" className="w-full sm:w-auto" disabled={!changed || !online || !!problem.name || !!problem.city} loading={busy === 'save'}
+          <Button kind="tonal" sm className="w-full !h-12 sm:w-auto sm:!h-9" disabled={!changed || !online || !!problem.name || !!problem.city} loading={busy === 'save'}
             onClick={() => onSave(name.trim().replace(/\s+/g, ' '), city.trim())}>حفظ بيانات الجامعة</Button>
         </div>
       </section>
@@ -87,7 +87,7 @@ export const UniversityPanel: React.FC<{
         <div className="flex items-center gap-2"><h3 className="m-0 flex-1 text-card">الكليات</h3><Badge>{num(mine.length)} · {num(shownCount)} تظهر</Badge></div>
         <form className="flex items-start gap-2" onSubmit={(e) => { e.preventDefault(); void addCollege(); }}>
           <TextField aria-label="اسم الكلية" placeholder="اسم الكلية كما يظهر للطالب" value={college} onChange={(e) => { setCollege(e.target.value); setCollegeError(''); }} maxLength={80} error={collegeError || undefined} className="flex-1" />
-          <Button type="submit" kind="tonal" icon="plus" loading={busy === 'college'} disabled={!online}>أضف كلية</Button>
+          <Button type="submit" kind="secondary" icon="plus" loading={busy === 'college'} disabled={!online}>أضف كلية</Button>
         </form>
         {mine.length === 0 ? (
           <Note tone="warning" title="لا كليات بعد">لا يستطيع طالب أن يختار هذه الجامعة عند التسجيل حتى تضيف كلية واحدة على الأقل.</Note>

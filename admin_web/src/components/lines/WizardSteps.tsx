@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Badge, Button, Card, Icon, IconButton, MoneyField, Note, Switch, TextField } from '../../ui';
+import { Badge, Button, Card, Icon, IconButton, Note, Switch, TextField } from '../../ui';
 import {
   BUS_CAPACITY_MAX, bothPriceNote, countOf, isSold, joinAnd, newKey, pricesText, stationsText, stepSubs, tripsRangeText, unitWord, W,
   type Issue, type LineDraft, type SaleContext, type StepNo,
@@ -195,14 +195,17 @@ const PriceRow: React.FC<{
 }> = ({ label, on, sold, onToggle, locked, value, onValue, sub, error }) => (
   <div className="flex flex-col gap-3 border-t border-hair py-4 first:border-t-0 first:pt-0 sm:flex-row sm:items-center sm:gap-6">
     <div className="flex min-w-0 flex-1 items-center gap-4">
-      <Switch checked={sold && on} disabled={!sold || locked} onChange={(v) => onToggle?.(v)} label={`بيع ${label} على هذا الخط`} />
+      {locked && sold
+        ? <span role="switch" aria-checked="true" aria-disabled="true" aria-label={`${label}: يُباع ما دامت شركتك تبيعه`} title="يُباع ما دامت شركتك تبيعه" className="flex h-6 w-11 flex-none items-center justify-end rounded-full bg-teal p-0.5"><span className="h-5 w-5 rounded-full bg-white shadow-[0_1px_2px_rgba(23,56,74,.25)]" /></span>
+        : <Switch checked={sold && on} disabled={!sold || locked} onChange={(v) => onToggle?.(v)} label={`بيع ${label} على هذا الخط`} />}
       <div className="min-w-0 flex-1">
         <div className={`text-small font-semibold ${sold ? 'text-ink' : 'text-ink-2'}`}>{label}</div>
         <div className="text-label text-ink-2">{sub}</div>
       </div>
     </div>
-    <MoneyField aria-label={`سعر ${label}`} value={value} onValue={onValue} disabled={!sold || !on} placeholder={sold && on ? 'اكتب السعر' : ''}
-      error={error} className="sm:w-[200px] sm:flex-none" />
+    <TextField aria-label={`سعر ${label}`} value={value === '' ? '' : Number(value).toLocaleString('en-US')} inputMode="numeric" ltr suffix="ج.م"
+      onChange={(e) => { const v = e.target.value.replace(/[٠-٩]/g, (x) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(x))).replace(/[^\d]/g, '').replace(/^0+(?=\d)/, '').slice(0, 6); onValue(v === '' ? '' : Number(v)); }}
+      disabled={!sold || !on} placeholder={sold && on ? 'اكتب السعر' : ''} error={error} className="sm:w-[200px] sm:flex-none" />
   </div>
 );
 

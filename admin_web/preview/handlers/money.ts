@@ -189,6 +189,8 @@ if (methods.length === 3) {
   );
 }
 
+if (sessionStorage.getItem('preview.payNone')) methods.forEach((m) => { m.is_active = false; });
+if (sessionStorage.getItem('preview.payOne')) methods.splice(1);
 reg({
   reorder_payment_methods: ({ p_ids }) => {
     const own = methods.filter((m) => m.company_id === COMPANY_ID);

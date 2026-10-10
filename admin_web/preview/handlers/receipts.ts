@@ -12,7 +12,7 @@
  *   pv=err       this page's own list fails to load (the rest of the dashboard works)
  *   pv=slow      this page's own list never answers (its loading state)
  */
-import { registerRpc, rpcs } from '../registry';
+import { registerFunctions, registerRpc, rpcs } from '../registry';
 import { COMPANY_ID, RECEIPTS, tables } from '../data';
 
 type Row = Record<string, any>;
@@ -154,6 +154,11 @@ registerRpc({
     if (r && open(r)) Object.assign(r, { status: 'cancelled', closed_at: new Date().toISOString() });
     return null;
   },
+});
+
+// The platform admin sets a temporary password (students page, «إعادة تعيين كلمة المرور»).
+registerFunctions({
+  'admin-reset-student-password': ({ password }) => (password ? { ok: true } : { ok: true, temporaryPassword: 'Tq7#mB2x9L' }),
 });
 
 // ── The company's details on its receipts ───────────────────────────────

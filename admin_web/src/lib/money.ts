@@ -213,7 +213,7 @@ export const emptyMethod = (): MethodDraft => ({
 export const methodToDraft = (m: PaymentMethod): MethodDraft => ({
   id: m.id, method_type: m.method_type, display_name: m.display_name, account_holder: m.account_holder ?? '',
   instapay_address: m.instapay_address ?? '', wallet_phone: m.wallet_phone ?? '', bank_name: m.bank_name ?? '',
-  bank_account_number: m.bank_account_number ?? '', iban: m.iban ?? '', instructions: m.instructions ?? '', is_active: m.is_active,
+  bank_account_number: groups4(m.bank_account_number ?? ''), iban: groups4(m.iban ?? ''), instructions: m.instructions ?? '', is_active: m.is_active,
 });
 
 /** Arabic or Persian digits typed on a phone keyboard, as Western digits. */
