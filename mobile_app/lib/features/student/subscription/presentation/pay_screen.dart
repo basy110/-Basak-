@@ -53,7 +53,7 @@ class PayScreen extends ConsumerStatefulWidget {
           builder: (_) => PayScreen(subscription: subscription, onGoHome: onGoHome)));
 
   /// A receipt may be sent five times for one subscription.
-  static const maxAttempts = 5;
+  static const maxAttempts = maxReceiptAttempts;
 
   /// Stands in for the phone's camera and photo library.
   @visibleForTesting
@@ -204,11 +204,24 @@ class _PayScreenState extends ConsumerState<PayScreen> {
     widget.onGoHome?.call();
   }
 
-  static String _methodCaption(PaymentMethodModel m) => switch (m.type) {
-        'instapay' => 'InstaPay',
-        'vodafone_cash' => 'محفظة ${m.displayName}',
-        _ => (m.bankName ?? '').trim().isEmpty ? 'تحويل بنكي' : 'تحويل بنكي · ${m.bankName!.trim()}',
-      };
+  /// What kind of transfer [m] is, under the payee's name. With the chips on
+  /// screen the chosen chip already names a wallet or InstaPay, so the caption
+  /// is left out rather than say "محفظة فودافون كاش" under "فودافون كاش".
+  @visibleForTesting
+  static String methodCaption(PaymentMethodModel m, {required bool chipShown}) {
+    final caption = switch (m.type) {
+      'instapay' => 'InstaPay',
+      'vodafone_cash' => 'محفظة ${m.displayName}',
+      _ => (m.bankName ?? '').trim().isEmpty ? 'تحويل بنكي' : 'تحويل بنكي · ${m.bankName!.trim()}',
+    };
+    if (!chipShown || m.type == 'bank') return caption;
+    final name = m.displayName.trim().toLowerCase();
+    final repeats = switch (m.type) {
+      'instapay' => name == 'instapay' || name == 'إنستاباي' || name == 'انستاباي',
+      _ => true,
+    };
+    return repeats ? '' : caption;
+  }
 
   /// What to do before transferring: the whole amount at once, then whatever
   /// the company itself asks for.
@@ -293,7 +306,9 @@ class _PayScreenState extends ConsumerState<PayScreen> {
     final colors = context.colors;
     final text = context.text;
     final attempts = receipts.length;
-    final rejected = sub.isRejected || latest?.isRejected == true;
+    // A refusal puts the subscription back to 'pending_payment': the latest
+    // receipt says it was refused.
+    final rejected = needsNewReceipt(sub, latest);
     final exhausted = attempts >= PayScreen.maxAttempts && !_sending;
     final noMethods = methods.isEmpty && !methodsLoading && !methodsFailed;
     // The method the student last said they used, otherwise the first offered.
@@ -343,9 +358,7 @@ class _PayScreenState extends ConsumerState<PayScreen> {
     final rejection = !rejected
         ? null
         : RejectionCard(
-            attempt: attempts >= 1 && attempts < PayScreen.maxAttempts
-                ? 'المحاولة ${attempts + 1} من ${PayScreen.maxAttempts}'
-                : null,
+            attempt: nextAttemptLabel(attempts),
             reason: (latest?.rejectionReason ?? '').trim().isEmpty
                 ? 'راجع سبب الرفض مع إدارة الشركة ثم ارفع إيصالاً جديداً.'
                 : latest!.rejectionReason!.trim(),
@@ -624,7 +637,7 @@ class _PayScreenState extends ConsumerState<PayScreen> {
                   name: (selected.accountHolder ?? '').trim().isNotEmpty
                       ? selected.accountHolder!.trim()
                       : ((sub.companyName ?? '').trim().isNotEmpty ? sub.companyName!.trim() : selected.displayName),
-                  method: _methodCaption(selected),
+                  method: methodCaption(selected, chipShown: methods.length > 1),
                   fields: [
                     if (selected.payTo.isNotEmpty)
                       CopyField(

@@ -29,7 +29,9 @@ import '../../recap/recap_screen.dart';
 import '../../../rating/rating.dart';
 import '../../subscription/data/subscription_repository.dart';
 import '../../subscription/models/subscription_model.dart';
+import '../../subscription/presentation/pay_screen.dart';
 import '../../subscription/presentation/purchase_flow.dart' show formatMoney;
+import '../../subscription/presentation/subscription_screen.dart' show subscriptionReceiptsProvider;
 import 'notifications_screen.dart';
 import 'ride_card.dart';
 import 'ride_sheet.dart';
@@ -469,18 +471,32 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
     return line.startsWith('خط ') ? line : 'خط $line';
   }
 
-  static BasakStatus _statusOf(SubscriptionModel sub) {
+  /// [latest] is the subscription's newest receipt: a refusal puts the
+  /// subscription back to 'pending_payment', and only the receipt says so.
+  static BasakStatus _statusOf(SubscriptionModel sub, ReceiptModel? latest) {
     if (sub.isExpired) return BasakStatus.expired;
     if (sub.isActive) return sub.isUpcoming ? BasakStatus.upcoming : BasakStatus.active;
     if (sub.isPendingReview) return BasakStatus.pendingReview;
-    if (sub.isRejected) return BasakStatus.rejected;
+    if (needsNewReceipt(sub, latest)) return BasakStatus.rejected;
     return BasakStatus.pendingPayment;
+  }
+
+  /// The receipts of a subscription that waits for payment (newest first), to
+  /// tell a refused receipt from one never sent. Nothing is read for one that
+  /// is running, under review, ended or paid in cash.
+  List<ReceiptModel>? _receiptsOf(SubscriptionModel sub) {
+    if (sub.isDaily || sub.isExpired || !(sub.status == 'pending_payment' || sub.isRejected)) return null;
+    return ref.watch(subscriptionReceiptsProvider(sub.id)).valueOrNull;
   }
 
   /// The pass: always a ticket. Its stub carries the one thing to do, or,
   /// with nothing to do, the line and the way to the card.
   Widget _pass(SubscriptionModel sub) {
-    final status = _statusOf(sub);
+    final receipts = _receiptsOf(sub);
+    final latest = receipts == null || receipts.isEmpty ? null : receipts.first;
+    final status = _statusOf(sub, latest);
+    final reason = (latest?.rejectionReason ?? '').trim();
+    final attempt = nextAttemptLabel(receipts?.length ?? 0);
     final company = (sub.companyName ?? '').trim();
     final line = _lineTitle(sub);
     final starts = DateTime.tryParse(sub.startDate ?? '');
@@ -495,8 +511,14 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
       BasakStatus.pendingReview => const StepLine(steps: ['أُرسل الإيصال', 'المراجعة', 'التفعيل'], current: 1),
       BasakStatus.pendingPayment => PassAction(
           caption: 'المبلغ المطلوب', value: formatMoney(sub.price), actionLabel: 'ادفع الآن', onAction: toSubscription),
+      // Why the company refused the receipt, which attempt the next one is,
+      // and straight to the pay page for it.
       BasakStatus.rejected => PassAction(
-          caption: 'المبلغ المطلوب', value: formatMoney(sub.price), actionLabel: 'إيصال جديد', onAction: toSubscription),
+          key: const Key('home-rejected'),
+          caption: attempt == null ? 'سبب الرفض' : 'سبب الرفض · $attempt',
+          value: reason.isNotEmpty ? reason : 'راجع سبب الرفض مع إدارة الشركة ثم ارفع إيصالاً جديداً.',
+          actionLabel: 'ارفع إيصالاً جديداً',
+          onAction: () => PayScreen.open(context, sub)),
       BasakStatus.expired => PassAction(
           caption: sub.periodName, value: formatMoney(sub.price), actionLabel: 'جدّد', onAction: toSubscription),
     };

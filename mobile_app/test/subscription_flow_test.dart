@@ -405,7 +405,7 @@ void main() {
       ]);
       expect(find.text('إيصال مرفوض'), findsOneWidget);
       expect(find.text('المبلغ غير مطابق'), findsOneWidget);
-      await tester.tap(find.text('إيصال جديد'));
+      await tester.tap(find.text('ارفع إيصالاً جديداً'));
       await tester.pumpAndSettle();
       expect(find.text('الإيصال مرفوض'), findsOneWidget);
       expect(find.text('ارفع إيصالاً جديداً'), findsOneWidget);
