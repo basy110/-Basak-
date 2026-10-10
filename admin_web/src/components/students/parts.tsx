@@ -81,3 +81,16 @@ export function Tabs<V extends string>({ value, onChange, tabs, label }: { value
 export const PanelHead: React.FC<{ children: React.ReactNode; end?: React.ReactNode }> = ({ children, end }) => (
   <div className="flex items-center gap-2"><h3 className="m-0 flex-1 text-label font-semibold text-ink">{children}</h3>{end}</div>
 );
+
+/** A phone toolbar's quiet choice: teal words and an icon, the native list on tap («⇅ كل الشركات»). */
+export function LinkSelect<V extends string>({ label, value, onChange, options, icon = 'sort' }: { label: string; value: V; onChange: (v: V) => void; options: { value: V; label: string }[]; icon?: IconName }) {
+  return (
+    <label className="relative inline-flex h-10 max-w-[60vw] flex-none items-center gap-1.5 px-1 text-label font-medium text-teal">
+      <Icon name={icon} size={14} stroke={2} />
+      <span className="truncate">{options.find((o) => o.value === value)?.label}</span>
+      <select aria-label={label} value={value} onChange={(e) => onChange(e.target.value as V)} className="absolute inset-0 h-full w-full cursor-pointer appearance-none opacity-0">
+        {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </select>
+    </label>
+  );
+}

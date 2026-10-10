@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Button, Dialog, FieldRow, FormSection, Icon, Note, SelectField, SkeletonForm, TextField, countText, NOUN, errorText, dayText } from '../../ui';
+import { Button, Dialog, FieldRow, FormSection, Icon, Note, SelectField, SkeletonForm, countText, NOUN, errorText, dayText } from '../../ui';
 import { clockLabel, cairoToday } from '../../lib/time';
+import { DayPicker, TimeSelect, pickedDay } from './fields';
 import { useGuard } from '../../lib/guard';
 import { notifyDone, notifyError } from '../../lib/toasts';
 import { useSaveVoteSettings, useVoteSettings } from '../../lib/linesData';
@@ -32,7 +33,7 @@ export const PlatformVoteSection: React.FC<{ follow: number | null; custom: numb
   const guard = useGuard();
   const saved = q.data;
   const [v, setV] = useState<VoteValues | null>(null);
-  const [day, setDay] = useState('');
+  const [day, setDay] = useState({ day: '', month: '' });
   const [dayError, setDayError] = useState('');
   const [asking, setAsking] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -54,10 +55,13 @@ export const PlatformVoteSection: React.FC<{ follow: number | null; custom: numb
   const set = (p: Partial<VoteValues>) => setV((x) => (x ? { ...x, ...p } : x));
   const toggleDay = (iso: number) => set({ off_weekdays: v.off_weekdays.includes(iso) ? v.off_weekdays.filter((d) => d !== iso) : [...v.off_weekdays, iso].sort() });
   const addDay = () => {
-    if (!day) { setDayError('اختر يوماً.'); return; }
-    if (day < today) { setDayError('هذا اليوم مضى. اختر اليوم أو بعده.'); return; }
-    if (v.off_dates.includes(day)) { setDayError('هذا اليوم مضاف من قبل.'); return; }
-    set({ off_dates: [...v.off_dates, day].sort() }); setDay(''); setDayError('');
+    const picked = pickedDay(day);
+    if (!picked) { setDayError('اكتب اليوم واختر الشهر.'); return; }
+    if (picked === 'bad') { setDayError('هذا الشهر ليس فيه هذا اليوم.'); return; }
+    const day_ = picked;
+    if (day_ < today) { setDayError('هذا اليوم مضى. اختر اليوم أو بعده.'); return; }
+    if (v.off_dates.includes(day_)) { setDayError('هذا اليوم مضاف من قبل.'); return; }
+    set({ off_dates: [...v.off_dates, day_].sort() }); setDay({ day: '', month: '' }); setDayError('');
   };
   const doSave = () => void guard('vote', async () => {
     setBusy(true);
@@ -86,8 +90,8 @@ export const PlatformVoteSection: React.FC<{ follow: number | null; custom: numb
           <Button disabled={!changed || sameTimes || !online} onClick={() => setAsking(true)}>حفظ مواعيد التأكيد</Button>
         </>}>
         <FieldRow>
-          <TextField label="يفتح التأكيد" type="time" ltr value={v.opens_at} onChange={(e) => set({ opens_at: e.target.value })} help="في اليوم السابق للرحلة" />
-          <TextField label="يُقفل التأكيد" type="time" ltr value={v.closes_at} onChange={(e) => set({ closes_at: e.target.value })}
+          <TimeSelect label="يفتح التأكيد" value={v.opens_at} onChange={(t) => set({ opens_at: t })} help="في اليوم السابق للرحلة" />
+          <TimeSelect label="يُقفل التأكيد" value={v.closes_at} onChange={(t) => set({ closes_at: t })}
             error={sameTimes ? 'موعد القفل يجب أن يختلف عن موعد الفتح.' : undefined} help={closesOnRideDay(v.opens_at, v.closes_at) ? 'يوم الرحلة نفسه' : 'في اليوم السابق نفسه'} />
           <SelectField label="تذكير من لم يؤكد" value={String(v.reminder_minutes)} onChange={(e) => set({ reminder_minutes: Number(e.target.value) })}
             options={options.map((r) => ({ value: String(r.value), label: r.label }))} help="يتوقف بمجرد أن يؤكد الطالب أو يلغي" />
@@ -109,8 +113,8 @@ export const PlatformVoteSection: React.FC<{ follow: number | null; custom: numb
         </fieldset>
         <div className="flex flex-col gap-2">
           <div className="flex items-end gap-2">
-            <TextField label={<span>إجازات رسمية <span className="font-normal text-ink-3">بلا تذكير</span></span>} type="date" ltr min={today} value={day}
-              onChange={(e) => { setDay(e.target.value); setDayError(''); }} error={dayError || undefined} className="flex-1 sm:max-w-[240px]" />
+            <DayPicker label={<span>إجازات رسمية <span className="font-normal text-ink-3">بلا تذكير</span></span>} today={today} value={day}
+              onChange={(x) => { setDay(x); setDayError(''); }} error={dayError || undefined} className="flex-1 sm:max-w-[320px]" />
             <Button kind="secondary" icon="plus" onClick={addDay} className={dayError ? 'mb-7' : ''}>أضف</Button>
           </div>
           {v.off_dates.length > 0 && (

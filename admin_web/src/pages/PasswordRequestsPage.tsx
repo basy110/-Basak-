@@ -7,7 +7,7 @@ import { useCompany } from '../lib/adminScope';
 import { cairoToday } from '../lib/time';
 import { useGuard } from '../lib/guard';
 import { notify } from '../lib/toasts';
-import { canAct, isOpenReset, requestedText, resetState, useResetRequests, type IssuedCode, type ResetRequest } from '../lib/resetRequests';
+import { canAct, isOpenReset, requestedText, resetState, useResetRequests, type IssuedCode, type ResetRequest } from '../lib/passwordRequests';
 import { CancelDialog, CodeDialog, VerifyDialog } from '../components/receipts/PasswordDialogs';
 
 type View = 'company' | 'platform';

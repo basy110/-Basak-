@@ -176,8 +176,8 @@ export const AddStudentFlow: React.FC<{
   return (
     <Page>
       <div className="flex w-full max-w-[920px] flex-col gap-4 sm:gap-4">
-        <PageHeader title="إضافة طالب" back={{ label: 'الطلاب', to: back }} sub="ثلاث خطوات. لا يُحفظ شيء قبل الخطوة الأخيرة." />
-        <div className="rounded-card bg-surface px-4 py-3 shadow-card max-sm:-mx-4 max-sm:-mt-2 max-sm:rounded-none max-sm:shadow-none sm:px-6 sm:py-4"><Stepper steps={steps} /></div>
+        <PageHeader title="إضافة طالب" back={{ label: 'الطلاب', to: back }} sub={<span className="hidden sm:inline">ثلاث خطوات. لا يُحفظ شيء قبل الخطوة الأخيرة.</span>} />
+        <div className="rounded-card bg-surface px-4 py-3 shadow-card max-sm:-mx-4 max-sm:-mt-9 max-sm:rounded-none max-sm:bg-transparent max-sm:shadow-none sm:px-6 sm:py-4"><Stepper steps={steps} /></div>
 
         {options.error && !options.data ? <ErrorState title="تعذّر تحميل الجامعات والخطوط" text="تأكد من اتصالك ثم حاول مرة أخرى." onRetry={() => void options.reload()} card />
           : step > 0 && !options.data ? <SkeletonForm rows={2} />

@@ -107,7 +107,7 @@ export const Toaster: React.FC = () => {
   const navigate = useNavigate();
   if (toasts.length === 0) return null;
   return (
-    <div className="pointer-events-none fixed inset-x-4 bottom-4 z-[70] flex flex-col gap-2 sm:inset-x-auto sm:start-6 sm:bottom-6 sm:w-[400px]" aria-live="polite">
+    <div className="pointer-events-none fixed inset-x-4 bottom-[88px] z-[70] flex flex-col gap-2 sm:inset-x-auto sm:start-6 sm:bottom-6 sm:w-[400px]" aria-live="polite">
       {toasts.map((t) => (
         <div key={t.id} role={t.tone === 'error' ? 'alert' : 'status'} className="enter pointer-events-auto flex min-h-14 items-center gap-3 rounded-inner bg-ink px-4 py-2 pe-2 text-white shadow-floating sm:min-h-[52px]">
           <span className={`flex ${t.tone === 'success' ? 'text-[#5BD4A0]' : t.tone === 'error' ? 'text-[#FF9C94]' : 'text-[#A8D8F0]'}`}>

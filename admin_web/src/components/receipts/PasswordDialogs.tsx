@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Button, Dialog, Icon, Ltr, Note, phoneText } from '../../ui';
-import { CODE_MINUTES, codeText, type IssuedCode, type ResetRequest } from '../../lib/resetRequests';
+import { CODE_MINUTES, codeText, type IssuedCode, type ResetRequest } from '../../lib/passwordRequests';
 import { shortName } from '../../lib/pendingReceipts';
 import { cairo, clock } from '../../ui/format';
 

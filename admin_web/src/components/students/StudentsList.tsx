@@ -11,7 +11,7 @@ import {
   fetchStudentsList, mainSubscription, openSubscriptions, periodName, SHOWN_ORDER, studentShown, studyLine,
   type Shown, type StatusCounts, type StudentRow, type StudentSort, type StudentsListAnswer,
 } from '../../lib/students';
-import { Avatar, FilterSelect, ShownPill, shortDay } from './parts';
+import { Avatar, FilterSelect, LinkSelect, ShownPill, shortDay } from './parts';
 
 export const PAGE_SIZE = 25;
 const SHOWN_LABEL: Record<Shown, string> = { ...Object.fromEntries(Object.entries(STATUS).map(([k, v]) => [k, v[0]])), none: 'بلا اشتراك' } as Record<Shown, string>;
@@ -79,7 +79,10 @@ export const StudentsList: React.FC<{
       options={[{ value: '', label: 'الكل', count: counts ? num(counts.all) : undefined },
         ...SHOWN_ORDER.map((s) => ({ value: s, label: SHOWN_LABEL[s], count: counts ? num(counts[s]) : undefined }))]} />
   );
-  const sort = <SortSelect<StudentSort> value={filter.sort} onChange={(s) => set({ sort: s })} options={SORTS} />;
+  const sort = (<>
+    <span className="sm:hidden"><LinkSelect<StudentSort> label="الترتيب" value={filter.sort} onChange={(s) => set({ sort: s })} options={SORTS} /></span>
+    <span className="hidden sm:inline-flex"><SortSelect<StudentSort> value={filter.sort} onChange={(s) => set({ sort: s })} options={SORTS} /></span>
+  </>);
   const toolbar = (
     <div className={`flex flex-col gap-3 sm:gap-3 sm:border-b sm:border-hair sm:px-4 sm:py-3 ${none ? 'max-sm:hidden' : ''}`}>
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">

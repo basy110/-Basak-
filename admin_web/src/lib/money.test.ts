@@ -139,3 +139,20 @@ describe('card colours', () => {
     expect(contrast('#FFFFFF', '#000000')).toBeCloseTo(21, 0);
   });
 });
+
+import { counted, currentReset, rowStatus, SUBS } from './reports';
+describe('revenue words', () => {
+  it('counts as the boards do', () => {
+    expect([1, 2, 5, 180, 300].map((n) => counted(n, SUBS))).toEqual(['اشتراك واحد', 'اشتراكان', '5 اشتراكات', '180 اشتراكاً', '300 اشتراك']);
+  });
+  it('maps report rows to the six statuses', () => {
+    expect(rowStatus({ status: 'active', phase: 'upcoming', paid: true })).toBe('soon');
+    expect(rowStatus({ status: 'pending_review', phase: 'current', paid: false })).toBe('review');
+    expect(rowStatus({ status: 'active', phase: 'expired', paid: true })).toBe('ended');
+  });
+  it('finds the reset in force and the one before', () => {
+    const r = (id: string, at: string, undone = false) => ({ id, scope: 'financial' as const, reset_at: at, note: null, undone_at: undone ? at : null });
+    const { current, before } = currentReset([r('a', '2026-02-07'), r('b', '2026-09-01'), r('c', '2026-06-14', true)]);
+    expect([current?.id, before?.id]).toEqual(['b', 'a']);
+  });
+});

@@ -224,7 +224,7 @@ export const ReceiptsPage: React.FC = () => {
 
   const chips = (
     <Chips value={line ?? ''} onChange={(v) => setLine(v || null)}
-      options={[{ value: '', label: 'كل الخطوط', count: queue.receipts.length }, ...lines.map((l) => ({ value: l.line, label: l.line, count: l.count }))]} />
+      options={[{ value: '', label: 'كل الخطوط', count: total }, ...lines.map((l) => ({ value: l.line, label: l.line, count: l.count }))]} />
   );
   const searchBox = <SearchBox value={search} onChange={setSearch} placeholder="ابحث باسم الطالب أو هاتفه" className="!bg-ground" />;
   const noMatch = visible.length === 0;
