@@ -8,12 +8,13 @@
  *   pv=broken    the second receipt's picture cannot be shown
  *   pv=used      issuing a code is refused: the student already changed the password
  *   pv=many      64 receipts waiting (the long queue)
+ *   pv=nohistory nothing decided yet (the history's empty state)
  *   pv=quiet     no open password request (history only)
  *   pv=err       this page's own list fails to load (the rest of the dashboard works)
  *   pv=slow      this page's own list never answers (its loading state)
  */
 import { registerFunctions, registerRpc, rpcs } from '../registry';
-import { COMPANY_ID, RECEIPTS, tables } from '../data';
+import { ADMINS, COMPANY_ID, LINES, RECEIPTS, tables } from '../data';
 
 type Row = Record<string, any>;
 const flag = (name: string) => new URLSearchParams(location.search).get('pv') === name;
@@ -66,14 +67,76 @@ registerRpc({
     const all = (flag('many') ? MANY : RECEIPTS).map((r, i) => (flag('broken') && i === 1 ? { ...r, image_url: null } : r));
     return { rows: all.slice(0, p_limit), has_more: all.length > p_limit, total: all.length };
   }),
-  review_receipt: ({ p_receipt_id, p_decision }) => {
+  review_receipt: ({ p_receipt_id, p_decision, p_reason }) => {
     if (flag('decided')) throw new Error('هذا الإيصال لم يعد قيد المراجعة.');
     if (flag('fail')) throw new Error('Failed to fetch');
     const i = RECEIPTS.findIndex((r) => r.id === p_receipt_id);
     if (i < 0) throw new Error('هذا الإيصال لم يعد قيد المراجعة.');
-    RECEIPTS.splice(i, 1);
-    return { id: p_receipt_id, status: p_decision, company_id: COMPANY_ID, reviewed_at: new Date().toISOString(), overview: null };
+    const [taken] = RECEIPTS.splice(i, 1);
+    const reviewed_at = new Date().toISOString();
+    HISTORY.unshift(decided(taken, p_decision, reviewed_at, ADMINS.company.full_name, p_decision === 'rejected' ? p_reason ?? null : null));
+    return { id: p_receipt_id, status: p_decision, company_id: COMPANY_ID, reviewed_at, overview: null };
   },
+});
+
+// ── Receipts already decided («السجل») ──────────────────────────────────
+const lineByName = (name: string) => LINES.find((l) => l.name === name);
+/** A pending-shaped row as admin_reviewed_receipts answers it once decided. */
+const decided = (r: Row, status: string, reviewed_at: string, reviewer: string | null, reason: string | null): Row => ({
+  id: r.id, status, amount: r.amount, reviewed_at, created_at: r.created_at, reviewer_name: reviewer, rejection_reason: reason,
+  attempt_number: r.attempt_number, image_url: r.image_url, payment_method: r.amount > 5000 ? 'تحويل بنكي' : 'InstaPay',
+  subscription_id: r.subscription_id, student_id: r.student_id, student_name: r.student_name, student_phone: r.student_phone,
+  line_id: lineByName(r.line_name)?.id ?? null, line_name: r.line_name, station_name: r.station_name, subscription_type: r.subscription_type,
+  period_label: r.period_label, period_start: r.period_start, period_end: r.period_end,
+});
+const HISTORY_NAMES: [string, string][] = [
+  ['يوسف أحمد عبد الفتاح البنا', '01245678902'], ['مريم عادل فتحي الدسوقي', '01289012346'], ['كريم وائل السعيد أبو النجا', '01112345679'],
+  ['آية مصطفى كامل النحاس', '01067890124'], ['ندى علاء الدين محمد البسيوني', '01245678903'], ['فارس جمال عبد الناصر قنديل', '01556789014'],
+  ['ملك حسام الدين مصطفى الغنام', '01556789015'], ['جنى أيمن فؤاد المرسي', '01501234568'], ['إسلام حمدي عبد الباسط خليل', '01112345670'],
+  ['بسملة شريف عبد المنعم عوض', '01023456782'], ['أحمد سامي عبد المقصود حجازي', '01090123457'], ['روان هشام عبد الله الطنطاوي', '01245678904'],
+  ['حازم مدحت السيد الصياد', '01134567892'], ['سارة محمود إبراهيم شاهين', '01023456783'], ['عبد الرحمن محمد السيد الشربيني', '01134567891'],
+];
+const HISTORY_LINES: [string, string][] = [['الزرقا', 'كوبري السرو'], ['دمياط الجديدة', 'الحي الثالث'], ['شربين', 'ميدان شربين'], ['فارسكور', 'الروضة'], ['كفر سعد', 'الصيانة']];
+const REASONS = ['الصورة غير واضحة', 'المبلغ أقل من المطلوب. المحوَّل 4,000 والمطلوب 4,500', 'التحويل ليس إلى حساب الشركة', 'الإيصال قديم أو مكرر'];
+const REVIEWERS = [ADMINS.company.full_name, 'منى عبد الله الشافعي', ADMINS.company.full_name, null];
+const HISTORY: Row[] = Array.from({ length: 46 }, (_, i) => {
+  const [name, phone] = HISTORY_NAMES[i % HISTORY_NAMES.length];
+  const [line, station] = HISTORY_LINES[(i * 3) % HISTORY_LINES.length];
+  const period = i % 6 === 5 ? PERIODS.both : PERIODS.first;
+  const rejected = i % 5 === 2 || i === 0;
+  const minutes = i === 0 ? 25 : i * 1260 + (i % 4) * 47;   // newest first, about a day apart
+  const reviewed_at = ago(minutes);
+  const amount = period === PERIODS.both ? 9000 : [4500, 4500, 4200, 3500][i % 4];
+  const base = {
+    id: uid('4ed0', i + 1), image_url: `${COMPANY_ID}/${uid('57f0', i + 1)}/receipt-h${i + 1}.jpg`, attempt_number: rejected ? 1 + (i % 3) : 1 + (i % 7 === 3 ? 1 : 0),
+    created_at: ago(minutes + 35 + (i % 5) * 60), amount, subscription_id: uid('5b80', i + 1), student_id: uid('57f0', i + 1), student_name: name, student_phone: phone,
+    line_name: line, station_name: station, subscription_type: period[0], period_label: period[1], period_start: period[2], period_end: period[3],
+  };
+  return decided(base, rejected ? 'rejected' : 'approved', reviewed_at, REVIEWERS[i % REVIEWERS.length], rejected ? REASONS[i % REASONS.length] : null);
+});
+const cairoDay = (iso: string) => new Date(new Date(iso).getTime() + 3 * 3_600_000).toISOString().slice(0, 10);
+const fold = (t: string) => t.replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/\s+/g, ' ').trim().toLowerCase();
+registerRpc({
+  admin_reviewed_receipts: ({ p_outcome, p_from, p_to, p_search, p_limit = 25, p_offset = 0, p_line_id }) => own(() => {
+    const term = fold(p_search ?? '');
+    const digits = String(p_search ?? '').replace(/\D/g, '');
+    const base = (flag('nohistory') ? [] : HISTORY).filter((r) => (!p_from || cairoDay(r.reviewed_at) >= p_from) && (!p_to || cairoDay(r.reviewed_at) <= p_to)
+      && (!term || fold(r.student_name).includes(term) || (digits.length >= 3 && r.student_phone.includes(digits))));
+    const scoped = base.filter((r) => !p_line_id || r.line_id === p_line_id);
+    const matching = scoped.filter((r) => !p_outcome || r.status === p_outcome);
+    const lines = new Map<string, Row>();
+    base.filter((r) => r.line_id && (!p_outcome || r.status === p_outcome)).forEach((r) => {
+      const e = lines.get(r.line_id) ?? { line_id: r.line_id, line_name: r.line_name, count: 0 };
+      e.count += 1; lines.set(r.line_id, e);
+    });
+    const approved = scoped.filter((r) => r.status === 'approved');
+    return {
+      rows: matching.slice(p_offset, p_offset + p_limit), total: matching.length,
+      counts: { approved: approved.length, rejected: scoped.length - approved.length },
+      approved_amount: approved.reduce((sum, r) => sum + r.amount, 0),
+      lines: [...lines.values()].sort((a, b) => b.count - a.count),
+    };
+  }),
 });
 
 // ── Password requests ────────────────────────────────────────────────────
