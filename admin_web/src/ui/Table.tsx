@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { Icon } from './Icon';
 import { Checkbox } from './Field';
 import { Button } from './Button';
 import { Select } from './Select';
+import { baseWidth, clampW, fitWidths, isFixed, nodeText, readWidths, writeWidths } from '../lib/tableLayout';
 
 /* ── Toolbar parts ───────────────────────────────────────────────────── */
 export const SearchBox: React.FC<{ value: string; onChange: (v: string) => void; placeholder: string; className?: string; inputRef?: React.Ref<HTMLInputElement>; onFocus?: () => void; onKeyDown?: React.KeyboardEventHandler<HTMLInputElement>; kbd?: boolean; label?: string }> = ({ value, onChange, placeholder, className = '', inputRef, onFocus, onKeyDown, kbd, label }) => (
@@ -100,35 +101,100 @@ export interface Column<T> {
 /** The phone card of a row: the same fields in the same order as the columns; column 1 is the title. */
 export interface CardSpec { title: React.ReactNode; sub?: React.ReactNode; end?: React.ReactNode; stats?: [React.ReactNode, React.ReactNode][]; fields?: [React.ReactNode, React.ReactNode][]; actions?: React.ReactNode }
 
-export function DataTable<T>({ columns, rows, rowKey, onOpen, openKey, selectable, selected, onSelect, toolbar, pager, foot, empty, card, caption, muted, rowH = 56 }: {
+const wide = typeof window !== 'undefined' ? window.matchMedia('(min-width: 1024px)') : null;
+const useDesktop = () => useSyncExternalStore((cb) => { wide?.addEventListener('change', cb); return () => wide?.removeEventListener('change', cb); }, () => wide?.matches ?? true);
+const SELECT_W = 48;
+
+/**
+ * The columns to draw at the current width and their pixel widths filling the
+ * card, with the widths the admin dragged (kept in this browser under `id`).
+ */
+function useColumnWidths<T>(id: string, columns: Column<T>[], extra: number) {
+  const desktop = useDesktop();
+  const [saved, setSavedState] = useState<Record<string, number>>(() => readWidths(id));
+  const setSaved = (next: Record<string, number>) => { setSavedState(next); writeWidths(id, next); };
+  const box = useRef<HTMLDivElement>(null);
+  const [room, setRoom] = useState(0);
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (!el) return undefined;
+    setRoom(el.clientWidth);
+    const ro = new ResizeObserver(() => setRoom(el.clientWidth));
+    ro.observe(el);
+    return () => ro.disconnect();
+  });
+  const shown = useMemo(() => columns.filter((c) => desktop || !c.hideTablet), [columns, desktop]);
+  const bases = shown.map((c) => baseWidth({ key: c.key, w: c.w }, c.key === columns[0]?.key, saved));
+  const { widths, factors } = fitWidths(bases, Math.max(0, room - extra));
+  return { box, saved, setSaved, shown, widths, factors };
+}
+
+export function DataTable<T>({ columns, rows, rowKey, onOpen, openKey, selectable, selected, onSelect, toolbar, pager, foot, empty, card, caption, muted, rowH = 56, id }: {
   columns: Column<T>[]; rows: T[]; rowKey: (row: T) => string;
   /** Row click (and Enter on a focused row) opens the record. */
   onOpen?: (row: T) => void; openKey?: string | null;
   selectable?: boolean; selected?: Set<string>; onSelect?: (keys: Set<string>) => void;
   toolbar?: React.ReactNode; pager?: React.ReactNode; foot?: Record<string, React.ReactNode>; empty?: React.ReactNode;
   card: (row: T) => CardSpec; caption?: string; muted?: (row: T) => boolean; rowH?: number;
+  /** Where the widths the admin drags are remembered (defaults to the caption). */
+  id?: string;
 }) {
   const sel = selectable && selected && onSelect;
   const allOn = sel && rows.length > 0 && rows.every((r) => selected!.has(rowKey(r)));
   const someOn = sel && rows.some((r) => selected!.has(rowKey(r)));
   const toggle = (k: string, on: boolean) => { const next = new Set(selected); if (on) next.add(k); else next.delete(k); onSelect!(next); };
   const al = (c: Column<T>) => (c.align === 'end' ? 'text-end' : c.align === 'center' ? 'text-center' : 'text-start');
-  const tab = (c: Column<T>) => (c.hideTablet ? 'hidden lg:table-cell' : '');
+
+  const L = useColumnWidths(id ?? caption ?? columns.map((c) => c.key).join('|'), columns, sel ? SELECT_W : 0);
+  const [live, setLive] = useState<{ key: string; w: number } | null>(null);
+  const widthOf = (i: number) => (live && L.shown[i].key === live.key ? live.w : L.widths[i]);
+  const total = L.shown.reduce((a, _, i) => a + widthOf(i), 0) + (sel ? SELECT_W : 0);
+
+  /** Dragging a header's end edge: the column follows the pointer and keeps that width. */
+  const startResize = (e: React.PointerEvent, i: number) => {
+    e.preventDefault(); e.stopPropagation();
+    const c = L.shown[i];
+    const rtl = getComputedStyle(e.currentTarget).direction === 'rtl';
+    const x0 = e.clientX; const w0 = L.widths[i]; const fixed = isFixed(c.w);
+    let w = w0;
+    const move = (ev: PointerEvent) => { w = clampW(w0 + (rtl ? x0 - ev.clientX : ev.clientX - x0), fixed); setLive({ key: c.key, w }); };
+    const up = () => {
+      window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up);
+      setLive(null);
+      if (w !== w0) L.setSaved({ ...L.saved, [c.key]: clampW(Math.round(w / (L.factors[i] || 1)), fixed) });
+    };
+    window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
+  };
+  const resetWidth = (key: string) => { const { [key]: _gone, ...rest } = L.saved; L.setSaved(rest); };
+
   return (
     <>
       {/* Desktop and tablet */}
       <div className="hidden flex-col overflow-hidden rounded-card bg-surface shadow-card sm:flex">
         {toolbar}
         {empty ?? (
-          <div className="overflow-x-auto">
-            <table className="w-full table-fixed border-collapse">
+          <div ref={L.box} className="overflow-x-auto">
+            <table className="table-fixed border-collapse" style={{ width: total, minWidth: '100%' }}>
               {caption && <caption className="sr-only">{caption}</caption>}
+              <colgroup>
+                {sel && <col style={{ width: SELECT_W }} />}
+                {L.shown.map((c, i) => <col key={c.key} style={{ width: widthOf(i) }} />)}
+              </colgroup>
               <thead>
                 <tr className="h-12 bg-ground">
-                  {sel && <th className="w-12 text-center"><Checkbox hideLabel label="تحديد كل الصفوف" checked={allOn ? true : someOn ? 'mixed' : false} onChange={(on) => { const next = new Set(selected); rows.forEach((r) => (on ? next.add(rowKey(r)) : next.delete(rowKey(r)))); onSelect!(next); }} /></th>}
-                  {columns.map((c, i) => (
-                    <th key={c.key} scope="col" style={c.w ? { width: c.w } : undefined}
-                      className={`whitespace-nowrap px-3 text-label font-semibold text-ink-2 ${al(c)} ${tab(c)} ${i === 0 && !sel ? 'ps-4' : ''} ${i === columns.length - 1 ? 'pe-4' : ''}`}>{c.label}</th>
+                  {sel && <th className="text-center"><Checkbox hideLabel label="تحديد كل الصفوف" checked={allOn ? true : someOn ? 'mixed' : false} onChange={(on) => { const next = new Set(selected); rows.forEach((r) => (on ? next.add(rowKey(r)) : next.delete(rowKey(r)))); onSelect!(next); }} /></th>}
+                  {L.shown.map((c, i) => (
+                    <th key={c.key} scope="col"
+                      className={`group/th relative whitespace-nowrap px-3 text-label font-semibold text-ink-2 ${al(c)} ${i === 0 && !sel ? 'ps-4' : ''} ${i === L.shown.length - 1 ? 'pe-4' : ''}`}>
+                      <span className="block truncate">{c.label}</span>
+                      {i < L.shown.length - 1 && (
+                        <span role="separator" aria-orientation="vertical" aria-label={`عرض عمود ${nodeText(c.label).trim() || c.key}`} title="اسحب لتغيير عرض العمود · ضغطتان للعرض الأصلي"
+                          onPointerDown={(e) => startResize(e, i)} onDoubleClick={() => resetWidth(c.key)}
+                          className="absolute inset-y-0 end-0 z-10 flex w-2 cursor-col-resize justify-center">
+                          <span className="my-3.5 w-px bg-transparent group-hover/th:bg-hair" />
+                        </span>
+                      )}
+                    </th>
                   ))}
                 </tr>
               </thead>
@@ -141,8 +207,8 @@ export function DataTable<T>({ columns, rows, rowKey, onOpen, openKey, selectabl
                       onKeyDown={onOpen ? (e) => { if (e.key === 'Enter' && e.target === e.currentTarget) onOpen(r); } : undefined}
                       className={`border-t border-hair focus-visible:shadow-none focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-teal ${onOpen ? 'cursor-pointer' : ''} ${isSel || isOpen ? 'bg-teal-tint' : onOpen ? 'hover:bg-ground' : ''} ${isOpen ? 'shadow-[inset_-3px_0_0_#00658D]' : ''} ${muted?.(r) ? 'text-ink-3' : ''}`}>
                       {sel && <td className="text-center"><Checkbox hideLabel label="تحديد الصف" checked={!!isSel} onChange={(on) => toggle(k, on)} /></td>}
-                      {columns.map((c, i) => (
-                        <td key={c.key} className={`overflow-hidden px-3 py-2 text-small ${al(c)} ${tab(c)} ${i === 0 && !sel ? 'ps-4' : ''} ${i === columns.length - 1 ? 'pe-4' : ''}`}>{c.render(r)}</td>
+                      {L.shown.map((c, i) => (
+                        <td key={c.key} className={`overflow-hidden px-3 py-2 text-small ${al(c)} ${i === 0 && !sel ? 'ps-4' : ''} ${i === L.shown.length - 1 ? 'pe-4' : ''}`}>{c.render(r)}</td>
                       ))}
                     </tr>
                   );
@@ -150,7 +216,7 @@ export function DataTable<T>({ columns, rows, rowKey, onOpen, openKey, selectabl
                 {foot && (
                   <tr className="border-t-2 border-hair" style={{ height: rowH }}>
                     {sel && <td />}
-                    {columns.map((c, i) => <td key={c.key} className={`px-3 text-small font-semibold tabular ${al(c)} ${tab(c)} ${i === 0 && !sel ? 'ps-4' : ''}`}>{foot[c.key] ?? ''}</td>)}
+                    {L.shown.map((c, i) => <td key={c.key} className={`px-3 text-small font-semibold tabular ${al(c)} ${i === 0 && !sel ? 'ps-4' : ''}`}>{foot[c.key] ?? ''}</td>)}
                   </tr>
                 )}
               </tbody>
