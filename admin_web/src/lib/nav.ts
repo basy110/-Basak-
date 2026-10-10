@@ -42,6 +42,9 @@ export const COMPANY_NAV: NavGroup[] = [
 
 export const PLATFORM_NAV: NavGroup[] = [
   { group: null, items: [{ id: 'p-today', slug: '', label: 'اليوم', icon: 'home', preload: routes.PlatformTodayPage.preload }] },
+  { group: 'المال والتحليلات', items: [
+    { id: 'p-analytics', slug: 'analytics', label: 'تحليلات المنصة', icon: 'trend', preload: routes.PlatformAnalyticsPage.preload },
+    { id: 'p-billing', slug: 'billing', label: 'الحسابات', icon: 'card', preload: routes.PlatformBillingPage.preload }] },
   { group: 'يحتاج قرارك', items: [
     { id: 'p-corrections', slug: 'corrections', label: 'طلبات تصحيح البيانات', icon: 'pencil', badge: 'corrections', preload: routes.CorrectionsPage.preload },
     { id: 'p-password-requests', slug: 'password-requests', label: 'طلبات كلمة المرور', icon: 'key', badge: 'requests', preload: routes.PlatformPasswordRequestsPage.preload }] },

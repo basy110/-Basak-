@@ -9,7 +9,7 @@ import { supabase } from '../lib/supabase';
 import { useAdminScope } from '../lib/adminScope';
 import { useResetRequestCount, useTabCount, whoOf } from './Workspace';
 import {
-  AllStudentsPage, AppVersionsPage, PlatformRecapPage, CompaniesPage, CompanyAdminsPage, CompanyNewPage, CorrectionsPage, PlatformDefaultsPage,
+  AllStudentsPage, AppVersionsPage, PlatformAnalyticsPage, PlatformBillingPage, PlatformRecapPage, CompaniesPage, CompanyAdminsPage, CompanyNewPage, CorrectionsPage, PlatformDefaultsPage,
   PlatformNotificationsPage, PlatformPasswordRequestsPage, PlatformTodayPage, UniversitiesPage,
 } from '../lib/routes';
 
@@ -45,6 +45,8 @@ export const PlatformArea: React.FC<{ onLogout: () => void }> = ({ onLogout }) =
           <Route path="defaults" element={<PlatformDefaultsPage />} />
           <Route path="app-versions" element={<AppVersionsPage />} />
           <Route path="recap" element={<PlatformRecapPage />} />
+          <Route path="analytics" element={<PlatformAnalyticsPage />} />
+          <Route path="billing" element={<PlatformBillingPage />} />
           <Route path="*" element={<Navigate to="/platform" replace />} />
         </Routes>
       </Suspense>
