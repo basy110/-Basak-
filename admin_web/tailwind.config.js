@@ -25,7 +25,8 @@ export default {
         badge: '#C8372D',
       },
       fontFamily: {
-        sans: ['"Readex Pro"', '"Segoe UI"', 'Tahoma', 'sans-serif'],
+        // The dashboard's own pair, as before the redesign: Inter for Latin letters and digits, Cairo for Arabic.
+        sans: ['Inter', 'Cairo', '"Segoe UI"', 'Tahoma', 'sans-serif'],
       },
       fontSize: {
         page: ['28px', { lineHeight: '36px', fontWeight: '600' }],
