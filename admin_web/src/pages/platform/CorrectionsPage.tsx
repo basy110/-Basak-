@@ -66,16 +66,16 @@ export const CorrectionsPage: React.FC = () => {
 
   const columns: Column<PlatformCorrection>[] = [
     { key: 'student', label: 'الطالب', render: (r) => <Cell2 main={r.student_name ?? '—'} sub={r.student_phone ? <Ltr>{phoneText(r.student_phone)}</Ltr> : undefined} /> },
-    { key: 'field', label: 'يُطلب تغيير', w: 110, render: (r) => <Badge>{FIELD_LABEL[r.field]}</Badge> },
-    { key: 'from', label: 'من', w: 180, render: (r) => <span className="line-clamp-2 whitespace-normal text-ink-2">{r.old_value ?? '—'}</span> },
-    { key: 'to', label: 'إلى', w: 190, render: (r) => <span className="line-clamp-2 whitespace-normal font-semibold">{r.new_value}</span> },
+    { key: 'field', label: 'يُطلب تغيير', w: 104, render: (r) => <Badge>{FIELD_LABEL[r.field]}</Badge> },
+    { key: 'from', label: 'من', w: 170, render: (r) => <span className="line-clamp-2 whitespace-normal text-ink-2">{r.old_value ?? '—'}</span> },
+    { key: 'to', label: 'إلى', w: 180, render: (r) => <span className="line-clamp-2 whitespace-normal font-semibold">{r.new_value}</span> },
     { key: 'company', label: 'الشركة الطالبة', w: 170, hideTablet: true, render: (r) => r.company ?? '—' },
-    { key: 'since', w: 120, label: (
+    { key: 'since', w: 120, hideTablet: true, label: (
       <button type="button" onClick={(e) => { e.stopPropagation(); setOrder(order === 'oldest' ? 'newest' : 'oldest'); }} className="inline-flex items-center gap-1 font-semibold text-ink"
         aria-label={order === 'oldest' ? 'منذ: الأقدم أولاً. اضغط للأحدث أولاً' : 'منذ: الأحدث أولاً. اضغط للأقدم أولاً'}>
         منذ<Icon name={order === 'oldest' ? 'aup' : 'adown'} size={14} stroke={2} />
       </button>), render: (r) => <span className="whitespace-nowrap">{agoText(r.created_at)}</span> },
-    { key: 'act', label: <span className="sr-only">قرار</span>, w: 96, align: 'end', render: (r) => <Button sm kind="tonal" onClick={(e) => { e.stopPropagation(); setOpen(r.id); }}>راجع</Button> },
+    { key: 'act', label: <span className="sr-only">قرار</span>, w: 92, align: 'end', render: (r) => <Button sm kind="tonal" onClick={(e) => { e.stopPropagation(); setOpen(r.id); }}>راجع</Button> },
   ];
 
   const toolbar = (
