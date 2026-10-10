@@ -6,8 +6,9 @@ import 'package:basak_mobile/core/ui/ui.dart';
 import '../data/colleges.dart';
 import 'university_picker_sheet.dart';
 
-/// The sheet a student picks their college from: the app's list, or, under
-/// «كلية أخرى», a name of their own. Either way the answer is a text.
+/// The sheet a student picks their college from: their university's colleges
+/// (or the app's general list when it has none), or, under «كلية أخرى», a name
+/// of their own. Either way the answer is a text.
 class CollegePickerSheet extends StatefulWidget {
   final String? selected;
   final List<String> colleges;
@@ -15,9 +16,10 @@ class CollegePickerSheet extends StatefulWidget {
   const CollegePickerSheet({super.key, this.selected, this.colleges = kColleges});
 
   /// Returns the college's name, or null when the sheet is dismissed.
-  static Future<String?> show(BuildContext context, {String? selected}) => BasakSheet.showFrame<String>(
+  static Future<String?> show(BuildContext context, {String? selected, List<String> colleges = kColleges}) =>
+      BasakSheet.showFrame<String>(
         context,
-        builder: (_) => CollegePickerSheet(selected: selected),
+        builder: (_) => CollegePickerSheet(selected: selected, colleges: colleges),
       );
 
   /// The longest college name the database takes.

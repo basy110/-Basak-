@@ -21,6 +21,12 @@ final activeUniversitiesProvider =
   return ref.watch(authRepositoryProvider).getActiveUniversities();
 });
 
+/// One university's colleges as the platform listed them (empty: none listed).
+final universityCollegesProvider =
+    FutureProvider.family<List<String>, String>((ref, universityId) {
+  return ref.watch(authRepositoryProvider).getCollegesOf(universityId);
+});
+
 /// The student's own row. The photo is its storage path
 /// (`profile_image_url`); screens sign a link to it with signedPhotoProvider.
 final studentProfileSummaryProvider =
