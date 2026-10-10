@@ -115,8 +115,8 @@ const SideNav: React.FC<ShellProps & { collapsed: boolean; setCollapsed: (c: boo
   );
   return (
     <>
-      <div className={`sticky top-0 hidden h-screen flex-none sm:block ${p.collapsed ? '' : 'lg:hidden'}`}>{rail}</div>
-      <div className={`sticky top-0 hidden h-screen flex-none ${p.collapsed ? '' : 'lg:block'}`}>{full}</div>
+      <div className={`sticky top-[var(--ws-top,0px)] hidden h-[calc(100vh-var(--ws-top,0px))] flex-none sm:block ${p.collapsed ? '' : 'lg:hidden'}`}>{rail}</div>
+      <div className={`sticky top-[var(--ws-top,0px)] hidden h-[calc(100vh-var(--ws-top,0px))] flex-none ${p.collapsed ? '' : 'lg:block'}`}>{full}</div>
       {expanded && (
         <div className="fixed inset-0 z-50 hidden bg-[rgba(23,56,74,.45)] sm:block" onMouseDown={(e) => { if (e.target === e.currentTarget) setExpanded(false); }}>
           <div className="h-full w-[264px] shadow-floating">{full}</div>
@@ -179,13 +179,13 @@ const TopBar: React.FC<ShellProps> = (p) => {
   return (
     <>
       {/* Desktop and tablet: 64 */}
-      <header className="sticky top-0 z-30 hidden h-16 flex-none items-center gap-3 border-b border-hair bg-surface px-5 sm:flex lg:gap-4 lg:px-8">
+      <header className="sticky top-[var(--ws-top,0px)] z-30 hidden h-16 flex-none items-center gap-3 border-b border-hair bg-surface px-5 sm:flex lg:gap-4 lg:px-8">
         <nav aria-label="مسار الصفحة" className="flex min-w-0 flex-1 items-center gap-1.5 text-small">
           {crumbs.map((c, i) => (
             <React.Fragment key={i}>
               {i > 0 && <Icon name="fwd" size={14} stroke={2} className="text-disabled" />}
-              {i === 1 && head.back ? <Link to={head.back.to} className="truncate text-ink-3 hover:text-teal">{c}</Link>
-                : <span className={`truncate ${i === crumbs.length - 1 ? 'font-semibold text-ink' : 'text-ink-3'}`}>{c}</span>}
+              {i === 1 && head.back ? <Link to={head.back.to} className="flex-none text-ink-3 hover:text-teal">{c}</Link>
+                : <span className={`truncate ${i === crumbs.length - 1 ? 'min-w-0 font-semibold text-ink' : 'flex-none text-ink-3'}`}>{c}</span>}
             </React.Fragment>
           ))}
         </nav>
@@ -199,7 +199,7 @@ const TopBar: React.FC<ShellProps> = (p) => {
         <div className="hidden lg:block"><Button kind="outline" sm icon="logout" onClick={p.onLogout}>خروج</Button></div>
       </header>
       {/* Phone: 56, sticky */}
-      <header className="sticky top-0 z-30 flex h-14 flex-none items-center gap-1 border-b border-hair bg-surface px-1 sm:hidden">
+      <header className="sticky top-[var(--ws-top,0px)] z-30 flex h-14 flex-none items-center gap-1 border-b border-hair bg-surface px-1 sm:hidden">
         {phoneSearch ? (
           <>
             <IconButton icon="arrowBack" label="إغلاق البحث" tone="ink" onClick={() => setPhoneSearch(false)} />
