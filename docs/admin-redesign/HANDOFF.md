@@ -16,12 +16,9 @@ Step 6 of the team test deletes a supervisor and could not run through the conne
 Edge functions `admin-reset-supervisor-password` and `admin-update-supervisor` are deployed (version 1 each).
 
 ## What is left
-1. Delete the temporary QA account (banned, password scrambled):
-   ```sql
-   delete from public.admins where email = 'qa-redesign@basak.invalid';
-   delete from auth.users where email = 'qa-redesign@basak.invalid';
-   ```
-2. Merge the branch (pull request) and let Vercel deploy the dashboard.
+The temporary QA account was deleted on 10 October 2026.
+
+1. Merge the branch (pull request) and let Vercel deploy the dashboard.
 
 ## Run locally
 ```
