@@ -186,13 +186,13 @@ export function readiness(d: CompanyDetail): ReadyItem[] {
 
 export type MethodType = 'later' | 'instapay' | 'vodafone_cash' | 'bank';
 export interface CompanyDraft {
-  name: string; contactPhone: string; contactLabel: string;
+  name: string; contactPhone: string; contactLabel: string; maxStudents: string;
   adminName: string; adminEmail: string; passwordMode: 'invite' | 'password'; password: string;
   method: MethodType; displayName: string; accountHolder: string; instapayAddress: string; walletPhone: string;
   bankName: string; bankAccount: string; iban: string;
 }
 export const emptyCompanyDraft = (): CompanyDraft => ({
-  name: '', contactPhone: '', contactLabel: '', adminName: '', adminEmail: '', passwordMode: 'invite', password: '',
+  name: '', contactPhone: '', contactLabel: '', maxStudents: '', adminName: '', adminEmail: '', passwordMode: 'invite', password: '',
   method: 'later', displayName: '', accountHolder: '', instapayAddress: '', walletPhone: '', bankName: '', bankAccount: '', iban: '',
 });
 export type DraftField = keyof CompanyDraft;
@@ -245,6 +245,7 @@ export function createPayload(d: CompanyDraft) {
   return {
     name: d.name.trim(),
     contactPhone: digitsOf(d.contactPhone) || null,
+    maxStudents: d.maxStudents.trim() === '' ? null : Number(digitsOf(d.maxStudents)),
     contactLabel: d.contactLabel.trim() || null,
     admin: { fullName: d.adminName.trim().replace(/\s+/g, ' '), email: d.adminEmail.trim().toLowerCase(), password: d.passwordMode === 'password' ? d.password : '' },
     paymentMethod: d.method === 'later' ? null : {

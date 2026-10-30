@@ -17,6 +17,8 @@ Deno.serve(async (request: Request) => {
     const name = text(body.name);
     const contactPhone = text(body.contactPhone).replace(/[^0-9+]/g, '') || null;
     const contactLabel = text(body.contactLabel) || null;
+    const maxStudentsRaw = body.maxStudents;
+    const maxStudents = maxStudentsRaw == null || maxStudentsRaw === '' ? null : Math.max(0, Math.floor(Number(maxStudentsRaw)));
     const admin = body.admin ?? {};
     const adminEmail = text(admin.email).toLowerCase();
     const adminName = text(admin.fullName);
@@ -33,7 +35,7 @@ Deno.serve(async (request: Request) => {
 
     // The database copies the default terms into the new company.
     const { data: company, error: companyError } = await serviceClient.from('companies')
-      .insert({ name, contact_phone: contactPhone, contact_label: contactLabel })
+      .insert({ name, contact_phone: contactPhone, contact_label: contactLabel, max_students: Number.isFinite(maxStudents as number) ? maxStudents : null })
       .select('id, name').single();
     if (companyError) {
       if (companyError.code === '23505') throw new HttpError(409, 'توجد شركة بهذا الاسم بالفعل.');
