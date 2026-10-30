@@ -139,6 +139,8 @@ export const CompanyNewPage: React.FC = () => {
             <TextField label="رقم التواصل" optional ltr inputMode="tel" {...field('contactPhone')} help={e.contactPhone ? undefined : 'يظهر للطلاب على بطاقة الطالب.'} maxLength={20} />
             <TextField label="اسم جهة التواصل" optional {...field('contactLabel')} maxLength={40} />
           </FieldRow>
+          <TextField label="الحد الأقصى للطلاب" optional ltr inputMode="numeric" {...field('maxStudents')} maxLength={6}
+            help="عند الوصول إليه تختفي الشركة من الطلاب حتى تزيده. اتركه فارغاً لبلا حد." />
         </FormSection>
       )}
 
