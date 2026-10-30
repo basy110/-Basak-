@@ -76,14 +76,14 @@ export const reminderOptions = (current: number) => (REMINDERS.some((r) => r.val
 
 /** The seven weekdays as checkbox cards (company page) or pills (platform). */
 export const WeekdayBoxes: React.FC<{ f: VoteForm; pills?: boolean }> = ({ f, pills }) => (
-  <div role="group" aria-label="أيام بلا تذكير كل أسبوع" className={pills ? 'flex flex-wrap gap-2' : 'grid grid-cols-2 gap-2 sm:grid-cols-4'}>
+  <div role="group" aria-label="أيام الإجازة كل أسبوع" className={pills ? 'flex flex-wrap gap-2' : 'grid grid-cols-2 gap-2 sm:grid-cols-4'}>
     {WEEK.map((d) => {
       const on = !!f.v?.off_weekdays.includes(d.iso);
       if (pills) {
         return (
           <button key={d.iso} type="button" aria-pressed={on} disabled={!f.online} onClick={() => f.toggleDay(d.iso)}
             className={`inline-flex h-10 items-center rounded-full px-3.5 text-label sm:h-9 ${on ? 'bg-ink font-semibold text-white' : 'bg-surface text-ink shadow-ring hover:bg-ground'}`}>
-            {d.name}{on ? ' · بلا تذكير' : ''}
+            {d.name}{on ? ' · إجازة' : ''}
           </button>
         );
       }
@@ -147,7 +147,7 @@ export const VoteSettingsCard: React.FC<{ companyId: string | null; companyName:
     if (f.v.closes_at !== f.saved.closes_at) return `يُقفل التأكيد ${clockLabel(f.v.closes_at)} بدل ${clockLabel(f.saved.closes_at)}`;
     if (f.v.opens_at !== f.saved.opens_at) return `يُفتح التأكيد ${clockLabel(f.v.opens_at)} بدل ${clockLabel(f.saved.opens_at)}`;
     if (f.v.reminder_minutes !== f.saved.reminder_minutes) return `يصبح التذكير ${reminderLabel(f.v.reminder_minutes)} بدل ${reminderLabel(f.saved.reminder_minutes)}`;
-    return 'تتغيّر أيام بلا تذكير';
+    return 'تتغيّر أيام الإجازة';
   }, [f.saved, f.v]);
 
   if (f.page.loading) return <SkeletonForm rows={3} />;
@@ -173,11 +173,11 @@ export const VoteSettingsCard: React.FC<{ companyId: string | null; companyName:
             onChange={(e) => f.set({ reminder_minutes: Number(e.target.value) })} help="يتوقف بمجرد أن يؤكد الطالب أو يلغي" />
         </div>
         <div className="flex flex-col gap-2">
-          <div className="text-label font-medium">أيام بلا تذكير</div>
+          <div className="text-label font-medium">أيام الإجازة (بلا تشغيل)</div>
           <WeekdayBoxes f={f} pills />
-          <p className="m-0 text-label text-ink-2">المقصود يوم الرحلة: اختيار الجمعة يوقف تذكير رحلة الجمعة. التأكيد نفسه يبقى متاحاً.</p>
+          <p className="m-0 text-label text-ink-2">المقصود يوم الرحلة: اختيار الجمعة يجعله إجازة — لا تذكير، ولا يستطيع الطالب تأكيد ركوب فيه.</p>
         </div>
-        <Holidays f={f} withYear addKind="secondary" label={<>إجازات رسمية <span className="font-normal text-ink-3">بلا تذكير</span></>} />
+        <Holidays f={f} withYear addKind="secondary" label={<>إجازات رسمية <span className="font-normal text-ink-3">بلا تشغيل</span></>} />
         <Note tone="teal" icon="info" title={`مثال: رحلة ${rideName}`}>
           {f.sameTimes ? 'اختر موعدين مختلفين للفتح والإقفال.' : `يفتح التأكيد ${before} ${clockLabel(v.opens_at)} ويُقفل ${closesOnRideDay(v.opens_at, v.closes_at) ? rideName : before} ${clockLabel(v.closes_at)}. ${v.reminder_minutes ? `التذكير ${timesCount(reminderTimes(v.opens_at, v.closes_at, v.reminder_minutes).length)}: ${remindersSentence(v, 4).replace(/^[^:]+: /, '')}` : 'بلا تذكير.'}`}
         </Note>
@@ -188,7 +188,7 @@ export const VoteSettingsCard: React.FC<{ companyId: string | null; companyName:
         {companyId
           ? <p className="m-0">لكل طلاب {companyName}: يُفتح التأكيد {clockLabel(v.opens_at)} في اليوم السابق ويُقفل {clockLabel(v.closes_at)} {closesOnRideDay(v.opens_at, v.closes_at) ? 'يوم الرحلة' : 'في اليوم نفسه'}.</p>
           : <p className="m-0">{firstChange} عند طلاب <b className="font-semibold text-ink">{follow != null ? companyWord(follow) : 'كل الشركات'}</b> تتبع المنصة، بداية من رحلات الغد.{own ? ` الشركات التي لها مواعيدها (${own}) لا تتأثر.` : ''}</p>}
-        <p className="m-0">{weekdaysText(v.off_weekdays) || v.off_dates.length ? `بلا تذكير: ${[weekdaysText(v.off_weekdays), v.off_dates.length ? holidaysCount(v.off_dates.length) : ''].filter(Boolean).join('، و')}.` : 'التذكير كل أيام الأسبوع.'}</p>
+        <p className="m-0">{weekdaysText(v.off_weekdays) || v.off_dates.length ? `إجازة (بلا تشغيل): ${[weekdaysText(v.off_weekdays), v.off_dates.length ? holidaysCount(v.off_dates.length) : ''].filter(Boolean).join('، و')}.` : 'تشغيل كل أيام الأسبوع.'}</p>
       </Dialog>
     </>
   );

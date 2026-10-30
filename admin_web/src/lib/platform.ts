@@ -116,7 +116,7 @@ export function statusQuestion(to: CompanyStatus, c: Pick<PlatformCompany, 'name
 // ── One company: can a student subscribe? ──────────────────────────────────
 export type LineHidden = 'line_inactive' | 'no_stations' | 'no_departure' | 'unserved_university' | 'nothing_on_sale';
 export interface CompanyDetail {
-  company: { id: string; name: string; status: CompanyStatus; created_at: string; status_changed_at: string | null; contact_phone: string | null; contact_label: string | null };
+  company: { id: string; name: string; status: CompanyStatus; created_at: string; status_changed_at: string | null; contact_phone: string | null; contact_label: string | null; max_students: number | null };
   admins: { id: string; full_name: string; email: string }[];
   payment_methods: { method_type: string; display_name: string }[];
   supervisors: number;
@@ -351,7 +351,7 @@ async function loadCompanies(): Promise<PlatformCompany[]> {
     return overview.per_company.map((r) => {
       const row = rows.find((x) => x.id === r.company.id);
       return {
-        ...r.company, status_changed_at: null, contact_phone: row?.contact_phone ?? null, contact_label: row?.contact_label ?? null,
+        ...r.company, status_changed_at: null, contact_phone: row?.contact_phone ?? null, contact_label: row?.contact_label ?? null, max_students: (row as {max_students?: number|null} | null)?.max_students ?? null,
         lines: r.lines, active_lines: r.active_lines, students: r.members, admins: r.admins, supervisors: r.supervisors,
         payment_methods: methods.filter((m) => m.company_id === r.company.id).length, selling: null,
       };
@@ -364,7 +364,7 @@ interface FallbackLine { id: string; name: string; is_active: boolean; stations:
 async function loadDetail(id: string): Promise<CompanyDetail> {
   return rpcOr<CompanyDetail>('platform_company_detail', () => supabase.rpc('platform_company_detail', { p_company_id: id }), async () => {
     const [company, admins, methods, lines, supervisors, assigned] = await Promise.all([
-      unwrap<CompanyDetail['company']>(supabase.from('companies').select('id, name, status, created_at, contact_phone, contact_label').eq('id', id).single()),
+      unwrap<CompanyDetail['company']>(supabase.from('companies').select('id, name, status, created_at, contact_phone, contact_label, max_students').eq('id', id).single()),
       unwrap<CompanyDetail['admins']>(supabase.from('admins').select('id, full_name, email').eq('company_id', id).order('created_at')),
       unwrap<CompanyDetail['payment_methods']>(supabase.from('company_payment_methods').select('method_type, display_name').eq('company_id', id).eq('is_active', true)),
       unwrap<FallbackLine[]>(supabase.from('lines').select('id, name, is_active, stations(is_active), line_trips(direction, is_active)').eq('company_id', id).order('name') as never),

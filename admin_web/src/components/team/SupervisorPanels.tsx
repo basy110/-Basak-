@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  Button, Icon, InfoRows, Note, PasswordField, SidePanel, StatePill, TextField, countText, errorText, phoneText,
+  Button, Icon, InfoRows, Note, PasswordField, SelectField, SidePanel, StatePill, TextField, countText, errorText, phoneText,
 } from '../../ui';
 import type { LineName, SupervisorRow } from '../../lib/reference';
 import {
@@ -12,8 +12,11 @@ import { Avatar, LinePicker, PhoneLtr } from './parts';
 export const PHONE_CARD = 'max-sm:rounded-card max-sm:bg-surface max-sm:p-4 max-sm:shadow-card';
 
 /* ── Add ─────────────────────────────────────────────────────────────── */
-export interface AddDraft { fullName: string; phone: string; password: string; lineIds: string[] }
-const EMPTY: AddDraft = { fullName: '', phone: '', password: '', lineIds: [] };
+export type SalaryPeriod = '' | 'daily' | 'monthly' | 'termly';
+export interface AddDraft { fullName: string; phone: string; password: string; lineIds: string[]; salary: string; salaryPeriod: SalaryPeriod }
+const EMPTY: AddDraft = { fullName: '', phone: '', password: '', lineIds: [], salary: '', salaryPeriod: '' };
+
+export const SALARY_PERIODS = [{ value: 'monthly', label: 'شهري' }, { value: 'termly', label: 'بالترم' }, { value: 'daily', label: 'يومي' }];
 
 /**
  * «مشرف جديد»: name, phone, password (hidden while typed, or made here) and
@@ -62,6 +65,12 @@ export const SupervisorAddPanel: React.FC<{
         </div>
         <LinePicker lines={lines} selected={d.lineIds} onChange={(lineIds) => setD({ ...d, lineIds })} uncovered={uncovered}
           error={err('lines', 'lines')} help="خط واحد على الأقل. الخط المتوقف لا يُسند لمشرف جديد." />
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+          <TextField label="المرتب" optional type="number" inputMode="numeric" ltr value={d.salary} className="min-w-0 flex-1"
+            placeholder="0" onChange={(e) => setD({ ...d, salary: e.target.value })} help="للتحليلات المالية للشركة." />
+          <SelectField label="الدفع" value={d.salaryPeriod} placeholder="اختر" className="sm:w-40"
+            options={SALARY_PERIODS} onChange={(e) => setD({ ...d, salaryPeriod: e.target.value as SalaryPeriod })} />
+        </div>
         {serverError && !server && <Note tone="danger">{errorText(new Error(serverError))}</Note>}
         <button type="submit" hidden aria-hidden="true" tabIndex={-1} />
       </form>

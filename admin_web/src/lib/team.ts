@@ -165,7 +165,7 @@ async function callFunction<T>(name: string, body: Record<string, unknown>): Pro
 }
 
 // ── Supervisor requests ─────────────────────────────────────────────
-export interface NewSupervisor { fullName: string; phone: string; password: string; companyId: string; lineIds: string[] }
+export interface NewSupervisor { fullName: string; phone: string; password: string; companyId: string; lineIds: string[]; salary?: string; salaryPeriod?: string }
 export const createSupervisor = (s: NewSupervisor) =>
   callFunction<{ id: string; lineIds: string[] }>('admin-create-supervisor', { ...s, phone: normalizePhone(s.phone) });
 
