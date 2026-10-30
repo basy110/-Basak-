@@ -79,7 +79,7 @@ export const PlatformVoteSection: React.FC<{ follow: number | null; custom: numb
     const r = times.length === 0 ? 'لا تذكير.' : times.length <= 4
       ? `التذكير ${timesCount(times.length)}: ${times.map(clockLabel).join('، ')}.`
       : `التذكير ${timesCount(times.length)}: ${times.slice(0, 3).map(clockLabel).join('، ')} … حتى ${clockLabel(times[times.length - 1])}.`;
-    return `يفتح التأكيد الأربعاء ${clockLabel(v.opens_at)} ويُقفل ${closeDay} ${clockLabel(v.closes_at)}. ${v.off_weekdays.includes(4) ? 'الخميس بلا تذكير.' : r}`;
+    return `يفتح التأكيد الأربعاء ${clockLabel(v.opens_at)} ويُقفل ${closeDay} ${clockLabel(v.closes_at)}. ${v.off_weekdays.includes(4) ? 'الخميس إجازة (بلا تشغيل).' : r}`;
   })();
 
   return (
@@ -97,23 +97,23 @@ export const PlatformVoteSection: React.FC<{ follow: number | null; custom: numb
             options={options.map((r) => ({ value: String(r.value), label: r.label }))} help="يتوقف بمجرد أن يؤكد الطالب أو يلغي" />
         </FieldRow>
         <fieldset className="m-0 flex flex-col gap-2 border-0 p-0">
-          <legend className="mb-1.5 text-label font-medium">أيام بلا تذكير</legend>
+          <legend className="mb-1.5 text-label font-medium">أيام الإجازة (بلا تشغيل)</legend>
           <div className="flex flex-wrap gap-1.5">
             {WEEK.map((d) => {
               const off = v.off_weekdays.includes(d.iso);
               return (
                 <button key={d.iso} type="button" aria-pressed={off} onClick={() => toggleDay(d.iso)}
                   className={`inline-flex h-10 items-center rounded-full px-3.5 text-label sm:h-9 ${off ? 'bg-ink font-semibold text-white' : 'bg-surface text-ink shadow-ring hover:bg-ground'}`}>
-                  {d.name}{off && ' · بلا تذكير'}
+                  {d.name}{off && ' · إجازة'}
                 </button>
               );
             })}
           </div>
-          <p className="m-0 text-label text-ink-2">المقصود يوم الرحلة: اختيار الجمعة يوقف تذكير رحلة الجمعة. التأكيد نفسه يبقى متاحاً.</p>
+          <p className="m-0 text-label text-ink-2">المقصود يوم الرحلة: اختيار الجمعة يجعله إجازة — لا تذكير، ولا يستطيع الطالب تأكيد ركوب فيه.</p>
         </fieldset>
         <div className="flex flex-col gap-2">
           <div className="flex items-end gap-2">
-            <DayPicker label={<span>إجازات رسمية <span className="font-normal text-ink-3">بلا تذكير</span></span>} today={today} value={day}
+            <DayPicker label={<span>إجازات رسمية <span className="font-normal text-ink-3">بلا تشغيل</span></span>} today={today} value={day}
               onChange={(x) => { setDay(x); setDayError(''); }} error={dayError || undefined} className="flex-1 sm:max-w-[320px]" />
             <Button kind="secondary" icon="plus" onClick={addDay} className={dayError ? 'mb-7' : ''}>أضف</Button>
           </div>

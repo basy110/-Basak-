@@ -41,8 +41,8 @@ describe('words', () => {
     expect(weekdaysText([])).toBe('');
   });
   it('the platform values in one sentence', () => {
-    expect(valuesSentence(v({ reminder_minutes: 180 }))).toBe('يُفتح 4:00 م، يُقفل 6:00 ص، تذكير كل 3 ساعات، وبلا تذكير كل جمعة');
-    expect(valuesSentence(v({ reminder_minutes: 0 }))).toBe('يُفتح 4:00 م، يُقفل 6:00 ص، بلا تذكير');
+    expect(valuesSentence(v({ reminder_minutes: 180 }))).toBe('يُفتح 4:00 م، يُقفل 6:00 ص، تذكير كل 3 ساعات، وإجازة كل جمعة');
+    expect(valuesSentence(v({ reminder_minutes: 0 }))).toBe('يُفتح 4:00 م، يُقفل 6:00 ص، بلا تذكير، وإجازة كل جمعة');
   });
   it('holidays and day names', () => {
     expect(holidayText('2026-10-22', '2026')).toBe('الخميس 22 أكتوبر');

@@ -81,12 +81,12 @@ export function holidaysCount(n: number): string {
   return `${n} ${n <= 10 ? 'إجازات' : 'إجازة'}`;
 }
 
-/** The platform's (or any) values in one sentence: «يُفتح 4:00 م، يُقفل 6:00 ص، تذكير كل 3 ساعات، وبلا تذكير كل جمعة». */
+/** The platform's (or any) values in one sentence: «يُفتح 4:00 م، يُقفل 6:00 ص، تذكير كل 3 ساعات، وإجازة كل جمعة». */
 export function valuesSentence(v: VoteValues): string {
   const parts = [`يُفتح ${clockLabel(v.opens_at)}`, `يُقفل ${clockLabel(v.closes_at)}`,
     v.reminder_minutes ? `تذكير ${reminderLabel(v.reminder_minutes)}` : 'بلا تذكير'];
   const off = weekdaysText(v.off_weekdays ?? []);
-  if (off && v.reminder_minutes) return `${parts.join('، ')}، وبلا تذكير ${off}`;
+  if (off) return `${parts.join('، ')}، وإجازة ${off}`;
   return parts.join('، ');
 }
 

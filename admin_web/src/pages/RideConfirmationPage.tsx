@@ -61,7 +61,7 @@ export const RideConfirmationPage: React.FC = () => {
               options={reminderOptions(v.reminder_minutes)} onChange={(e) => f.set({ reminder_minutes: Number(e.target.value) })} />
             <p className="m-0 rounded-control bg-ground px-3.5 py-2.5 text-label text-ink-2">{f.sameTimes ? '' : `${remindersSentence(v)} `}{REMINDER_CHOICES}</p>
           </Row>
-          <Row title="أيام بلا تذكير" help="أيام لا تعمل فيها الرحلات. المقصود يوم الرحلة نفسه: اختيار الجمعة يوقف تذكير رحلة الجمعة. التأكيد نفسه يبقى متاحاً لمن أراد.">
+          <Row title="أيام الإجازة (بلا تشغيل)" help="أيام لا تعمل فيها الرحلات. المقصود يوم الرحلة: اختيار الجمعة يجعله إجازة — لا تذكير، ولا يستطيع الطالب تأكيد ركوب فيه.">
             <div className="flex flex-col gap-2"><div className="text-label font-medium">كل أسبوع</div><WeekdayBoxes f={f} /></div>
             <Holidays f={f} label="إجازات رسمية" />
           </Row>
@@ -118,11 +118,11 @@ function changedText(n: number) {
   if (n === 2) return 'غيّرت شيئين ولم يُحفظا';
   return `غيّرت ${n} ${n <= 10 ? 'أشياء' : 'شيئاً'} ولم تُحفظ`;
 }
-/** «بلا تذكير: كل جمعة، و3 إجازات.» */
+/** «إجازة (بلا تشغيل): كل جمعة، و3 إجازات.» */
 function offSentence(v: VoteValues) {
   const w = weekdaysText(v.off_weekdays); const d = v.off_dates.length ? holidaysCount(v.off_dates.length) : '';
-  if (!w && !d) return 'التذكير كل أيام الأسبوع.';
-  return `بلا تذكير: ${[w, d].filter(Boolean).join('، و')}.`;
+  if (!w && !d) return 'تشغيل كل أيام الأسبوع.';
+  return `إجازة (بلا تشغيل): ${[w, d].filter(Boolean).join('، و')}.`;
 }
 
 /** One section of the form: title and help on the start side, fields on the end side; stacked on a phone. */
