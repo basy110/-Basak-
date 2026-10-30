@@ -65,10 +65,10 @@ class _AddToWalletButtonState extends ConsumerState<AddToWalletButton> {
     final colors = context.colors;
     final text = context.text;
     final apple = platform == WalletPlatform.apple;
-    // One height and one shape beside «التفاصيل». Apple's is its own
-    // button, drawn by PassKit (outlined, for the ink ground); Google's is
-    // the black pill its brand rules describe, with its own words.
-    final shape = BasakRadius.all(apple ? BasakRadius.tile : BasakRadius.full);
+    // One height and one shape beside «التفاصيل». Apple's is its own button,
+    // drawn by PassKit (outlined, for the ink ground, rounded to match «التفاصيل»
+    // BasakRadius.control); Google's is the black pill its brand rules describe.
+    final shape = BasakRadius.all(apple ? BasakRadius.control : BasakRadius.full);
     return Semantics(
       button: true,
       enabled: !_busy,

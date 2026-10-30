@@ -236,27 +236,22 @@ void main() {
     expect(find.byKey(const Key('by-university')), findsNothing);
   });
 
-  testWidgets('a message while every line is on screen goes to one line, chosen on the page', (tester) async {
+  testWidgets('a whole-line message can go to several of the supervisor\'s lines', (tester) async {
     final world = BoardWorld(dashboard: _dashboard());
     await pumpBoard(tester, world, const SupervisorSendScreen(), tab: null, size: const Size(390, 1100));
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('send-line')), findsNothing, reason: 'one line chosen: it is that line');
-
-    _container(tester, SupervisorSendScreen).read(supervisorSelectionProvider.notifier)
-        .selectLine(SupervisorSelection.allLines);
-    await tester.pumpAndSettle();
+    // More than one line: the picker is there, on the first by default.
     expect(tester.widget<PickRow>(find.byKey(const Key('send-line'))).value, 'خط الزرقا');
 
     await tester.tap(find.byKey(const Key('send-line')));
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('line-all')), findsNothing, reason: 'a message goes to one line');
-    await tester.tap(find.byKey(const Key('line-line-b')));
-    await tester.pump();
-    await tester.tap(find.byKey(const Key('line-confirm')));
+    expect(find.byType(SupervisorLinesSheet), findsOneWidget);
+    // Add a second line to the one already chosen, and confirm.
+    await tester.tap(find.byKey(const Key('lines-line-b')));
+    await tester.tap(find.byKey(const Key('lines-confirm')));
     await tester.pumpAndSettle();
 
-    expect(tester.widget<PickRow>(find.byKey(const Key('send-line'))).value, 'خط دمياط الجديدة');
-    expect(_container(tester, SupervisorSendScreen).read(supervisorSelectionProvider).isAllLines, isTrue,
-        reason: 'the app keeps showing every line');
+    final row = tester.widget<PickRow>(find.byKey(const Key('send-line')));
+    expect((row.label, row.value), ('الخطوط', 'خطان'), reason: 'two lines chosen');
   });
 }

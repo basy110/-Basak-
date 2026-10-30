@@ -19,25 +19,33 @@ import 'supervisor_notifications_screen.dart' show sendAnnouncedOnce;
 /// Who a supervisor's message goes to: every student of one of their lines,
 /// or the riders of one of its trips today or on the next ride day.
 class SendAudience {
-  final SupervisorLine line;
+  /// The whole-line audience: one line, or several of the supervisor's lines.
+  /// For a trip, just its own line.
+  final List<SupervisorLine> lines;
 
-  /// Null: every student of [line].
+  /// Null: every student of [lines].
   final SupervisorTripTime? trip;
 
   /// The server's today, to say «اليوم» or «غداً».
   final DateTime today;
 
-  const SendAudience({required this.line, this.trip, required this.today});
+  const SendAudience({required this.lines, this.trip, required this.today});
 
+  SupervisorLine get line => lines.first;
+  List<String> get lineIds => [for (final l in lines) l.id];
   String get lineId => line.id;
   String? get tripId => trip?.tripId;
   String? get rideDate => trip?.rideDate.toIso8601String().substring(0, 10);
 
+  /// The message goes to more than one line at once.
+  bool get multiLine => trip == null && lines.length > 1;
+
   /// How many students will receive it.
-  int get students => trip?.students ?? line.registeredStudents;
+  int get students => trip?.students ?? lines.fold(0, (sum, l) => sum + l.registeredStudents);
 
   /// "خط الزرقا", whether or not the line's name already says «خط».
-  String get lineName => line.name.trim().startsWith('خط ') ? line.name.trim() : 'خط ${line.name.trim()}';
+  static String nameOf(SupervisorLine l) => l.name.trim().startsWith('خط ') ? l.name.trim() : 'خط ${l.name.trim()}';
+  String get lineName => nameOf(line);
 
   static String day(SupervisorTripTime trip, DateTime today) => DateUtils.isSameDay(trip.rideDate, today) ? 'اليوم' : 'غداً';
 
@@ -48,11 +56,15 @@ class SendAudience {
   /// "اليوم · ذهاب 7:00 ص": a trip as the audience row and its sheet name it.
   static String tripTitle(SupervisorTripTime trip, DateTime today) => '${day(trip, today)} · ${tripName(trip)}';
 
-  /// "ركاب ذهاب 7:00 ص اليوم", or "كل طلاب خط الزرقا".
-  String get sentence => trip == null ? 'كل طلاب $lineName' : 'ركاب ${tripName(trip!)} ${day(trip!, today)}';
+  /// "ركاب ذهاب 7:00 ص اليوم", "كل طلاب خط الزرقا", or "كل طلاب 3 خطوط".
+  String get sentence => trip != null
+      ? 'ركاب ${tripName(trip!)} ${day(trip!, today)}'
+      : lines.length == 1
+          ? 'كل طلاب $lineName'
+          : 'كل طلاب ${ArabicCount.lines(lines.length)}';
 
   /// What tells one send from another, besides its text.
-  String get signature => '$lineId|$tripId|$rideDate';
+  String get signature => '${(lineIds.toList()..sort()).join(',')}|$tripId|$rideDate';
 }
 
 /// One send, as the server tells repeats apart: the same message to the same
@@ -105,24 +117,34 @@ class _SupervisorSendScreenState extends ConsumerState<SupervisorSendScreen> {
   bool? _riders;
   SupervisorTripTime? _trip;
 
-  /// The line written to while the app shows every line together: chosen
-  /// here, the first one until then.
-  String? _lineId;
+  /// The lines the whole-line message is written to. Empty = the one line the
+  /// app is on (or the first). The supervisor may pick several of their lines.
+  final Set<String> _lineSel = {};
 
   bool _allLines(SupervisorDashboard dashboard) =>
       ref.watch(supervisorSelectionProvider).isAllLines && dashboard.lines.length > 1;
 
-  SupervisorLine _line(SupervisorDashboard dashboard) {
-    final chosen = _allLines(dashboard) ? _lineId : ref.watch(supervisorSelectionProvider).lineId;
-    return dashboard.lines.firstWhere((l) => l.id == chosen, orElse: () => dashboard.lines.first);
+  /// The line used for a trip (the first chosen, else the app's).
+  SupervisorLine _line(SupervisorDashboard dashboard) => _audienceLines(dashboard).first;
+
+  /// The whole-line audience, in dashboard order.
+  List<SupervisorLine> _audienceLines(SupervisorDashboard dashboard) {
+    final fallback = _allLines(dashboard) ? dashboard.lines.first.id : ref.watch(supervisorSelectionProvider).lineId;
+    final set = _lineSel.where((id) => dashboard.lines.any((l) => l.id == id)).toSet();
+    if (set.isEmpty) set.add(dashboard.lines.any((l) => l.id == fallback) ? fallback! : dashboard.lines.first.id);
+    return [for (final l in dashboard.lines) if (set.contains(l.id)) l];
   }
 
-  Future<void> _pickLine(SupervisorLine current) async {
-    final id = await SupervisorLineSheet.pick(context, initial: current.id);
-    if (id == null || id == current.id || !mounted) return;
+  /// Pick one or more of the supervisor's lines for the whole-line message.
+  Future<void> _pickLines(SupervisorDashboard dashboard) async {
+    final chosen = await SupervisorLinesSheet.show(context,
+        lines: dashboard.lines, selected: _audienceLines(dashboard).map((l) => l.id).toSet());
+    if (chosen == null || chosen.isEmpty || !mounted) return;
     setState(() {
-      _lineId = id;
-      _riders = null;
+      _lineSel
+        ..clear()
+        ..addAll(chosen);
+      _riders = false;
       _trip = null;
     });
   }
@@ -243,7 +265,8 @@ class _SupervisorSendScreenState extends ConsumerState<SupervisorSendScreen> {
     final line = _line(dashboard);
     final trips = _trips(dashboard, line);
     final trip = _currentTrip(dashboard, trips);
-    final audience = SendAudience(line: line, trip: trip, today: dashboard.today);
+    final audienceLines = _audienceLines(dashboard);
+    final audience = SendAudience(lines: trip != null ? [line] : audienceLines, trip: trip, today: dashboard.today);
     final templatesAsync = ref.watch(quickTemplatesProvider);
     final templates = [
       for (final t in templatesAsync.valueOrNull ?? const <QuickNotificationTemplate>[])
@@ -257,13 +280,16 @@ class _SupervisorSendScreenState extends ConsumerState<SupervisorSendScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Every line on screen: a message still goes to one of them.
-            if (_allLines(dashboard)) ...[
+            // The supervisor's lines: a whole-line message may go to several.
+            if (dashboard.lines.length > 1 && trip == null) ...[
               PickRow(
                 key: const Key('send-line'),
-                label: 'الخط',
-                value: audience.lineName,
-                onTap: () => _pickLine(line),
+                label: audienceLines.length > 1 ? 'الخطوط' : 'الخط',
+                value: audienceLines.length > 1
+                    ? ArabicCount.lines(audienceLines.length)
+                    : SendAudience.nameOf(audienceLines.first),
+                note: audienceLines.length > 1 ? ArabicCount.students(audience.students, oblique: true) : null,
+                onTap: () => _pickLines(dashboard),
               ),
               const SizedBox(height: BasakSpace.s8),
             ],
@@ -507,23 +533,37 @@ class _SendConfirmSheetState extends ConsumerState<SendConfirmSheet> {
     final template = widget.template;
     final repo = ref.read(notificationsRepoProvider);
     try {
-      final result = await sendAnnouncedOnce(() => template != null
-          ? repo.sendQuick(
-              templateKey: template.key,
-              lineId: audience.lineId,
-              tripId: audience.tripId,
-              rideDate: audience.rideDate,
-              minutes: _minutes,
-              idempotencyKey: widget.sendKey.of('${template.key}|${audience.signature}|$_minutes'),
-            )
-          : repo.send(
-              title: widget.title!,
-              body: widget.body!,
-              lineId: audience.lineId,
-              tripId: audience.tripId,
-              rideDate: audience.rideDate,
-              idempotencyKey: widget.sendKey.of('${audience.signature}|${widget.title}|${widget.body}'),
-            ));
+      // A whole-line message may cover several lines: one send each, their
+      // counts added up. Each line keeps its own idempotency key, so a line is
+      // never written twice, and a retry of the set repeats none of them.
+      final result = await sendAnnouncedOnce(() async {
+        var students = 0;
+        var duplicate = true;
+        for (final lineId in audience.multiLine ? audience.lineIds : [audience.lineId]) {
+          final r = template != null
+              ? await repo.sendQuick(
+                  templateKey: template.key,
+                  lineId: lineId,
+                  tripId: audience.tripId,
+                  rideDate: audience.rideDate,
+                  minutes: _minutes,
+                  idempotencyKey:
+                      widget.sendKey.of('${template.key}|$lineId|${audience.tripId}|${audience.rideDate}|$_minutes'),
+                )
+              : await repo.send(
+                  title: widget.title!,
+                  body: widget.body!,
+                  lineId: lineId,
+                  tripId: audience.tripId,
+                  rideDate: audience.rideDate,
+                  idempotencyKey: widget.sendKey
+                      .of('$lineId|${audience.tripId}|${audience.rideDate}|${widget.title}|${widget.body}'),
+                );
+          students += r.students;
+          duplicate = duplicate && r.duplicate;
+        }
+        return (students: students, duplicate: duplicate);
+      });
       if (mounted) Navigator.of(context).pop(result);
     } catch (error) {
       if (!mounted) return;

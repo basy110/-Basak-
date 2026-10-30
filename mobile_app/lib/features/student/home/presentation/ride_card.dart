@@ -24,6 +24,10 @@ enum RideCardKind {
 
   /// The vote is open, but the line has no departure time to choose.
   noTimes,
+
+  /// The ride day is a company day off (Friday, a holiday): no bus runs, so
+  /// there is nothing to confirm.
+  dayOff,
 }
 
 /// Where the ride vote stands at one moment: which card to draw, for which
@@ -72,6 +76,10 @@ class RideMoment {
     final ride = vote.rideDateFor(now);
     final window = vote.windowFor(ride);
     if (vote.isOpenAt(now)) {
+      // A day off closes the confirmation itself, not only the reminder.
+      if (vote.isDayOff(ride)) {
+        return RideMoment(kind: RideCardKind.dayOff, day: ride, opens: window.opens, closes: window.closes);
+      }
       return RideMoment(
         kind: riding ? RideCardKind.confirmed : (hasDepartures ? RideCardKind.ask : RideCardKind.noTimes),
         day: ride,
@@ -372,6 +380,14 @@ class RideCard extends StatelessWidget {
           ),
           const SizedBox(height: BasakSpace.s12),
           answers(enabled: false),
+        ];
+      case RideCardKind.dayOff:
+        children = [
+          head(RideWords.date(m.day), const IconPill(icon: LucideIcons.calendarX2, label: 'إجازة')),
+          const SizedBox(height: BasakSpace.s12),
+          Text('إجازة ${RideWords.rideOf(m.day, now)}', style: text.sheetTitle),
+          const SizedBox(height: BasakSpace.s12),
+          Text('لا يوجد تشغيل في هذا اليوم، فلا حاجة لتأكيد الركوب.', style: help),
         ];
     }
 

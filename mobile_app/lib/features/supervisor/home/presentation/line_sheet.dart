@@ -104,3 +104,70 @@ class _SupervisorLineSheetState extends ConsumerState<SupervisorLineSheet> {
     );
   }
 }
+
+/// Several of the supervisor's lines, chosen with checkboxes: the audience of a
+/// whole-line message that may go to more than one line at once. Returns the
+/// chosen line ids, or null when the sheet is dismissed.
+class SupervisorLinesSheet extends StatefulWidget {
+  final List<SupervisorLine> lines;
+  final Set<String> selected;
+
+  const SupervisorLinesSheet({super.key, required this.lines, required this.selected});
+
+  static Future<Set<String>?> show(
+    BuildContext context, {
+    required List<SupervisorLine> lines,
+    required Set<String> selected,
+  }) =>
+      BasakSheet.showFrame<Set<String>>(
+        context,
+        builder: (_) => SupervisorLinesSheet(lines: lines, selected: selected),
+      );
+
+  @override
+  State<SupervisorLinesSheet> createState() => _SupervisorLinesSheetState();
+}
+
+class _SupervisorLinesSheetState extends State<SupervisorLinesSheet> {
+  late final Set<String> _chosen = {...widget.selected};
+
+  @override
+  Widget build(BuildContext context) {
+    return BasakSheetFrame(
+      title: 'الخطوط',
+      subtitle: 'تصل الرسالة إلى كل طلاب الخطوط المختارة.',
+      largeTitle: true,
+      primary: BasakButton(
+        key: const Key('lines-confirm'),
+        label: 'تأكيد',
+        onPressed: _chosen.isEmpty ? null : () => Navigator.of(context).pop(_chosen),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final (i, line) in widget.lines.indexed) ...[
+            if (i > 0) const SizedBox(height: BasakSpace.s4),
+            CheckRow(
+              key: Key('lines-${line.id}'),
+              value: _chosen.contains(line.id),
+              onChanged: (on) => setState(() => on ? _chosen.add(line.id) : _chosen.remove(line.id)),
+              child: Padding(
+                padding: const EdgeInsetsDirectional.symmetric(vertical: BasakSpace.s6),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(line.name, style: context.text.body.copyWith(fontWeight: FontWeight.w600)),
+                    Text(SupervisorLineSheet.caption(line),
+                        style: context.text.caption.copyWith(color: context.colors.ink3)),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
