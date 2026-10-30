@@ -257,14 +257,55 @@ class _FloatingGlassNavBarState extends State<FloatingGlassNavBar>
               tween: Tween(end: widget.collapsed ? 1.0 : 0.0),
               duration: FloatingGlassNavBar.animationDuration,
               curve: BasakMotion.pageCurve,
-              builder: (context, t, _) => _GlassPill(
-                height: lerpDouble(FloatingGlassNavBar.height, FloatingGlassNavBar.collapsedHeight, t)!,
-                glass: widget.glass && !highContrast && !reduceTransparency,
-                child: Padding(
-                  padding: const EdgeInsetsDirectional.symmetric(horizontal: BasakSpace.s8),
-                  child: LayoutBuilder(builder: (context, box) => _content(context, box, t)),
-                ),
-              ),
+              builder: (context, t, _) {
+                final glass = widget.glass && !highContrast && !reduceTransparency;
+                final height = lerpDouble(FloatingGlassNavBar.height, FloatingGlassNavBar.collapsedHeight, t)!;
+                // Fully open: the plain full-width bar (its own layout and taps).
+                if (t < 0.001) {
+                  return _GlassPill(
+                    height: height,
+                    glass: glass,
+                    child: Padding(
+                      padding: const EdgeInsetsDirectional.symmetric(horizontal: BasakSpace.s8),
+                      child: LayoutBuilder(builder: (context, box) => _content(context, box, t)),
+                    ),
+                  );
+                }
+                // Collapsing onto the tab you are on: a clipped slice of the full
+                // bar, centred on that tab (the lens and drag keep working under it).
+                return LayoutBuilder(
+                  builder: (context, outer) {
+                    final f = (widget.currentIndex + 0.5) / widget.items.length;
+                    final align = AlignmentDirectional(2 * f - 1, 0);
+                    final full = outer.maxWidth;
+                    final pillWidth = lerpDouble(full, FloatingGlassNavBar.collapsedHeight + 8, t)!;
+                    return Align(
+                      alignment: align,
+                      child: SizedBox(
+                        width: pillWidth,
+                        child: _GlassPill(
+                          height: height,
+                          glass: glass,
+                          child: ClipRect(
+                            child: OverflowBox(
+                              minWidth: full,
+                              maxWidth: full,
+                              alignment: align,
+                              child: SizedBox(
+                                width: full,
+                                child: Padding(
+                                  padding: const EdgeInsetsDirectional.symmetric(horizontal: BasakSpace.s8),
+                                  child: LayoutBuilder(builder: (context, box) => _content(context, box, t)),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
             ),
           ),
         ),
@@ -324,6 +365,7 @@ class _FloatingGlassNavBarState extends State<FloatingGlassNavBar>
     final isSelected = index == widget.currentIndex;
 
     return BasakPressable(
+      key: Key('nav-tab-$index'),
       onTap: () => widget.onTabSelected(index),
       semanticLabel: item.label,
       selected: isSelected,
@@ -349,32 +391,7 @@ class _FloatingGlassNavBarState extends State<FloatingGlassNavBar>
                   ),
                 ),
               ),
-              // The label folds away as the bar collapses; the icon stays.
-              if (t < 1)
-                ClipRect(
-                  child: Align(
-                    alignment: Alignment.topCenter,
-                    heightFactor: 1 - t,
-                    child: Opacity(
-                      opacity: (1 - t * 2).clamp(0.0, 1.0),
-                      child: Padding(
-                        padding: const EdgeInsetsDirectional.only(top: BasakSpace.s2),
-                        child: ExcludeSemantics(
-                          child: Text(
-                            item.label,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: context.text.tab.copyWith(
-                              // White on the lens, like its icon.
-                              color: Color.lerp(colors.ink, colors.onInk, under),
-                              fontWeight: under > .5 ? FontWeight.w600 : FontWeight.w400,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
+              // Icons only: no labels. The bar still shrinks as it collapses.
             ],
           );
         },

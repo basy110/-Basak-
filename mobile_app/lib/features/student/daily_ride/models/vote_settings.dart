@@ -75,11 +75,15 @@ class VoteSettings {
     return !now.isBefore(window.opens) && now.isBefore(window.closes);
   }
 
+  /// A day the company does not operate (a weekly day off such as Friday, or a
+  /// holiday): no bus runs, so the student cannot confirm a ride for it, and
+  /// there is no reminder. The server (toggle_student_daily_ride) enforces it.
+  bool isDayOff(DateTime rideDate) =>
+      offWeekdays.contains(rideDate.weekday) ||
+      offDates.contains(DateTime(rideDate.year, rideDate.month, rideDate.day));
+
   /// Whether the app reminds students about [rideDate] at all.
-  bool remindsFor(DateTime rideDate) =>
-      reminderMinutes > 0 &&
-      !offWeekdays.contains(rideDate.weekday) &&
-      !offDates.contains(DateTime(rideDate.year, rideDate.month, rideDate.day));
+  bool remindsFor(DateTime rideDate) => reminderMinutes > 0 && !isDayOff(rideDate);
 
   /// The reminders for [rideDate]: as its vote opens, then every
   /// [reminderMinutes] until it closes. None on a day off.

@@ -198,6 +198,9 @@ final class AddPassButtonView: NSObject, FlutterPlatformView {
     // Outlined: the card's page is dark, and a plain black button sinks into it.
     button = PKAddPassButton(addPassButtonStyle: .blackOutline)
     button.frame = frame
+    // The corner radius of «التفاصيل» beside it (BasakRadius.control = 16), so
+    // the two buttons read as one pair.
+    button.cornerRadius = 16
     // Taps are handled on the Flutter side, which requests the pass first.
     button.isUserInteractionEnabled = false
   }

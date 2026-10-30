@@ -382,10 +382,10 @@ void main() {
       expect(tester.widget<FloatingGlassNavBar>(find.byType(FloatingGlassNavBar)).currentIndex, 1);
 
       // Home, then Trips from the bar: today, the same trip.
-      await tester.tap(find.text('الرئيسية'));
+      await tester.tap(find.byKey(const Key('nav-tab-0')));
       await tester.pumpAndSettle();
       expect(find.byType(SupervisorHomeScreen), findsOneWidget);
-      await tester.tap(find.text('الرحلات').last);
+      await tester.tap(find.byKey(const Key('nav-tab-1')));
       await tester.pumpAndSettle();
       expect(find.text('الأحد 11 أكتوبر'), findsOneWidget);
       expect(world.manifestKeys.last, (lineId: 'line-a', direction: 'departure', tripId: 'd-07:00'));

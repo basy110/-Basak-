@@ -17,9 +17,15 @@ Deno.serve(async (request: Request) => {
     const lineIds: string[] = Array.isArray(body.lineIds)
       ? [...new Set(body.lineIds.map((id: unknown) => String(id ?? '').trim()).filter(Boolean))] as string[]
       : [];
+    // Optional monthly/termly/daily salary, for the company's own finances.
+    const salary = body.salary == null || body.salary === '' ? null : Number(body.salary);
+    const salaryPeriod = ['daily', 'monthly', 'termly'].includes(String(body.salaryPeriod)) ? String(body.salaryPeriod) : null;
 
     if (!fullName || !isEgyptianMobile(phone)) {
       return jsonResponse({ error: 'أدخل اسم المشرف ورقم هاتف مصري صحيح.' }, 400);
+    }
+    if (salary != null && (!Number.isFinite(salary) || salary < 0)) {
+      return jsonResponse({ error: 'المرتب يجب أن يكون رقماً صحيحاً.' }, 400);
     }
     if (password.length < 8) {
       return jsonResponse({ error: 'كلمة المرور يجب ألا تقل عن 8 أحرف.' }, 400);
@@ -59,6 +65,8 @@ Deno.serve(async (request: Request) => {
         company_id: scope.companyId,
         created_by_admin_id: user.id,
         is_active: true,
+        salary: salary != null && salaryPeriod ? salary : null,
+        salary_period: salary != null && salaryPeriod ? salaryPeriod : null,
       });
       if (insertError) throw insertError;
       // Company -> Line -> Supervisor. Stored in supervisor_lines (validated in the DB).

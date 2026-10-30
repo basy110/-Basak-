@@ -51,7 +51,7 @@ describe('companies', () => {
 
 describe('readiness', () => {
   const detail: CompanyDetail = {
-    company: { id: 'x', name: 'x', status: 'active', created_at: '', status_changed_at: null, contact_phone: null, contact_label: null },
+    company: { id: 'x', name: 'x', status: 'active', created_at: '', status_changed_at: null, contact_phone: null, contact_label: null, max_students: null },
     admins: [], supervisors: 4,
     payment_methods: [{ method_type: 'instapay', display_name: 'a' }, { method_type: 'vodafone_cash', display_name: 'b' }],
     lines: [

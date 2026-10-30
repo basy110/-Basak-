@@ -4,6 +4,7 @@ import {
   Button, Dialog, Icon, InfoRows, Ltr, Money, Note, SidePanel, SkeletonText, StatePill, num, dayText, cairo, type StateKey,
 } from '../../ui';
 import { useCompanyOverview } from '../../lib/overview';
+import { supabase } from '../../lib/supabase';
 import { CompanyGovernoratesCard } from '../CompanyGovernoratesCard';
 import { readiness, statusQuestion, useCompanyDetail, phoneGroups, type CompanyStatus, type PlatformCompany } from '../../lib/platform';
 
@@ -16,6 +17,43 @@ const Tile: React.FC<{ label: string; value: React.ReactNode }> = ({ label, valu
     <span className="text-[20px] font-semibold leading-7 tabular">{value}</span>
   </div>
 );
+
+/** Sets how many students may subscribe to the company. Empty = no cap. Once
+ * the active subscriptions reach it, the company is hidden from students until
+ * the cap is raised. */
+const CapacityEditor: React.FC<{ companyId: string; current: number | null; students: number; online: boolean; onSaved: () => void }> = ({ companyId, current, students, online, onSaved }) => {
+  const [val, setVal] = React.useState(current == null ? '' : String(current));
+  const [busy, setBusy] = React.useState(false);
+  const [saved, setSaved] = React.useState(false);
+  React.useEffect(() => { setVal(current == null ? '' : String(current)); }, [current]);
+  const n = val.trim() === '' ? null : Number(val);
+  const invalid = n != null && (!Number.isInteger(n) || n < 0);
+  const changed = (n ?? null) !== (current ?? null);
+  const full = current != null && students >= current;
+  const save = async () => {
+    if (busy || invalid || !changed) return;
+    setBusy(true); setSaved(false);
+    const { error } = await supabase.from('companies').update({ max_students: n }).eq('id', companyId);
+    setBusy(false);
+    if (!error) { setSaved(true); onSaved(); setTimeout(() => setSaved(false), 2000); }
+  };
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center gap-2">
+        <input type="number" inputMode="numeric" min={0} value={val} disabled={!online || busy}
+          onChange={(e) => setVal(e.target.value)} placeholder="بلا حد"
+          className="h-11 w-36 rounded-control border border-hair bg-surface px-3 text-small tabular outline-none focus:border-teal disabled:bg-ground" />
+        <Button sm disabled={!online || busy || invalid || !changed} loading={busy} onClick={save}>حفظ</Button>
+        {saved && <span className="text-label text-ok">تم الحفظ</span>}
+      </div>
+      <p className="m-0 text-label text-ink-2">
+        {invalid ? 'اكتب رقماً صحيحاً أو اتركه فارغاً.'
+          : current == null ? 'بلا حد: تظهر الشركة للطلاب دائماً.'
+          : `المشتركون الآن ${num(students)} من ${num(current)}.${full ? ' الشركة ممتلئة ولا تظهر للطلاب حتى تزيد الحد.' : ''}`}
+      </p>
+    </div>
+  );
+};
 
 /**
  * One company in the side panel (AdmPlatCompaniesPanel, AdmPlatCompanyPhone): its
@@ -107,6 +145,12 @@ export const CompanyPanel: React.FC<{
           ['المديرون', num(c.admins)],
         ]} />
       </section>
+      {working && (
+        <section className="flex flex-col gap-2">
+          <h3 className="m-0 text-card">الحد الأقصى للطلاب</h3>
+          <CapacityEditor companyId={c.id} current={d?.company.max_students ?? null} students={o?.members ?? c.students} online={online} onSaved={() => void detail.reload()} />
+        </section>
+      )}
       <section className="flex flex-col gap-2">
         <h3 className="m-0 text-card">المحافظات التي تخدمها</h3>
         <CompanyGovernoratesCard companyId={c.id} compact />

@@ -4,7 +4,7 @@ import {
   ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Clock, Contact, Copy, CreditCard, Download, ExternalLink, Eye, EyeOff,
   Filter, GraduationCap, GripVertical, HelpCircle, Home, Image, Info, KeyRound, Lock, LogOut, Mail, MapPin, Megaphone, Menu,
   MoreVertical, Palette, PanelRight, Pencil, Phone, Plus, Power, Receipt, RefreshCw, Route, ScanLine, Search, Send, Shield,
-  SlidersHorizontal, Smartphone, Trash2, TrendingUp, Undo2, Upload, User, Users, Wand2, WifiOff, X, ZoomIn, type LucideIcon,
+  SlidersHorizontal, Smartphone, Trash2, TrendingUp, Undo2, Upload, User, Users, Wallet, Wand2, WifiOff, X, ZoomIn, type LucideIcon,
 } from 'lucide-react';
 
 /**
@@ -12,7 +12,7 @@ import {
  * In RTL «fwd» (the direction of reading) points left and «back» points right.
  */
 const ICONS = {
-  home: Home, receipt: Receipt, route: Route, key: KeyRound, user: User, users: Users, scan: ScanLine, megaphone: Megaphone,
+  wallet: Wallet, home: Home, receipt: Receipt, route: Route, key: KeyRound, user: User, users: Users, scan: ScanLine, megaphone: Megaphone,
   card: CreditCard, chart: BarChart3, calendar: Calendar, clock: Clock, idcard: Contact, building: Building2, school: GraduationCap,
   sliders: SlidersHorizontal, smartphone: Smartphone, shield: Shield, bus: Bus, menu: Menu, search: Search, zoom: ZoomIn,
   filter: Filter, sort: ArrowUpDown, dots: MoreVertical, fwd: ChevronLeft, back: ChevronRight, arrowBack: ArrowRight,

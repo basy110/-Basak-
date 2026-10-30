@@ -15,7 +15,7 @@ import { OPEN_RESET_STATUSES } from '../lib/resetRequests';
 import { COMPANY_NAV, MOVED_SLUGS } from '../lib/nav';
 import { AdminProfile, CompanyScope, CompanyScopeProvider, companyAccountStatusLabel } from '../lib/adminScope';
 import {
-  AnalyticsPage, GovernoratesPage, LineNewPage, LinePage, LinesPage, NotificationsPage, PaymentMethodsPage, ReceiptDetailsPage,
+  AnalyticsPage, FinancePage, GovernoratesPage, LineNewPage, LinePage, LinesPage, NotificationsPage, PaymentMethodsPage, ReceiptDetailsPage,
   ReceiptsPage, ReportsPage, RideConfirmationPage, StudentsPage, SubscriptionPeriodsPage, SupervisorsPage, TeamPage,
   TodayPage, WalletCardPage,
 } from '../lib/routes';
@@ -102,6 +102,7 @@ export const Workspace: React.FC<{ admin: AdminProfile; onLogout: () => void }> 
             <Route path="payment-methods" element={<PaymentMethodsPage />} />
             <Route path="reports" element={<ReportsPage />} />
             <Route path="analytics" element={<AnalyticsPage />} />
+            <Route path="finance" element={<FinancePage />} />
             <Route path="wallet-card" element={<WalletCardPage />} />
             <Route path="receipt-details" element={<ReceiptDetailsPage />} />
             {Object.entries(MOVED_SLUGS).map(([from, to]) => <Route key={from} path={from} element={<Navigate to={`/c/${company.id}/${to}`} replace />} />)}
