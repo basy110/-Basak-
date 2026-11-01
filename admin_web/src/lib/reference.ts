@@ -36,7 +36,7 @@ interface StationRow { id: string; name: string; order_index: number; is_active:
 interface TripStopRow { station_id: string; stop_time: string }
 interface TripRow {
   id: string; direction: Direction; label: string; start_time: string; arrival_time: string | null;
-  university_id: string | null; is_active: boolean; line_trip_stops: TripStopRow[];
+  university_id: string | null; is_active: boolean; is_paused: boolean; line_trip_stops: TripStopRow[];
 }
 export interface LineRow {
   id: string; name: string; company_id: string; origin_name: string | null; destination_university_id: string | null;
@@ -52,7 +52,7 @@ const loadLines = (companyId: string) => unwrap<LineRow[]>(
   supabase.from('lines')
     .select(`id, name, company_id, origin_name, destination_university_id, price_termly, price_yearly, price_daily,
       is_active, stations(id, name, order_index, is_active),
-      line_trips(id, direction, label, start_time, arrival_time, university_id, is_active,
+      line_trips(id, direction, label, start_time, arrival_time, university_id, is_active, is_paused,
         line_trip_stops(station_id, stop_time)), line_universities(university_id),
       line_period_prices(option, price, is_enabled)`)
     .eq('company_id', companyId).order('name') as unknown as PromiseLike<{ data: LineRow[] | null; error: { message: string } | null }>);

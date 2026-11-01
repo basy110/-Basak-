@@ -18,6 +18,8 @@ export interface TripDraft {
   start_time: string; arrival_time: string;
   /** '' = every university of the line. */
   university_id: string; is_active: boolean;
+  /** Paused: kept, but hidden from students (they cannot pick it or vote for it). Re-enabled any time. */
+  is_paused: boolean;
   /** Stop time per station key (departure only). A station with no time is skipped. */
   times: Record<string, string>;
 }
@@ -42,7 +44,7 @@ export interface LineLike {
   stations: { id: string; name: string; order_index: number; is_active: boolean }[];
   line_trips: {
     id: string; direction: Direction; label: string | null; start_time: string; arrival_time: string | null;
-    university_id: string | null; is_active: boolean; line_trip_stops: { station_id: string; stop_time: string }[];
+    university_id: string | null; is_active: boolean; is_paused?: boolean; line_trip_stops: { station_id: string; stop_time: string }[];
   }[];
   line_universities: { university_id: string }[];
   line_period_prices: { option: SaleOption; price: number; is_enabled: boolean }[];
@@ -88,7 +90,7 @@ export function emptyDraft(companyId: string, sold?: Partial<Record<SaleOption, 
 }
 
 export const emptyTrip = (direction: Direction, start = ''): TripDraft => ({
-  key: newKey(), direction, label: '', start_time: start, arrival_time: '', university_id: '', is_active: true, times: {},
+  key: newKey(), direction, label: '', start_time: start, arrival_time: '', university_id: '', is_active: true, is_paused: false, times: {},
 });
 
 /** The saved line as a draft (only what is in use: active stations and trips). */
@@ -111,7 +113,7 @@ export function draftFromLine(line: LineLike, capacity: number | null | undefine
       .sort((a, b) => a.direction.localeCompare(b.direction) || a.start_time.localeCompare(b.start_time))
       .map((t) => ({
         key: t.id, id: t.id, direction: t.direction, label: t.label ?? '', start_time: hhmm(t.start_time),
-        arrival_time: hhmm(t.arrival_time), university_id: t.university_id ?? '', is_active: t.is_active,
+        arrival_time: hhmm(t.arrival_time), university_id: t.university_id ?? '', is_active: t.is_active, is_paused: t.is_paused ?? false,
         times: t.direction === 'return' ? {} : Object.fromEntries(t.line_trip_stops.map((s) => [s.station_id, hhmm(s.stop_time)])),
       })),
   };
@@ -218,7 +220,7 @@ export function draftIssues(d: LineDraft, ctx: SaleContext): Issue[] {
 
 /** Universities of the line that no departure trip goes to (their students would never see the line). */
 export function uncoveredUniversities(d: Pick<LineDraft, 'university_ids' | 'trips'>): string[] {
-  return d.university_ids.filter((id) => !d.trips.some((t) => t.direction === 'departure' && t.is_active && (!t.university_id || t.university_id === id)));
+  return d.university_ids.filter((id) => !d.trips.some((t) => t.direction === 'departure' && t.is_active && !t.is_paused && (!t.university_id || t.university_id === id)));
 }
 
 /** A soft note under the prices (not blocking). */
@@ -239,7 +241,7 @@ export interface SavePayload {
   is_active?: boolean;
   bus_capacity: number | null;
   stations: { id: string | null; name: string }[];
-  trips: { id: string | null; direction: Direction; label: string; start_time: string; arrival_time: string | null; university_id: string | null; is_active: boolean; stops: { station_index: number; time: string }[] }[];
+  trips: { id: string | null; direction: Direction; label: string; start_time: string; arrival_time: string | null; university_id: string | null; is_active: boolean; is_paused: boolean; stops: { station_index: number; time: string }[] }[];
   prices: { option: SaleOption; price: number | null; is_enabled: boolean }[];
 }
 
@@ -262,7 +264,7 @@ export function buildSavePayload(d: LineDraft): SavePayload {
     trips: d.trips.map((t) => ({
       id: t.id ?? null, direction: t.direction, label: t.label.trim(), start_time: t.start_time,
       arrival_time: t.direction === 'departure' ? t.arrival_time || null : null,
-      university_id: t.university_id || null, is_active: t.is_active,
+      university_id: t.university_id || null, is_active: t.is_active, is_paused: t.is_paused,
       stops: t.direction === 'return' ? []
         : d.stations.filter((s) => t.times[s.key]).map((s) => ({ station_index: index.get(s.key)!, time: t.times[s.key] })),
     })),
@@ -355,7 +357,7 @@ export function lineVisibility(line: LineLike, o: { daily: boolean; uniName: (id
   if (!line.is_active) return { state: 'off' };
   const unis = line.line_universities.map((u) => u.university_id);
   if (unis.length === 0) return { state: 'hidden', reason: 'لم تُحدد له جامعة', fix: 'اختر الجامعات', step: 1 };
-  const going = line.line_trips.filter((t) => t.direction === 'departure' && t.is_active);
+  const going = line.line_trips.filter((t) => t.direction === 'departure' && t.is_active && !t.is_paused);
   const missing = unis.filter((u) => !going.some((t) => !t.university_id || t.university_id === u));
   if (missing.length) return { state: 'hidden', reason: `تنقصه رحلة ذهاب إلى ${joinAnd(missing.map(o.uniName))}`, fix: 'أضف رحلة', step: 3 };
   const priced = line.line_period_prices.some((p) => p.is_enabled && Number(p.price) > 0) || (o.daily && Number(line.price_daily) > 0);
@@ -398,7 +400,7 @@ export function parseClock(text: string, assume?: 'am' | 'pm'): string | null {
 const sameTrip = (a: TripDraft, b: TripDraft, keep: Set<string>) => {
   const times = (t: TripDraft) => JSON.stringify(Object.entries(t.times).filter(([k, v]) => v && keep.has(k)).sort());
   return a.start_time === b.start_time && a.arrival_time === b.arrival_time && a.label.trim() === b.label.trim()
-    && a.university_id === b.university_id && times(a) === times(b);
+    && a.university_id === b.university_id && a.is_paused === b.is_paused && times(a) === times(b);
 };
 
 /** How many things the draft changes compared with the saved line (for «تعديلان لم يُحفظا»). */

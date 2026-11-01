@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Card, Icon } from '../../ui';
+import { Badge, Card, Icon } from '../../ui';
 import { clockLabel } from '../../lib/time';
 import type { LineRow } from '../../lib/reference';
 import type { LineStats } from '../../lib/linesData';
@@ -55,8 +55,9 @@ export const DepartureTable: React.FC<{ stations: Station[]; trips: Trip[]; stat
               <th scope="col" className="w-[280px] px-5 pb-3 pt-4 text-start align-bottom text-label font-medium text-ink-2">المحطة بترتيب المسار</th>
               {trips.map((t) => (
                 <th key={t.id} scope="col" className="border-s border-hair px-4 pb-3 pt-4 text-start align-bottom font-normal">
-                  <Clock t={t.start_time} className="block text-section font-semibold" />
+                  <Clock t={t.start_time} className={`block text-section font-semibold ${t.is_paused ? 'text-ink-3 line-through' : ''}`} />
                   <span className="block truncate text-cap text-ink-2">{tripSub(t, uniName)}</span>
+                  {t.is_paused && <Badge tone="neutral" className="mt-1">معطّلة</Badge>}
                 </th>
               ))}
             </tr>
@@ -96,8 +97,8 @@ export const ReturnList: React.FC<{ trips: Trip[]; stats: LineStats; uniName: (i
     {trips.map((t, i) => (
       <div key={t.id} className={`flex items-center gap-4 px-4 py-3.5 sm:px-5 ${i ? 'border-t border-hair' : ''}`}>
         <div className={`flex min-w-0 flex-1 ${phone ? 'flex-col' : 'items-center gap-6'}`}>
-          <Clock t={t.start_time} className="w-[88px] flex-none text-card font-semibold" />
-          <span className="min-w-0 truncate text-small text-ink-2">{t.university_id ? `من ${uniName(t.university_id)}` : 'من كل جامعات الخط'}{t.label ? ` · ${t.label}` : ''}</span>
+          <Clock t={t.start_time} className={`w-[88px] flex-none text-card font-semibold ${t.is_paused ? 'text-ink-3 line-through' : ''}`} />
+          <span className="flex min-w-0 items-center gap-2 truncate text-small text-ink-2"><span className="truncate">{t.university_id ? `من ${uniName(t.university_id)}` : 'من كل جامعات الخط'}{t.label ? ` · ${t.label}` : ''}</span>{t.is_paused && <Badge tone="neutral">معطّل</Badge>}</span>
         </div>
         <RidersMeter riders={stats.riders_return == null ? null : stats.trip_riders[t.id] ?? 0} seats={stats.bus_capacity} w="w-[120px]" />
       </div>
@@ -126,7 +127,7 @@ export const PhoneTrips: React.FC<{ stations: Station[]; going: Trip[]; back: Tr
         return (
           <Card key={t.id} className="overflow-hidden">
             <button type="button" aria-expanded={on} onClick={() => setOpen(on ? null : t.id)} className="flex w-full items-center gap-3 px-4 py-3 text-start">
-              <span className="flex min-w-0 flex-1 flex-col"><Clock t={t.start_time} className="text-section font-semibold" /><span className="truncate text-cap text-ink-2">{tripSub(t, uniName, true)}</span></span>
+              <span className="flex min-w-0 flex-1 flex-col"><Clock t={t.start_time} className={`text-section font-semibold ${t.is_paused ? 'text-ink-3 line-through' : ''}`} /><span className="flex items-center gap-2 truncate text-cap text-ink-2"><span className="truncate">{tripSub(t, uniName, true)}</span>{t.is_paused && <Badge tone="neutral">معطّلة</Badge>}</span></span>
               <RidersMeter riders={stats.riders_departure == null ? null : stats.trip_riders[t.id] ?? 0} seats={stats.bus_capacity} w="w-[84px]" />
               <Icon name={on ? 'up' : 'down'} size={18} className="text-ink-2" />
             </button>

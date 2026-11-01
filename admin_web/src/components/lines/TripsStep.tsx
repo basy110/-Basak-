@@ -108,11 +108,12 @@ const TripCard: React.FC<{
     return (
       <button type="button" onClick={onToggle} aria-expanded={false}
         className="flex min-h-14 w-full items-center gap-3 rounded-inner bg-surface px-4 py-2.5 text-start shadow-ring hover:bg-ground">
-        <span className="whitespace-nowrap text-card font-semibold tabular">{t.start_time ? clockLabel(t.start_time) : 'بلا موعد'}</span>
-        <span className="min-w-0 flex-1 truncate text-label text-ink-2">
+        <span className={`whitespace-nowrap text-card font-semibold tabular ${t.is_paused ? 'text-ink-3 line-through' : ''}`}>{t.start_time ? clockLabel(t.start_time) : 'بلا موعد'}</span>
+        <span className={`min-w-0 flex-1 truncate text-label ${t.is_paused ? 'text-ink-3' : 'text-ink-2'}`}>
           <span className="max-sm:hidden">{t.arrival_time ? `تصل ${clockLabel(t.arrival_time)} · ` : ''}</span>
           {countOf(stops, W.station, 'محطة واحدة')} · {uni}<span className="max-sm:hidden">{t.label.trim() ? ` · ${t.label.trim()}` : ''}</span>
         </span>
+        {t.is_paused && <Badge tone="neutral">معطّلة</Badge>}
         {problems.length > 0 && <Badge tone="danger">{problemsBadge(problems.length)}</Badge>}
         <Icon name="down" size={18} className="text-ink-2" />
       </button>
@@ -122,10 +123,12 @@ const TripCard: React.FC<{
     <div className="flex flex-col gap-4 rounded-inner bg-surface p-4 shadow-[inset_0_0_0_2px_#00658D]">
       <button type="button" onClick={onToggle} aria-expanded className="flex items-center gap-3 text-start">
         <span className="text-card font-semibold">رحلة {t.start_time ? clockLabel(t.start_time) : 'جديدة'}</span>
+        {t.is_paused && <Badge tone="neutral">معطّلة</Badge>}
         {problems.length > 0 && <Badge tone="danger">{problemsBadge(problems.length)}</Badge>}
         <span className="flex-1" />
         <Icon name="up" size={18} className="text-ink-2" />
       </button>
+      {t.is_paused && <Note tone="neutral" icon="eyeOff" title="هذه الرحلة معطّلة: لا تظهر للطلاب ولا يختارونها، لكنها محفوظة بمواعيدها. فعّلها متى شئت." />}
       <div className="grid grid-cols-1 items-end gap-4 sm:grid-cols-2">
         <TimeField label="تتحرك من أول محطة" value={t.start_time} assume="am" error={show && problems.find((p) => p.field === 'start')?.message}
           onChange={(v) => set(Object.keys(t.times).length === 0 && v ? { start_time: v, times: fillStopTimes(v, Number(gap), d.stations) } : { start_time: v })} />
@@ -181,8 +184,9 @@ const TripCard: React.FC<{
         <SelectField label="لطلاب" value={t.university_id} options={uniOptions} onChange={(e) => set({ university_id: e.target.value })} />
       </div>
       <TextField label="اسم الرحلة" optional value={t.label} maxLength={40} placeholder="مثال: أول رحلة" onChange={(e) => set({ label: e.target.value })} />
-      <div className="flex items-center gap-3 border-t border-hair pt-3">
+      <div className="flex flex-wrap items-center gap-3 border-t border-hair pt-3">
         <Button kind="outline" sm icon="copy" onClick={onCopy}>انسخ الرحلة</Button>
+        <Button kind="outline" sm icon={t.is_paused ? 'eye' : 'eyeOff'} onClick={() => set({ is_paused: !t.is_paused })}>{t.is_paused ? 'فعِّل الرحلة' : 'عطِّل الرحلة'}</Button>
         <span className="flex-1" />
         <Button kind="link" sm icon="trash" className="!text-bad" onClick={onRemove}>احذف الرحلة</Button>
       </div>
@@ -197,9 +201,10 @@ const ReturnRow: React.FC<{
   const phone = typeof window !== 'undefined' && !!window.matchMedia?.('(max-width: 639px)').matches;
   const err = show && !t.start_time ? 'اكتب موعد تحرك الباص من الجامعة.' : undefined;
   return (
-    <div className="flex flex-col gap-2 rounded-inner p-2 shadow-ring sm:p-0 sm:shadow-none">
+    <div className={`flex flex-col gap-2 rounded-inner p-2 shadow-ring sm:p-0 sm:shadow-none ${t.is_paused ? 'opacity-70' : ''}`}>
       <div className="flex items-start gap-2">
         <TimeField value={t.start_time} assume="pm" ariaLabel="موعد تحرك الباص من الجامعة" placeholder="مثال: 2:00 م" error={err} className="w-[118px] flex-none" onChange={(v) => set({ start_time: v })} />
+        {t.is_paused && <Badge tone="neutral" className="mt-1.5 self-start">معطّل</Badge>}
         <div className="min-w-0 flex-1 sm:w-[184px] sm:flex-none">
           <SelectField aria-label="من أي جامعة" value={t.university_id} onChange={(e) => set({ university_id: e.target.value })}
             options={uniOptions.map((o) => ({ ...o, label: phone ? o.label : o.value ? `من ${o.label}` : 'من كل جامعات الخط' }))} />
@@ -210,6 +215,7 @@ const ReturnRow: React.FC<{
         <LineMenu label="إجراءات الموعد" sm={false} items={[
           ...(phone ? [{ label: 'سمِّ الموعد', icon: 'pencil' as const, onClick: () => setNamed(true) }] : []),
           { label: 'انسخ الموعد', icon: 'copy', onClick: onCopy },
+          { label: t.is_paused ? 'فعِّل الموعد' : 'عطِّل الموعد', icon: t.is_paused ? 'eye' : 'eyeOff', onClick: () => set({ is_paused: !t.is_paused }) },
           { label: 'احذف الموعد', icon: 'trash', danger: true, sep: true, onClick: onRemove },
         ]} />
       </div>
