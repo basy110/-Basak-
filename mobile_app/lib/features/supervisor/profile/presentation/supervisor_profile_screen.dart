@@ -13,7 +13,8 @@ import '../../../notifications/push/push_messaging.dart';
 import '../../../notifications/push/push_providers.dart';
 import '../../../student/home/presentation/supervisor_contact_sheet.dart';
 import '../../../student/profile/presentation/help_sheet.dart';
-import '../../../student/profile/presentation/profile_screen.dart' show appVersionProvider;
+import '../../../student/profile/presentation/profile_screen.dart'
+    show appVersionProvider;
 import '../../data/supervisor_repository.dart';
 import '../../home/presentation/line_sheet.dart';
 import '../../models/supervisor_models.dart';
@@ -22,7 +23,8 @@ import 'package:basak_mobile/core/constants/legal_links.dart';
 
 /// Asks before a supervisor is signed out of this phone, then does it. Used
 /// by the account page and by the suspended-account screen.
-Future<void> confirmSupervisorSignOut(BuildContext context, WidgetRef ref) async {
+Future<void> confirmSupervisorSignOut(
+    BuildContext context, WidgetRef ref) async {
   final confirmed = await BasakDialog.confirm(
     context,
     icon: LucideIcons.logOut,
@@ -42,7 +44,8 @@ class SupervisorProfileScreen extends ConsumerWidget {
 
   /// «العمل»: the company, the lines (the sheet that chooses one, when there
   /// is a choice) and the month's summary.
-  List<SettingRow> _workRows(BuildContext context, SupervisorDashboard data, CompanyBrand brand) {
+  List<SettingRow> _workRows(
+      BuildContext context, SupervisorDashboard data, CompanyBrand brand) {
     final now = DateTime.now();
     final company = data.profile.companyName;
     return [
@@ -52,13 +55,20 @@ class SupervisorProfileScreen extends ConsumerWidget {
         // Its mark beside its name, once the company has one.
         mark: company == null || !brand.hasMark
             ? null
-            : CompanyLogo(key: const Key('supervisor-company-logo'), name: company, brand: brand, size: 28),
+            : CompanyLogo(
+                key: const Key('supervisor-company-logo'),
+                name: company,
+                brand: brand,
+                size: 28),
       ),
       SettingRow(
         key: const Key('supervisor-lines'),
         label: 'الخطوط',
-        value: data.lines.isEmpty ? 'لا يوجد خط مسند' : ArabicCount.lines(data.lines.length),
-        onTap: data.lines.isEmpty ? null : () => SupervisorLineSheet.show(context),
+        value: data.lines.isEmpty
+            ? 'لا يوجد خط مسند'
+            : ArabicCount.lines(data.lines.length),
+        onTap:
+            data.lines.isEmpty ? null : () => SupervisorLineSheet.show(context),
       ),
       SettingRow(
         key: const Key('supervisor-monthly'),
@@ -75,34 +85,36 @@ class SupervisorProfileScreen extends ConsumerWidget {
   List<SettingRow> _appRows(BuildContext context, WidgetRef ref) {
     final support = ref.watch(helpSupportProvider);
     final pushReady = ref.watch(pushReadyProvider).valueOrNull == true;
-    final permission = pushReady ? ref.watch(pushPermissionProvider).valueOrNull : null;
+    final permission =
+        pushReady ? ref.watch(pushPermissionProvider).valueOrNull : null;
     final biometric = biometricSettingRow(context, ref);
     return [
       if (support.isNotEmpty)
         SettingRow(
           key: const Key('supervisor-help'),
           label: HelpSheet.title,
-          onTap: () => HelpSheet.show(context, journey: const [], support: support),
+          onTap: () =>
+              HelpSheet.show(context, journey: const [], support: support),
         ),
       // The supervisor's own switches (which kinds of push), with the phone's
       // permission at their top.
       SettingRow(
         key: const Key('supervisor-phone-notifications'),
         label: 'إشعارات الهاتف',
-        value: permission == null ? null : (permission == PushPermission.granted ? 'مفعّلة' : 'متوقفة'),
+        value: permission == null
+            ? null
+            : (permission == PushPermission.granted ? 'مفعّلة' : 'متوقفة'),
         onTap: () => NotificationPreferencesScreen.open(context),
       ),
       if (biometric != null) biometric,
       SettingRow(
         key: const Key('supervisor-privacy'),
         label: 'سياسة الخصوصية',
-        external: true,
         onTap: () => LegalLinks.open(context, LegalLinks.privacy),
       ),
       SettingRow(
         key: const Key('supervisor-terms'),
         label: 'شروط الاستخدام',
-        external: true,
         onTap: () => LegalLinks.open(context, LegalLinks.terms),
       ),
     ];
@@ -118,7 +130,8 @@ class SupervisorProfileScreen extends ConsumerWidget {
     final companyId = data?.profile.companyId;
     final brand = companyId == null || companyId.isEmpty
         ? CompanyBrand.none
-        : ref.watch(supervisorCompanyBrandProvider(companyId)).valueOrNull ?? CompanyBrand.none;
+        : ref.watch(supervisorCompanyBrandProvider(companyId)).valueOrNull ??
+            CompanyBrand.none;
     final version = ref.watch(appVersionProvider).valueOrNull;
     final text = context.text;
     final colors = context.colors;
@@ -148,11 +161,14 @@ class SupervisorProfileScreen extends ConsumerWidget {
               label: data.profile.isActive ? null : 'موقوف',
             ),
           ),
-          GroupSection(title: 'العمل', child: SettingRows(rows: _workRows(context, data, brand))),
+          GroupSection(
+              title: 'العمل',
+              child: SettingRows(rows: _workRows(context, data, brand))),
         ] else if (dashboard.hasError)
           BasakCard(
             child: InlineError(
-              message: 'تعذّر تحميل بيانات الحساب. تحقّق من الاتصال بالإنترنت ثم أعد المحاولة.',
+              message:
+                  'تعذّر تحميل بيانات الحساب. تحقّق من الاتصال بالإنترنت ثم أعد المحاولة.',
               onRetry: () => ref.invalidate(supervisorDashboardProvider),
             ),
           )
@@ -163,12 +179,15 @@ class SupervisorProfileScreen extends ConsumerWidget {
             padding: EdgeInsetsDirectional.all(BasakSpace.s20),
             child: ProfileSkeleton(),
           ),
-        GroupSection(title: 'التطبيق', child: SettingRows(rows: _appRows(context, ref))),
+        GroupSection(
+            title: 'التطبيق', child: SettingRows(rows: _appRows(context, ref))),
         Padding(
-          padding: const EdgeInsetsDirectional.symmetric(horizontal: BasakSpace.s4),
+          padding:
+              const EdgeInsetsDirectional.symmetric(horizontal: BasakSpace.s4),
           child: Text(
             'بياناتك وكلمة المرور تديرها شركتك. لتغييرها أو لحذف حسابك تواصل مع إدارة الشركة.',
-            style: text.label.copyWith(color: colors.ink3, fontWeight: FontWeight.w400),
+            style: text.label
+                .copyWith(color: colors.ink3, fontWeight: FontWeight.w400),
           ),
         ),
         Column(

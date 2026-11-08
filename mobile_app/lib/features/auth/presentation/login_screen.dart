@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+import 'package:basak_mobile/core/constants/legal_links.dart';
 import 'package:basak_mobile/core/ui/ui.dart';
 
 import '../biometrics/biometric_sign_in.dart';
@@ -51,16 +52,19 @@ class LoginScreen extends ConsumerStatefulWidget {
   /// One of them cannot be used (the phone's biometrics changed, its session
   /// ended, the phone locked its check): the line to say, and whether its
   /// entry is gone.
-  final void Function(StoredSignIn stored, BiometricFallback reason)? onBiometricFallback;
+  final void Function(StoredSignIn stored, BiometricFallback reason)?
+      onBiometricFallback;
 
   /// Said beside the fields when the server could not be reached.
-  static const offlineMessage = 'تعذر الاتصال بالإنترنت. تحقق من الاتصال وحاول مرة أخرى.';
+  static const offlineMessage =
+      'تعذر الاتصال بالإنترنت. تحقق من الاتصال وحاول مرة أخرى.';
 
   /// What a refused sign-in says, under the password field.
   static const wrongCredentialsMessage = 'رقم الهاتف أو كلمة المرور غير صحيحة.';
 
   /// What an account blocked by the platform is told when it tries to sign in.
-  static const blockedMessage = 'تم إيقاف هذا الحساب من إدارة باصك. للاستفسار تواصل مع إدارة باصك.';
+  static const blockedMessage =
+      'تم إيقاف هذا الحساب من إدارة باصك. للاستفسار تواصل مع إدارة باصك.';
 
   @override
   ConsumerState<LoginScreen> createState() => _LoginScreenState();
@@ -112,8 +116,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final id = _phone.text.trim();
     String? phoneError;
     if (id.isEmpty) {
-      phoneError = _supervisor ? 'اكتب رقم الهاتف أو البريد الإلكتروني.' : 'اكتب رقم الهاتف.';
-    } else if (!_supervisor && AuthRepository.normalizeEgyptianPhone(id).length < 10) {
+      phoneError = _supervisor
+          ? 'اكتب رقم الهاتف أو البريد الإلكتروني.'
+          : 'اكتب رقم الهاتف.';
+    } else if (!_supervisor &&
+        AuthRepository.normalizeEgyptianPhone(id).length < 10) {
       phoneError = 'اكتب رقم هاتف مصري صحيح.';
     }
     final passwordError = _password.text.isEmpty ? 'اكتب كلمة المرور.' : null;
@@ -129,7 +136,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Future<void> _saveRemembered() async {
     try {
       if (_remember) {
-        await _storage.write(key: 'basak.remembered_phone', value: _phone.text.trim());
+        await _storage.write(
+            key: 'basak.remembered_phone', value: _phone.text.trim());
       } else {
         await _storage.delete(key: 'basak.remembered_phone');
       }
@@ -224,7 +232,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       quiet: true,
       value: _remember,
       onChanged: loading ? null : (value) => setState(() => _remember = value),
-      child: Text('تذكّر رقمي', style: text.bodySmall.copyWith(color: colors.ink2)),
+      child: Text('تذكّر رقمي',
+          style: text.bodySmall.copyWith(color: colors.ink2)),
     );
 
     return EntryPage(
@@ -235,19 +244,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             },
       trailing: const BrandLockup(),
       title: _supervisor ? 'دخول المشرف' : 'أهلاً بعودتك',
-      subtitle: _supervisor ? 'تابع رحلات خطوطك وسجّل صعود الطلاب.' : 'سجّل دخولك وكمّل رحلتك.',
+      subtitle: _supervisor
+          ? 'تابع رحلات خطوطك وسجّل صعود الطلاب.'
+          : 'سجّل دخولك وكمّل رحلتك.',
       actions: [
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(_supervisor ? 'طالب؟' : 'طالب جديد؟', style: text.bodySmall.copyWith(color: colors.ink2)),
+            Text(_supervisor ? 'طالب؟' : 'طالب جديد؟',
+                style: text.bodySmall.copyWith(color: colors.ink2)),
             const SizedBox(width: BasakSpace.s6),
             EntryLink(
               key: Key(_supervisor ? 'login-students' : 'login-signup'),
               label: _supervisor ? 'دخول الطلاب' : 'إنشاء حساب',
               inline: true,
               strong: true,
-              onTap: loading ? null : (_supervisor ? widget.onOtherRole : widget.onSignup),
+              onTap: loading
+                  ? null
+                  : (_supervisor ? widget.onOtherRole : widget.onSignup),
             ),
           ],
         ),
@@ -261,24 +275,43 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               onTap: loading ? null : widget.onOtherRole,
             ),
           ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            TextButton(
+                onPressed: () => LegalLinks.open(context, LegalLinks.terms),
+                child: const Text('شروط الاستخدام')),
+            const Text(' · '),
+            TextButton(
+                onPressed: () => LegalLinks.open(context, LegalLinks.privacy),
+                child: const Text('سياسة الخصوصية')),
+          ],
+        ),
       ],
       children: [
-        if (widget.notice != null) InfoNote(widget.notice!, key: const Key('login-notice')),
+        if (widget.notice != null)
+          InfoNote(widget.notice!, key: const Key('login-notice')),
         // Lets the phone's password manager offer and save the login.
         AutofillGroup(
           child: GroupedFields(children: [
             GroupedField(
               key: const Key('login-identifier'),
-              label: _supervisor ? 'رقم الهاتف أو البريد الإلكتروني' : 'رقم الهاتف',
+              label: _supervisor
+                  ? 'رقم الهاتف أو البريد الإلكتروني'
+                  : 'رقم الهاتف',
               hint: '01XXXXXXXXX',
               controller: _phone,
               error: _phoneError,
               ltr: true,
-              keyboardType: _supervisor ? TextInputType.emailAddress : TextInputType.phone,
+              keyboardType: _supervisor
+                  ? TextInputType.emailAddress
+                  : TextInputType.phone,
               textInputAction: TextInputAction.next,
               autofillHints: [
                 AutofillHints.username,
-                _supervisor ? AutofillHints.email : AutofillHints.telephoneNumber,
+                _supervisor
+                    ? AutofillHints.email
+                    : AutofillHints.telephoneNumber,
               ],
               inputFormatters: _supervisor
                   ? null
@@ -303,9 +336,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               textInputAction: TextInputAction.done,
               autofillHints: const [AutofillHints.password],
               trailing: PasswordEye(
-                  hidden: _hidePassword, onTap: () => setState(() => _hidePassword = !_hidePassword)),
+                  hidden: _hidePassword,
+                  onTap: () => setState(() => _hidePassword = !_hidePassword)),
               onChanged: (_) {
-                if (_passwordError != null) setState(() => _passwordError = null);
+                if (_passwordError != null)
+                  setState(() => _passwordError = null);
               },
               onSubmitted: (_) => loading ? null : _submit(),
             ),
@@ -313,7 +348,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         ),
         if (_supervisor) ...[
           Align(alignment: AlignmentDirectional.centerStart, child: remember),
-          const InfoNote('حسابات المشرفين ينشئها مسؤول النظام فقط. لتغيير كلمة المرور تواصل مع إدارة شركتك.'),
+          const InfoNote(
+              'حسابات المشرفين ينشئها مسؤول النظام فقط. لتغيير كلمة المرور تواصل مع إدارة شركتك.'),
         ] else
           // Side by side; one under the other where the screen is too narrow.
           Wrap(
@@ -368,7 +404,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   _notRecognised = true;
                   _notRecognisedSupervisor = stored.account.isSupervisor;
                 }),
-                onOffline: () => setState(() => _failure = LoginScreen.offlineMessage),
+                onOffline: () =>
+                    setState(() => _failure = LoginScreen.offlineMessage),
                 onUsePassword: _passwordFocus.requestFocus,
                 onFallback: widget.onBiometricFallback,
               ),

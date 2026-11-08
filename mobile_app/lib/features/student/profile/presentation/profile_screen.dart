@@ -37,7 +37,8 @@ class ProfileScreen extends ConsumerWidget {
       context,
       icon: LucideIcons.trash2,
       title: 'حذف الحساب نهائياً؟',
-      message: 'يُحذف حسابك وبياناتك وصورك، وتتوقف بطاقتك عن العمل. الإيصالات الرسمية التي صدرت لك تبقى لدى شركتك سجلاً مالياً. لا يمكن التراجع عن الحذف.',
+      message:
+          'يُحذف حسابك وبياناتك وصورك، وتتوقف بطاقتك عن العمل. الإيصالات الرسمية التي صدرت لك تبقى لدى شركتك سجلاً مالياً. لا يمكن التراجع عن الحذف.',
       confirmLabel: 'تأكيد الحذف',
     );
     if (!confirmed) return;
@@ -45,7 +46,8 @@ class ProfileScreen extends ConsumerWidget {
       await ref.read(authStateProvider.notifier).deleteStudentAccount();
     } catch (e) {
       if (context.mounted) {
-        BasakToast.show(context, 'فشل الحذف: ${errorMessage(e)}', kind: BasakToastKind.failure);
+        BasakToast.show(context, 'فشل الحذف: ${errorMessage(e)}',
+            kind: BasakToastKind.failure);
       }
     }
   }
@@ -64,7 +66,8 @@ class ProfileScreen extends ConsumerWidget {
         SettingRow(
           key: const Key('profile-help'),
           label: HelpSheet.title,
-          onTap: () => HelpSheet.show(context, journey: journey, support: support),
+          onTap: () =>
+              HelpSheet.show(context, journey: journey, support: support),
         ),
       if (biometric != null) biometric,
       // Always there: the store's page for the app, asked for by the student.
@@ -78,13 +81,11 @@ class ProfileScreen extends ConsumerWidget {
       SettingRow(
         key: const Key('profile-privacy'),
         label: 'سياسة الخصوصية',
-        external: true,
         onTap: () => LegalLinks.open(context, LegalLinks.privacy),
       ),
       SettingRow(
         key: const Key('profile-terms'),
         label: 'شروط الاستخدام',
-        external: true,
         onTap: () => LegalLinks.open(context, LegalLinks.terms),
       ),
     ];
@@ -102,19 +103,24 @@ class ProfileScreen extends ConsumerWidget {
     final fullName = profile?['full_name'] as String? ??
         user?.userMetadata?['full_name'] as String? ??
         (authState.isSupervisor ? 'حساب المشرف' : 'حساب الطالب');
-    final phone =
-        profile?['phone'] as String? ?? user?.userMetadata?['phone'] as String? ?? user?.email ?? '';
-    final appRows = student != null ? _appRows(context, ref) : const <SettingRow>[];
+    final phone = profile?['phone'] as String? ??
+        user?.userMetadata?['phone'] as String? ??
+        user?.email ??
+        '';
+    final appRows =
+        student != null ? _appRows(context, ref) : const <SettingRow>[];
 
     return BasakPage(
       bottomInset: BasakPage.tabBarClearance,
       onRefresh: () async {
-        if (user != null) ref.invalidate(studentProfileSummaryProvider(user.id));
+        if (user != null)
+          ref.invalidate(studentProfileSummaryProvider(user.id));
         if (authState.isStudent) ref.invalidate(currentSubscriptionProvider);
         if (authState.isStudent) ref.invalidate(offersProvider);
       },
       children: [
-        Semantics(header: true, child: Text('حسابي', style: context.text.display)),
+        Semantics(
+            header: true, child: Text('حسابي', style: context.text.display)),
         if (student != null && detailsAsync.isLoading && !detailsAsync.hasValue)
           // First load on this phone only; afterwards the saved profile shows at once.
           const BasakCard(
@@ -123,10 +129,15 @@ class ProfileScreen extends ConsumerWidget {
             child: ProfileSkeleton(),
           )
         else if (student != null)
-          ProfileSection(userId: student.id, profile: profile, fallbackName: fullName, fallbackPhone: phone)
+          ProfileSection(
+              userId: student.id,
+              profile: profile,
+              fallbackName: fullName,
+              fallbackPhone: phone)
         else
           IdentityCard(name: fullName, phone: phone),
-        if (appRows.isNotEmpty) GroupSection(title: 'التطبيق', child: SettingRows(rows: appRows)),
+        if (appRows.isNotEmpty)
+          GroupSection(title: 'التطبيق', child: SettingRows(rows: appRows)),
         Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,

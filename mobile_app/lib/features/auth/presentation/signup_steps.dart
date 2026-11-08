@@ -34,8 +34,7 @@ const signupSteps = <({String rail, String title, String why})>[
   ),
 ];
 
-/// The terms and the privacy policy as links, under the box that accepts them.
-/// They sit outside the box's row so opening one never ticks (or unticks) it.
+/// The terms and privacy policy open in-app, outside the checkbox row.
 class _LegalLinksRow extends StatelessWidget {
   final TextStyle style;
 
@@ -49,7 +48,8 @@ class _LegalLinksRow extends StatelessWidget {
           child: Padding(
             // A finger-sized target around a short word.
             padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
-            child: Text(label, style: style.copyWith(decoration: TextDecoration.underline)),
+            child: Text(label,
+                style: style.copyWith(decoration: TextDecoration.underline)),
           ),
         ),
       );
@@ -102,11 +102,19 @@ class SignupDetailsStep extends StatelessWidget {
   static const nameMessage = 'اكتب الاسم ثلاثياً على الأقل.';
   static const phoneMessage = 'اكتب رقم هاتف مصري صحيح من 11 رقماً.';
 
-  static String? validateName(String value) =>
-      value.trim().split(RegExp(r'\s+')).where((part) => part.isNotEmpty).length < 3 ? nameMessage : null;
+  static String? validateName(String value) => value
+              .trim()
+              .split(RegExp(r'\s+'))
+              .where((part) => part.isNotEmpty)
+              .length <
+          3
+      ? nameMessage
+      : null;
 
-  static String? validatePhone(String value) =>
-      RegExp(r'^01[0125][0-9]{8}$').hasMatch(AuthRepository.normalizeEgyptianPhone(value)) ? null : phoneMessage;
+  static String? validatePhone(String value) => RegExp(r'^01[0125][0-9]{8}$')
+          .hasMatch(AuthRepository.normalizeEgyptianPhone(value))
+      ? null
+      : phoneMessage;
 
   @override
   Widget build(BuildContext context) => GroupedFields(children: [
@@ -183,7 +191,9 @@ class SignupStudyStep extends StatelessWidget {
           value: university,
           placeholder: loaded != null
               ? 'اختر جامعتك'
-              : (universities.hasError ? 'تعذر تحميل الجامعات' : 'جارٍ تحميل الجامعات…'),
+              : (universities.hasError
+                  ? 'تعذر تحميل الجامعات'
+                  : 'جارٍ تحميل الجامعات…'),
           error: universityError,
           opensSheet: true,
           onTap: loaded == null ? null : () => onPickUniversity(loaded),
@@ -207,7 +217,8 @@ class SignupStudyStep extends StatelessWidget {
         ),
       ]),
       if (loaded == null && universities.hasError)
-        InlineError(message: 'تعذر تحميل الجامعات', onRetry: onRetryUniversities),
+        InlineError(
+            message: 'تعذر تحميل الجامعات', onRetry: onRetryUniversities),
       const InfoNote('لا يمكن تغيير الجامعة بعد التسجيل.'),
     ]);
   }
@@ -223,7 +234,12 @@ class SignupPhotoStep extends StatelessWidget {
   /// A tap on the circle itself: asks where the photo comes from.
   final VoidCallback? onTapPhoto;
 
-  const SignupPhotoStep({super.key, required this.photo, this.onCamera, this.onGallery, this.onTapPhoto});
+  const SignupPhotoStep(
+      {super.key,
+      required this.photo,
+      this.onCamera,
+      this.onGallery,
+      this.onTapPhoto});
 
   @override
   Widget build(BuildContext context) => Padding(
@@ -311,7 +327,8 @@ class SignupPasswordStep extends StatelessWidget {
     final colors = context.colors;
     final strength = passwordStrength(password.text);
     final plain = context.text.bodySmall.copyWith(color: colors.ink2);
-    final strong = plain.copyWith(color: colors.teal, fontWeight: FontWeight.w600);
+    final strong =
+        plain.copyWith(color: colors.teal, fontWeight: FontWeight.w600);
 
     return _blocks([
       AutofillGroup(
@@ -326,7 +343,8 @@ class SignupPasswordStep extends StatelessWidget {
             obscureText: hidePassword,
             textInputAction: TextInputAction.next,
             autofillHints: const [AutofillHints.newPassword],
-            trailing: PasswordEye(hidden: hidePassword, onTap: onTogglePassword),
+            trailing:
+                PasswordEye(hidden: hidePassword, onTap: onTogglePassword),
             onChanged: onPasswordChanged,
             onSubmitted: (_) => confirmationFocus.requestFocus(),
           ),
@@ -341,14 +359,16 @@ class SignupPasswordStep extends StatelessWidget {
             obscureText: hideConfirmation,
             textInputAction: TextInputAction.done,
             autofillHints: const [AutofillHints.newPassword],
-            trailing: PasswordEye(hidden: hideConfirmation, onTap: onToggleConfirmation),
+            trailing: PasswordEye(
+                hidden: hideConfirmation, onTap: onToggleConfirmation),
             onChanged: onConfirmationChanged,
             onSubmitted: (_) => onDone(),
           ),
         ]),
       ),
       // Judging an empty field as "weak" only scolds the student.
-      if (password.text.isNotEmpty) StrengthMeter(level: strength.level, label: strength.label),
+      if (password.text.isNotEmpty)
+        StrengthMeter(level: strength.level, label: strength.label),
       Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
