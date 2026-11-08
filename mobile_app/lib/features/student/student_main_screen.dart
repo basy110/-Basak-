@@ -31,7 +31,8 @@ class StudentMainScreen extends ConsumerStatefulWidget {
   ConsumerState<StudentMainScreen> createState() => _StudentMainScreenState();
 }
 
-class _StudentMainScreenState extends ConsumerState<StudentMainScreen> implements NotificationShell {
+class _StudentMainScreenState extends ConsumerState<StudentMainScreen>
+    implements NotificationShell {
   int _currentIndex = 0;
   bool _navCollapsed = false;
 
@@ -73,10 +74,12 @@ class _StudentMainScreenState extends ConsumerState<StudentMainScreen> implement
   }
 
   @override
-  Set<NotificationDestination> get destinations => NotificationDestination.values.toSet();
+  Set<NotificationDestination> get destinations =>
+      NotificationDestination.values.toSet();
 
   @override
-  void showDestination(NotificationDestination destination, NotificationIntent intent) {
+  void showDestination(
+      NotificationDestination destination, NotificationIntent intent) {
     if (!mounted) return;
     // Whatever was open on top (a sheet, the purchase flow) makes way.
     Navigator.of(context).popUntil((route) => route.isFirst);
@@ -85,7 +88,8 @@ class _StudentMainScreenState extends ConsumerState<StudentMainScreen> implement
         _selectTab(0);
       case NotificationDestination.subscription:
         // The subscriptions tab opens the card the notification is about.
-        ref.read(focusedSubscriptionProvider.notifier).state = intent.subscriptionId;
+        ref.read(focusedSubscriptionProvider.notifier).state =
+            intent.subscriptionId;
         _selectTab(1);
       case NotificationDestination.card:
         _selectTab(2);
@@ -152,10 +156,7 @@ class _StudentMainScreenState extends ConsumerState<StudentMainScreen> implement
   }
 
   bool _onScroll(ScrollNotification notification) {
-    final collapse = FloatingGlassNavBar.collapseOnScroll(notification);
-    if (collapse != null && collapse != _navCollapsed) {
-      setState(() => _navCollapsed = collapse);
-    }
+    // Keep the complete navigation bar visible while a tab scrolls.
     return false;
   }
 

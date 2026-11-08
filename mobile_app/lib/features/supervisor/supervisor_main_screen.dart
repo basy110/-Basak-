@@ -32,7 +32,8 @@ class SupervisorMainScreen extends ConsumerStatefulWidget {
   static const homeTab = 0, tripsTab = 1, scanTab = 2, accountTab = 3;
 
   @override
-  ConsumerState<SupervisorMainScreen> createState() => _SupervisorMainScreenState();
+  ConsumerState<SupervisorMainScreen> createState() =>
+      _SupervisorMainScreenState();
 }
 
 class _SupervisorMainScreenState extends ConsumerState<SupervisorMainScreen>
@@ -74,7 +75,8 @@ class _SupervisorMainScreenState extends ConsumerState<SupervisorMainScreen>
       const {NotificationDestination.home, NotificationDestination.center};
 
   @override
-  void showDestination(NotificationDestination destination, NotificationIntent intent) {
+  void showDestination(
+      NotificationDestination destination, NotificationIntent intent) {
     if (!mounted) return;
     Navigator.of(context).popUntil((route) => route.isFirst);
     if (destination == NotificationDestination.home) {
@@ -93,7 +95,8 @@ class _SupervisorMainScreenState extends ConsumerState<SupervisorMainScreen>
   /// A tab chosen on the bar. Trips opened this way is about today; a trip of
   /// tomorrow is only ever opened from Home's card of tomorrow.
   void _selectTab(int index) {
-    if (index == SupervisorMainScreen.tripsTab) ref.read(supervisorTripDayProvider.notifier).state = null;
+    if (index == SupervisorMainScreen.tripsTab)
+      ref.read(supervisorTripDayProvider.notifier).state = null;
     _show(index);
   }
 
@@ -107,25 +110,22 @@ class _SupervisorMainScreenState extends ConsumerState<SupervisorMainScreen>
   }
 
   bool _onScroll(ScrollNotification notification) {
-    final collapse = FloatingGlassNavBar.collapseOnScroll(notification);
-    if (collapse != null && collapse != _navCollapsed) {
-      setState(() => _navCollapsed = collapse);
-    }
+    // Keep the complete navigation bar visible while a tab scrolls.
     return false;
   }
 
   @override
   Widget build(BuildContext context) {
     // One blocking screen for the whole app, not a card on Home.
-    final suspended =
-        ref.watch(supervisorDashboardProvider.select((d) => d.valueOrNull?.profile.isActive == false));
+    final suspended = ref.watch(supervisorDashboardProvider
+        .select((d) => d.valueOrNull?.profile.isActive == false));
     if (suspended) return const SupervisorSuspendedScreen();
 
     // Only the tab in front is built: the camera never runs behind another
     // tab. What a tab chose is kept in providers, not in the tab.
     final screen = switch (_currentIndex) {
-      SupervisorMainScreen.homeTab =>
-        SupervisorHomeScreen(onOpenTrips: () => _show(SupervisorMainScreen.tripsTab)),
+      SupervisorMainScreen.homeTab => SupervisorHomeScreen(
+          onOpenTrips: () => _show(SupervisorMainScreen.tripsTab)),
       SupervisorMainScreen.tripsTab => const SupervisorTripsScreen(),
       SupervisorMainScreen.scanTab => const SupervisorQrScannerScreen(),
       _ => const SupervisorProfileScreen(),
@@ -138,9 +138,12 @@ class _SupervisorMainScreenState extends ConsumerState<SupervisorMainScreen>
         // Home places the strip itself, under its header, and the scanner says
         // it on the camera; over the other tabs it takes the top of the screen.
         child: ConnectionStripHost(
-          enabled: _currentIndex == SupervisorMainScreen.tripsTab || _currentIndex == SupervisorMainScreen.accountTab,
+          enabled: _currentIndex == SupervisorMainScreen.tripsTab ||
+              _currentIndex == SupervisorMainScreen.accountTab,
           onRetry: _retryConnection,
-          note: _currentIndex == SupervisorMainScreen.tripsTab ? 'المسح لا يسجّل الصعود الآن' : null,
+          note: _currentIndex == SupervisorMainScreen.tripsTab
+              ? 'المسح لا يسجّل الصعود الآن'
+              : null,
           child: AnimatedSwitcher(
             duration: BasakMotion.fade,
             switchInCurve: BasakMotion.fadeCurve,
@@ -173,10 +176,16 @@ class SupervisorSuspendedScreen extends ConsumerWidget {
         maxScaleFactor: basakMaxTextScale,
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: BasakSpace.maxContentWidth),
+            constraints:
+                const BoxConstraints(maxWidth: BasakSpace.maxContentWidth),
             child: Padding(
-              padding: EdgeInsetsDirectional.fromSTEB(BasakSpace.gutter, safe.top + BasakSpace.s24, BasakSpace.gutter,
-                  safe.bottom > 0 ? safe.bottom + BasakSpace.s8 : BasakSpace.s24),
+              padding: EdgeInsetsDirectional.fromSTEB(
+                  BasakSpace.gutter,
+                  safe.top + BasakSpace.s24,
+                  BasakSpace.gutter,
+                  safe.bottom > 0
+                      ? safe.bottom + BasakSpace.s8
+                      : BasakSpace.s24),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -187,7 +196,8 @@ class SupervisorSuspendedScreen extends ConsumerWidget {
                           icon: LucideIcons.userX,
                           tone: BasakTone.danger,
                           title: 'الحساب موقوف',
-                          message: 'أوقفت إدارة الشركة حساب المشرف. تواصل مع شركتك لإعادة تفعيله.',
+                          message:
+                              'أوقفت إدارة الشركة حساب المشرف. تواصل مع شركتك لإعادة تفعيله.',
                         ),
                       ),
                     ),
@@ -197,7 +207,8 @@ class SupervisorSuspendedScreen extends ConsumerWidget {
                     label: 'إعادة المحاولة',
                     icon: LucideIcons.refreshCw,
                     variant: BasakButtonVariant.secondary,
-                    onPressed: () => ref.invalidate(supervisorDashboardProvider),
+                    onPressed: () =>
+                        ref.invalidate(supervisorDashboardProvider),
                   ),
                   const SizedBox(height: BasakSpace.s8),
                   BasakButton(
@@ -205,7 +216,8 @@ class SupervisorSuspendedScreen extends ConsumerWidget {
                     label: 'تسجيل الخروج',
                     variant: BasakButtonVariant.danger,
                     size: BasakButtonSize.medium,
-                    onPressed: () => ref.read(authStateProvider.notifier).signOut(),
+                    onPressed: () =>
+                        ref.read(authStateProvider.notifier).signOut(),
                   ),
                 ],
               ),
